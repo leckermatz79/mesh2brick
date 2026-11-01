@@ -353,3 +353,17 @@ def test_verify_ldraw_rejects_broken_files(
     broken.write_text("0 broken\n1 4 3 -24 7 1 0 0 0 1 0 0 0 1 3001.dat\n")  # off-grid
     with pytest.raises(BackendError, match="failed the LDraw check"):
         backend.verify_ldraw(broken)
+
+
+# ------------------------------------------------------------------ palette
+def test_color_quantizer_matches_and_restricts() -> None:
+    from mesh2brick.backends.legolization import color_quantizer  # noqa: PLC0415
+
+    rgb = np.array([[201, 26, 9], [0, 0, 0], [255, 255, 255]], dtype=np.uint8)
+    assert color_quantizer()(rgb).tolist() == [4, 0, 15]
+    only_blue = color_quantizer({1, 999_999})
+    assert set(only_blue(rgb).tolist()) == {1}
+    many = np.tile(rgb, (10_000, 1))  # more than one batch
+    assert color_quantizer()(many).tolist() == [4, 0, 15] * 10_000
+    with pytest.raises(BackendError, match="palette is empty"):
+        color_quantizer({999_999})

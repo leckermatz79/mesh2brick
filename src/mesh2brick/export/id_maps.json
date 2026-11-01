@@ -1,5 +1,5 @@
 {
- "schema": 1,
+ "schema": 2,
  "generated": "2026-11-01",
  "sources": {
   "ldraw": "local LDraw library (part descriptions, colour names)",
@@ -12,557 +12,1118 @@
   "0": {
    "name": "Black",
    "bricklink": 11,
-   "rebrickable": 0
+   "rebrickable": 0,
+   "usage": {
+    "parts": 849879,
+    "sets": 235259,
+    "first_year": 1957,
+    "last_year": 2027
+   }
   },
   "1": {
    "name": "Blue",
    "bricklink": 7,
-   "rebrickable": 1
+   "rebrickable": 1,
+   "usage": {
+    "parts": 209960,
+    "sets": 50599,
+    "first_year": 1949,
+    "last_year": 2027
+   }
   },
   "2": {
    "name": "Green",
    "bricklink": 6,
-   "rebrickable": 2
+   "rebrickable": 2,
+   "usage": {
+    "parts": 93146,
+    "sets": 27564,
+    "first_year": 1949,
+    "last_year": 2026
+   }
   },
   "3": {
    "name": "Dark Turquoise",
    "bricklink": 39,
-   "rebrickable": 3
+   "rebrickable": 3,
+   "usage": {
+    "parts": 24103,
+    "sets": 6494,
+    "first_year": 1990,
+    "last_year": 2026
+   }
   },
   "4": {
    "name": "Red",
    "bricklink": 5,
-   "rebrickable": 4
+   "rebrickable": 4,
+   "usage": {
+    "parts": 325810,
+    "sets": 97428,
+    "first_year": 1949,
+    "last_year": 2027
+   }
   },
   "5": {
    "name": "Dark Pink",
    "bricklink": 47,
-   "rebrickable": 5
+   "rebrickable": 5,
+   "usage": {
+    "parts": 16560,
+    "sets": 5136,
+    "first_year": 2003,
+    "last_year": 2026
+   }
   },
   "6": {
    "name": "Brown",
    "bricklink": 8,
-   "rebrickable": 6
+   "rebrickable": 6,
+   "usage": {
+    "parts": 9560,
+    "sets": 3789,
+    "first_year": 1974,
+    "last_year": 2006
+   }
   },
   "7": {
    "name": "Light Grey",
    "bricklink": 9,
-   "rebrickable": 7
+   "rebrickable": 7,
+   "usage": {
+    "parts": 92855,
+    "sets": 25190,
+    "first_year": 1954,
+    "last_year": 2007
+   }
   },
   "8": {
    "name": "Dark Grey",
    "bricklink": 10,
-   "rebrickable": 8
+   "rebrickable": 8,
+   "usage": {
+    "parts": 22453,
+    "sets": 7803,
+    "first_year": 1978,
+    "last_year": 2006
+   }
   },
   "9": {
    "name": "Light Blue",
    "bricklink": 62,
-   "rebrickable": 9
+   "rebrickable": 9,
+   "usage": {
+    "parts": 43,
+    "sets": 34,
+    "first_year": 1995,
+    "last_year": 2007
+   }
   },
   "10": {
    "name": "Bright Green",
    "bricklink": 36,
-   "rebrickable": 10
+   "rebrickable": 10,
+   "usage": {
+    "parts": 28767,
+    "sets": 8721,
+    "first_year": 1949,
+    "last_year": 2026
+   }
   },
   "11": {
    "name": "Light Turquoise",
    "bricklink": 40,
-   "rebrickable": 11
+   "rebrickable": 11,
+   "usage": {
+    "parts": 164,
+    "sets": 78,
+    "first_year": 1998,
+    "last_year": 2004
+   }
   },
   "12": {
    "name": "Salmon",
    "bricklink": 25,
-   "rebrickable": 12
+   "rebrickable": 12,
+   "usage": {
+    "parts": 186,
+    "sets": 116,
+    "first_year": 1997,
+    "last_year": 2000
+   }
   },
   "13": {
    "name": "Pink",
    "bricklink": 23,
-   "rebrickable": 13
+   "rebrickable": 13,
+   "usage": {
+    "parts": 482,
+    "sets": 249,
+    "first_year": 1994,
+    "last_year": 2005
+   }
   },
   "14": {
    "name": "Yellow",
    "bricklink": 3,
-   "rebrickable": 14
+   "rebrickable": 14,
+   "usage": {
+    "parts": 219430,
+    "sets": 73352,
+    "first_year": 1949,
+    "last_year": 2026
+   }
   },
   "15": {
    "name": "White",
    "bricklink": 1,
-   "rebrickable": 15
+   "rebrickable": 15,
+   "usage": {
+    "parts": 526312,
+    "sets": 154193,
+    "first_year": 1949,
+    "last_year": 2027
+   }
   },
   "17": {
    "name": "Light Green",
    "bricklink": 38,
-   "rebrickable": 17
+   "rebrickable": 17,
+   "usage": {
+    "parts": 166,
+    "sets": 125,
+    "first_year": 1992,
+    "last_year": 2005
+   }
   },
   "18": {
    "name": "Light Yellow",
    "bricklink": 33,
-   "rebrickable": 18
+   "rebrickable": 18,
+   "usage": {
+    "parts": 340,
+    "sets": 187,
+    "first_year": 1994,
+    "last_year": 2005
+   }
   },
   "19": {
    "name": "Tan",
    "bricklink": 2,
-   "rebrickable": 19
+   "rebrickable": 19,
+   "usage": {
+    "parts": 201919,
+    "sets": 48481,
+    "first_year": 1982,
+    "last_year": 2027
+   }
   },
   "20": {
    "name": "Light Violet",
    "bricklink": 44,
-   "rebrickable": 20
+   "rebrickable": 20,
+   "usage": {
+    "parts": 186,
+    "sets": 125,
+    "first_year": 1994,
+    "last_year": 2002
+   }
   },
   "22": {
    "name": "Purple",
    "bricklink": 24,
-   "rebrickable": 22
+   "rebrickable": 22,
+   "usage": {
+    "parts": 1005,
+    "sets": 318,
+    "first_year": 1997,
+    "last_year": 2005
+   }
   },
   "23": {
    "name": "Dark Blue Violet",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "25": {
    "name": "Orange",
    "bricklink": 4,
-   "rebrickable": 25
+   "rebrickable": 25,
+   "usage": {
+    "parts": 55886,
+    "sets": 18358,
+    "first_year": 1998,
+    "last_year": 2026
+   }
   },
   "26": {
    "name": "Magenta",
    "bricklink": 71,
-   "rebrickable": 26
+   "rebrickable": 26,
+   "usage": {
+    "parts": 14141,
+    "sets": 4886,
+    "first_year": 2000,
+    "last_year": 2026
+   }
   },
   "27": {
    "name": "Lime",
    "bricklink": 34,
-   "rebrickable": 27
+   "rebrickable": 27,
+   "usage": {
+    "parts": 46917,
+    "sets": 15253,
+    "first_year": 1998,
+    "last_year": 2026
+   }
   },
   "28": {
    "name": "Dark Tan",
    "bricklink": 69,
-   "rebrickable": 28
+   "rebrickable": 28,
+   "usage": {
+    "parts": 76670,
+    "sets": 18226,
+    "first_year": 2000,
+    "last_year": 2026
+   }
   },
   "29": {
    "name": "Bright Pink",
    "bricklink": 104,
-   "rebrickable": 29
+   "rebrickable": 29,
+   "usage": {
+    "parts": 19132,
+    "sets": 6187,
+    "first_year": 2003,
+    "last_year": 2026
+   }
   },
   "30": {
    "name": "Medium Lavender",
    "bricklink": 157,
-   "rebrickable": 30
+   "rebrickable": 30,
+   "usage": {
+    "parts": 10388,
+    "sets": 3427,
+    "first_year": 2011,
+    "last_year": 2026
+   }
   },
   "31": {
    "name": "Lavender",
    "bricklink": 154,
-   "rebrickable": 31
+   "rebrickable": 31,
+   "usage": {
+    "parts": 8906,
+    "sets": 2422,
+    "first_year": 2011,
+    "last_year": 2026
+   }
   },
   "68": {
    "name": "Very Light Orange",
    "bricklink": 96,
-   "rebrickable": 68
+   "rebrickable": 68,
+   "usage": {
+    "parts": 16,
+    "sets": 16,
+    "first_year": 2000,
+    "last_year": 2002
+   }
   },
   "69": {
    "name": "Bright Reddish Lilac",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "70": {
    "name": "Reddish Brown",
    "bricklink": 88,
-   "rebrickable": 70
+   "rebrickable": 70,
+   "usage": {
+    "parts": 183802,
+    "sets": 52008,
+    "first_year": 2003,
+    "last_year": 2026
+   }
   },
   "71": {
    "name": "Light Bluish Grey",
    "bricklink": 86,
-   "rebrickable": 71
+   "rebrickable": 71,
+   "usage": {
+    "parts": 529904,
+    "sets": 138018,
+    "first_year": 2002,
+    "last_year": 2026
+   }
   },
   "72": {
    "name": "Dark Bluish Grey",
    "bricklink": 85,
-   "rebrickable": 72
+   "rebrickable": 72,
+   "usage": {
+    "parts": 380174,
+    "sets": 106293,
+    "first_year": 1999,
+    "last_year": 2026
+   }
   },
   "73": {
    "name": "Medium Blue",
    "bricklink": 42,
-   "rebrickable": 73
+   "rebrickable": 73,
+   "usage": {
+    "parts": 13327,
+    "sets": 3514,
+    "first_year": 1997,
+    "last_year": 2026
+   }
   },
   "74": {
    "name": "Medium Green",
    "bricklink": 37,
-   "rebrickable": 74
+   "rebrickable": 74,
+   "usage": {
+    "parts": 572,
+    "sets": 309,
+    "first_year": 1994,
+    "last_year": 2005
+   }
   },
   "77": {
    "name": "Light Pink",
    "bricklink": null,
-   "rebrickable": 77
+   "rebrickable": 77,
+   "usage": {
+    "parts": 184,
+    "sets": 81,
+    "first_year": 1991,
+    "last_year": 1994
+   }
   },
   "78": {
    "name": "Light Nougat",
    "bricklink": 90,
-   "rebrickable": 78
+   "rebrickable": 78,
+   "usage": {
+    "parts": 12165,
+    "sets": 6253,
+    "first_year": 2004,
+    "last_year": 2026
+   }
   },
   "84": {
    "name": "Medium Nougat",
    "bricklink": 150,
-   "rebrickable": 84
+   "rebrickable": 84,
+   "usage": {
+    "parts": 45581,
+    "sets": 12881,
+    "first_year": 2010,
+    "last_year": 2026
+   }
   },
   "85": {
    "name": "Medium Lilac",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "86": {
    "name": "Light Brown",
    "bricklink": 91,
-   "rebrickable": 86
+   "rebrickable": 86,
+   "usage": {
+    "parts": 168,
+    "sets": 101,
+    "first_year": 2002,
+    "last_year": 2006
+   }
   },
   "89": {
    "name": "Blue Violet",
    "bricklink": 174,
-   "rebrickable": null
+   "rebrickable": 1147,
+   "usage": {
+    "parts": 891,
+    "sets": 205,
+    "first_year": 2026,
+    "last_year": 2026
+   }
   },
   "92": {
    "name": "Nougat",
    "bricklink": 28,
-   "rebrickable": 92
+   "rebrickable": 92,
+   "usage": {
+    "parts": 3109,
+    "sets": 1251,
+    "first_year": 1979,
+    "last_year": 2026
+   }
   },
   "100": {
    "name": "Light Salmon",
    "bricklink": 26,
-   "rebrickable": 100
+   "rebrickable": 100,
+   "usage": {
+    "parts": 180,
+    "sets": 111,
+    "first_year": 1997,
+    "last_year": 2002
+   }
   },
   "110": {
    "name": "Violet",
    "bricklink": 43,
-   "rebrickable": 110
+   "rebrickable": 110,
+   "usage": {
+    "parts": 191,
+    "sets": 119,
+    "first_year": 1992,
+    "last_year": 2008
+   }
   },
   "112": {
    "name": "Medium Violet",
    "bricklink": 73,
-   "rebrickable": null
+   "rebrickable": 1001,
+   "usage": {
+    "parts": 13,
+    "sets": 13,
+    "first_year": 2000,
+    "last_year": 2007
+   }
   },
   "115": {
    "name": "Medium Lime",
    "bricklink": 76,
-   "rebrickable": 115
+   "rebrickable": 115,
+   "usage": {
+    "parts": 190,
+    "sets": 104,
+    "first_year": 1998,
+    "last_year": 2005
+   }
   },
   "118": {
    "name": "Aqua",
    "bricklink": 41,
-   "rebrickable": 118
+   "rebrickable": 118,
+   "usage": {
+    "parts": 322,
+    "sets": 130,
+    "first_year": 1998,
+    "last_year": 2006
+   }
   },
   "120": {
    "name": "Light Lime",
    "bricklink": 35,
-   "rebrickable": 120
+   "rebrickable": 120,
+   "usage": {
+    "parts": 29,
+    "sets": 21,
+    "first_year": 1998,
+    "last_year": 2008
+   }
   },
   "121": {
    "name": "Light Orange",
    "bricklink": 32,
-   "rebrickable": null
+   "rebrickable": 125,
+   "usage": {
+    "parts": 66,
+    "sets": 46,
+    "first_year": 1998,
+    "last_year": 2004
+   }
   },
   "123": {
    "name": "Dark Salmon",
    "bricklink": 231,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "125": {
    "name": "Spud Orange",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "128": {
    "name": "Dark Nougat",
    "bricklink": 225,
-   "rebrickable": null
+   "rebrickable": 1067,
+   "usage": {
+    "parts": 10,
+    "sets": 10,
+    "first_year": 2001,
+    "last_year": 2004
+   }
   },
   "134": {
    "name": "Copper",
    "bricklink": 84,
-   "rebrickable": 134
+   "rebrickable": 134,
+   "usage": {
+    "parts": 186,
+    "sets": 43,
+    "first_year": 2002,
+    "last_year": 2008
+   }
   },
   "151": {
    "name": "Very Light Bluish Grey",
    "bricklink": 99,
-   "rebrickable": 151
+   "rebrickable": 151,
+   "usage": {
+    "parts": 285,
+    "sets": 154,
+    "first_year": 2004,
+    "last_year": 2013
+   }
   },
   "180": {
    "name": "Dark Yellow",
    "bricklink": 161,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "189": {
    "name": "Reddish Gold",
    "bricklink": 235,
-   "rebrickable": null
+   "rebrickable": 1065,
+   "usage": {
+    "parts": 85,
+    "sets": 70,
+    "first_year": 2002,
+    "last_year": 2006
+   }
   },
   "191": {
    "name": "Bright Light Orange",
    "bricklink": 110,
-   "rebrickable": 191
+   "rebrickable": 191,
+   "usage": {
+    "parts": 30872,
+    "sets": 10276,
+    "first_year": 2003,
+    "last_year": 2026
+   }
   },
   "212": {
    "name": "Bright Light Blue",
    "bricklink": 105,
-   "rebrickable": 212
+   "rebrickable": 212,
+   "usage": {
+    "parts": 9944,
+    "sets": 2991,
+    "first_year": 2004,
+    "last_year": 2026
+   }
   },
   "213": {
    "name": "Medium Blue Violet",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "216": {
    "name": "Rust",
    "bricklink": 27,
-   "rebrickable": 216
+   "rebrickable": 216,
+   "usage": {
+    "parts": 31,
+    "sets": 17,
+    "first_year": 1989,
+    "last_year": 2001
+   }
   },
   "218": {
    "name": "Reddish Lilac",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": 1007,
+   "usage": {
+    "parts": 50,
+    "sets": 23,
+    "first_year": 2004,
+    "last_year": 2007
+   }
   },
   "219": {
    "name": "Lilac",
    "bricklink": 245,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "220": {
    "name": "Light Lilac",
    "bricklink": 246,
-   "rebrickable": null
+   "rebrickable": 1093,
+   "usage": {
+    "parts": 51,
+    "sets": 19,
+    "first_year": 2003,
+    "last_year": 2011
+   }
   },
   "225": {
    "name": "Warm Yellowish Orange",
    "bricklink": 172,
-   "rebrickable": null
+   "rebrickable": 1091,
+   "usage": {
+    "parts": 19,
+    "sets": 19,
+    "first_year": 2004,
+    "last_year": 2004
+   }
   },
   "226": {
    "name": "Bright Light Yellow",
    "bricklink": 103,
-   "rebrickable": 226
+   "rebrickable": 226,
+   "usage": {
+    "parts": 12522,
+    "sets": 4006,
+    "first_year": 2004,
+    "last_year": 2026
+   }
   },
   "232": {
    "name": "Sky Blue",
    "bricklink": 87,
-   "rebrickable": 232
+   "rebrickable": 232,
+   "usage": {
+    "parts": 131,
+    "sets": 62,
+    "first_year": 2003,
+    "last_year": 2007
+   }
   },
   "272": {
    "name": "Dark Blue",
    "bricklink": 63,
-   "rebrickable": 272
+   "rebrickable": 272,
+   "usage": {
+    "parts": 55035,
+    "sets": 15855,
+    "first_year": 1999,
+    "last_year": 2027
+   }
   },
   "288": {
    "name": "Dark Green",
    "bricklink": 80,
-   "rebrickable": 288
+   "rebrickable": 288,
+   "usage": {
+    "parts": 28217,
+    "sets": 6715,
+    "first_year": 1999,
+    "last_year": 2026
+   }
   },
   "295": {
    "name": "Flamingo Pink",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "296": {
    "name": "Cool Silver",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "308": {
    "name": "Dark Brown",
    "bricklink": 120,
-   "rebrickable": 308
+   "rebrickable": 308,
+   "usage": {
+    "parts": 25643,
+    "sets": 7207,
+    "first_year": 2007,
+    "last_year": 2026
+   }
   },
   "313": {
    "name": "Maersk Blue",
    "bricklink": 72,
-   "rebrickable": 313
+   "rebrickable": 313,
+   "usage": {
+    "parts": 469,
+    "sets": 101,
+    "first_year": 1974,
+    "last_year": 2006
+   }
   },
   "315": {
    "name": "Flat Silver",
    "bricklink": 95,
-   "rebrickable": null
+   "rebrickable": 179,
+   "usage": {
+    "parts": 23421,
+    "sets": 8883,
+    "first_year": 2009,
+    "last_year": 2026
+   }
   },
   "320": {
    "name": "Dark Red",
    "bricklink": 59,
-   "rebrickable": 320
+   "rebrickable": 320,
+   "usage": {
+    "parts": 51208,
+    "sets": 13116,
+    "first_year": 2001,
+    "last_year": 2026
+   }
   },
   "321": {
    "name": "Dark Azure",
    "bricklink": 153,
-   "rebrickable": 321
+   "rebrickable": 321,
+   "usage": {
+    "parts": 17774,
+    "sets": 5990,
+    "first_year": 2011,
+    "last_year": 2027
+   }
   },
   "322": {
    "name": "Medium Azure",
    "bricklink": 156,
-   "rebrickable": 322
+   "rebrickable": 322,
+   "usage": {
+    "parts": 31709,
+    "sets": 10870,
+    "first_year": 2012,
+    "last_year": 2026
+   }
   },
   "323": {
    "name": "Light Aqua",
    "bricklink": 152,
-   "rebrickable": 323
+   "rebrickable": 323,
+   "usage": {
+    "parts": 10831,
+    "sets": 3134,
+    "first_year": 2011,
+    "last_year": 2026
+   }
   },
   "326": {
    "name": "Yellowish Green",
    "bricklink": 158,
-   "rebrickable": null
+   "rebrickable": 158,
+   "usage": {
+    "parts": 3970,
+    "sets": 1154,
+    "first_year": 2006,
+    "last_year": 2026
+   }
   },
   "330": {
    "name": "Olive Green",
    "bricklink": 155,
-   "rebrickable": null
+   "rebrickable": 326,
+   "usage": {
+    "parts": 12245,
+    "sets": 2672,
+    "first_year": 2010,
+    "last_year": 2026
+   }
   },
   "332": {
    "name": "Fluorescent Red Ink",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "333": {
    "name": "Fluorescent Green Ink",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "335": {
    "name": "Sand Red",
    "bricklink": 58,
-   "rebrickable": 335
+   "rebrickable": 335,
+   "usage": {
+    "parts": 603,
+    "sets": 51,
+    "first_year": 2001,
+    "last_year": 2004
+   }
   },
   "342": {
    "name": "Conductive Black",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "346": {
    "name": "Reddish Copper",
    "bricklink": 249,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "351": {
    "name": "Medium Dark Pink",
    "bricklink": 94,
-   "rebrickable": 351
+   "rebrickable": 351,
+   "usage": {
+    "parts": 1093,
+    "sets": 575,
+    "first_year": 1994,
+    "last_year": 2005
+   }
   },
   "353": {
    "name": "Coral",
    "bricklink": 220,
-   "rebrickable": null
+   "rebrickable": 1050,
+   "usage": {
+    "parts": 7921,
+    "sets": 1889,
+    "first_year": 2019,
+    "last_year": 2026
+   }
   },
   "366": {
    "name": "Earth Orange",
    "bricklink": 29,
-   "rebrickable": 366
+   "rebrickable": 366,
+   "usage": {
+    "parts": 170,
+    "sets": 132,
+    "first_year": 1982,
+    "last_year": 2005
+   }
   },
   "368": {
    "name": "Neon Yellow",
    "bricklink": 236,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "370": {
    "name": "Medium Brown",
    "bricklink": 240,
-   "rebrickable": null
+   "rebrickable": 1088,
+   "usage": {
+    "parts": 230,
+    "sets": 227,
+    "first_year": 2001,
+    "last_year": 2026
+   }
   },
   "371": {
    "name": "Medium Tan",
    "bricklink": 241,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "373": {
    "name": "Sand Purple",
    "bricklink": 54,
-   "rebrickable": 373
+   "rebrickable": 373,
+   "usage": {
+    "parts": 73,
+    "sets": 21,
+    "first_year": 2001,
+    "last_year": 2003
+   }
   },
   "378": {
    "name": "Sand Green",
    "bricklink": 48,
-   "rebrickable": 378
+   "rebrickable": 378,
+   "usage": {
+    "parts": 26378,
+    "sets": 5475,
+    "first_year": 2000,
+    "last_year": 2026
+   }
   },
   "379": {
    "name": "Sand Blue",
    "bricklink": 55,
-   "rebrickable": 379
+   "rebrickable": 379,
+   "usage": {
+    "parts": 11049,
+    "sets": 2966,
+    "first_year": 2001,
+    "last_year": 2026
+   }
   },
   "402": {
    "name": "Reddish Orange",
    "bricklink": 167,
-   "rebrickable": null
+   "rebrickable": 1136,
+   "usage": {
+    "parts": 3873,
+    "sets": 919,
+    "first_year": 2001,
+    "last_year": 2026
+   }
   },
   "422": {
    "name": "Sienna Brown",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": 1137,
+   "usage": {
+    "parts": 66,
+    "sets": 65,
+    "first_year": 2024,
+    "last_year": 2026
+   }
   },
   "423": {
    "name": "Umber Brown",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": 1138,
+   "usage": {
+    "parts": 20,
+    "sets": 20,
+    "first_year": 2001,
+    "last_year": 2026
+   }
   },
   "424": {
    "name": "Ochre Yellow",
    "bricklink": 173,
-   "rebrickable": null
+   "rebrickable": 1145,
+   "usage": {
+    "parts": 16,
+    "sets": 15,
+    "first_year": 2025,
+    "last_year": 2026
+   }
   },
   "430": {
    "name": "Warm Pink",
    "bricklink": 175,
-   "rebrickable": null
+   "rebrickable": 1146,
+   "usage": {
+    "parts": 428,
+    "sets": 74,
+    "first_year": 2026,
+    "last_year": 2026
+   }
   },
   "431": {
    "name": "Bright Blue Violet",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "450": {
    "name": "Fabuland Brown",
    "bricklink": 106,
-   "rebrickable": 450
+   "rebrickable": 450,
+   "usage": {
+    "parts": 56,
+    "sets": 44,
+    "first_year": 1979,
+    "last_year": 1991
+   }
   },
   "462": {
    "name": "Medium Orange",
    "bricklink": 31,
-   "rebrickable": 462
+   "rebrickable": 462,
+   "usage": {
+    "parts": 491,
+    "sets": 281,
+    "first_year": 1997,
+    "last_year": 2007
+   }
   },
   "484": {
    "name": "Dark Orange",
    "bricklink": 68,
-   "rebrickable": 484
+   "rebrickable": 484,
+   "usage": {
+    "parts": 29746,
+    "sets": 8645,
+    "first_year": 1994,
+    "last_year": 2026
+   }
   },
   "503": {
    "name": "Very Light Grey",
    "bricklink": 49,
-   "rebrickable": 503
+   "rebrickable": 503,
+   "usage": {
+    "parts": 261,
+    "sets": 51,
+    "first_year": 1997,
+    "last_year": 2004
+   }
   },
   "507": {
    "name": "Obsolete Light Orange Brown",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "508": {
    "name": "Fabuland Red",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": 1064,
+   "usage": {
+    "parts": 23,
+    "sets": 16,
+    "first_year": 1979,
+    "last_year": 1994
+   }
   },
   "509": {
    "name": "Fabuland Orange",
    "bricklink": 160,
-   "rebrickable": null
+   "rebrickable": 1012,
+   "usage": {
+    "parts": 5,
+    "sets": 3,
+    "first_year": 1983,
+    "last_year": 1987
+   }
   },
   "510": {
    "name": "Fabuland Lime",
    "bricklink": 248,
-   "rebrickable": null
+   "rebrickable": 1077,
+   "usage": {
+    "parts": 16,
+    "sets": 15,
+    "first_year": 1982,
+    "last_year": 1986
+   }
   },
   "10015": {
    "name": "Lemon",
    "bricklink": 171,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "10017": {
    "name": "Rose Pink",
    "bricklink": 56,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   },
   "10022": {
    "name": "Yellowish Dark Pink",
    "bricklink": null,
-   "rebrickable": null
+   "rebrickable": null,
+   "usage": null
   }
  },
  "parts": {

@@ -6,6 +6,37 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-01 - Phase 3: STEP and colours
+
+### Added
+- STEP import (`.step`/`.stp`) through the optional extra `step` (cascadio/OpenCASCADE,
+  ADR 0007): assemblies, solids and colours; `input.step_tolerance_mm` (0.05 mm) sets the
+  tessellation tolerance in millimetres whatever the file unit is.
+- `input.multi_body` (`union`/`error`) for files with several bodies, for every format.
+- Colours from the model (ADR 0008): `color.mode` `cad`, `vertex`, `texture` and the new
+  default `auto`. Sources: 3MF base materials and colour groups, Bambu Studio/Orca and
+  PrusaSlicer filament assignments, STEP colours, OBJ/glTF materials and textures (glTF
+  tint in linear light), PLY/OBJ vertex colours. Only the visible outer surface votes
+  (rays along x, y and z, union boundary), each cell takes the majority colour, thin
+  coatings colour the cell behind them, the rest copies the nearest coloured cell.
+- `color.palette` `common` (new default: ~40 colours LEGO currently makes in many parts,
+  from Rebrickable's statistics), `solid`, `all`; matching uses legolization's metric.
+- 3MF: slicer modifier, negative and support-helper volumes are no longer read as geometry;
+  painted colours and 3MF textures are reported as not supported yet.
+- Fixtures: `cube_10mm.step`, `two_bodies.step` (own AP214 writer in
+  `scripts/make_fixtures.py`), `toadstool.obj`, `vertex_colors.ply`, `textured_cube.obj`.
+
+### Changed
+- Mesh parts are merged as plain geometry (colours tracked separately), so UV seams no
+  longer keep meshes open; models made of touching closed parts use the exact volume method.
+- `id_maps.json` (schema 2): Rebrickable colour numbers also by exact name (90 instead of
+  69 colours confirmed), plus Rebrickable usage statistics per colour.
+- Optional extra `step`: cascadio replaces the cadquery placeholder.
+- CI installs the `step` extra; STEP tests must not skip there.
+
+### Fixed
+- ADR 0005 overstated the confirmed colours (93 for BrickLink, not for both catalogues).
+
 ## [0.2.0] - 2026-11-01 - Phase 2: end-to-end MVP
 
 ### Added

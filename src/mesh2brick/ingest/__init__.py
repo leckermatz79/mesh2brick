@@ -3,8 +3,9 @@
 """Input formats -> normalised mesh (z up, millimetres, outward normals).
 
 ``load_model(path, settings.input)`` picks a loader by file suffix:
-STL/OBJ/PLY via trimesh, 3MF via our own reader (core + production
-extension). STEP (Phase 3) and ``.blend`` (Phase 8) will register here too.
+STL/OBJ/PLY via trimesh, 3MF via our own reader (core, materials, production
+extension, slicer colours), STEP via cascadio (optional ``step`` extra).
+``.blend`` (Phase 8) will register here too.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from mesh2brick.ingest.base import (
 )
 from mesh2brick.ingest.mesh_formats import TrimeshLoader
 from mesh2brick.ingest.normalize import normalize
+from mesh2brick.ingest.step import StepLoader
 from mesh2brick.ingest.threemf import ThreeMFLoader
 
 if TYPE_CHECKING:
@@ -31,6 +33,7 @@ if TYPE_CHECKING:
 
 register(TrimeshLoader())
 register(ThreeMFLoader())
+register(StepLoader())
 
 
 def load_model(path: Path, config: InputConfig) -> MeshModel:
@@ -42,7 +45,7 @@ def load_model(path: Path, config: InputConfig) -> MeshModel:
     if not path.is_file():
         msg = f"input file not found: {path}"
         raise IngestError(msg)
-    raw = loader_for(path).load(path)
+    raw = loader_for(path).load(path, config)
     return normalize(raw, config, source=path)
 
 

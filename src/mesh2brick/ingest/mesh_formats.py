@@ -18,13 +18,19 @@ from mesh2brick.ingest.base import IngestError, RawModel
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from mesh2brick.config import InputConfig
+
 
 class TrimeshLoader:
     """Loader for ``.stl``, ``.obj`` and ``.ply``."""
 
     suffixes: frozenset[str] = frozenset({".stl", ".obj", ".ply"})
 
-    def load(self, path: Path) -> RawModel:
+    def load(
+        self,
+        path: Path,
+        config: InputConfig | None = None,  # noqa: ARG002 - no options yet
+    ) -> RawModel:
         """Read all geometry of the file as one or more parts (millimetres assumed).
 
         Raises:

@@ -28,7 +28,6 @@ surface sampling plus hole filling (``method="surface"``).
 
 from __future__ import annotations
 
-import itertools
 import math
 import time
 from dataclasses import dataclass
@@ -38,7 +37,7 @@ import numpy as np
 import trimesh
 from scipy import ndimage
 
-from mesh2brick.voxel.color import apply_colors
+from mesh2brick.voxel.color import apply_colors, model_colors
 from mesh2brick.voxel.grid import (
     EMPTY,
     LDU_PER_PLATE,
@@ -46,22 +45,18 @@ from mesh2brick.voxel.grid import (
     PLATES_PER_UNIT,
     VoxelGrid,
 )
+from mesh2brick.voxel.rays import JITTER, ray_hits
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from mesh2brick.config import Settings
     from mesh2brick.ingest.base import MeshModel
+    from mesh2brick.voxel.color import ColorQuantizer
     from mesh2brick.voxel.grid import HeightUnit
 
 DEFAULT_SAMPLES: Final = 4
 """Rays per stud and axis (4 x 4 = 16 rays per cell column)."""
-_PAIR_CHUNK: Final = 4_000_000
-"""Max (triangle, ray) candidate pairs held in memory at once."""
-# Rays sit a hair off the regular sample positions so they (almost surely)
-# never hit an edge or vertex exactly, which would double-count a crossing.
-_JITTER: Final = (1.234567e-6, 2.345678e-6)
-_MIN_AREA: Final = 1e-12
 _SURFACE_SAMPLES_PER_RAY: Final = 4
 _MAX_SURFACE_SAMPLES: Final = 5_000_000
 _FACES: Final = ndimage.generate_binary_structure(3, 1)
@@ -117,12 +112,23 @@ class VoxelizeResult:
 
 
 # --------------------------------------------------------------------------- API
-def voxelize(model: MeshModel, settings: Settings) -> VoxelizeResult:
+def voxelize(
+    model: MeshModel,
+    settings: Settings,
+    *,
+    quantize: ColorQuantizer | None = None,
+) -> VoxelizeResult:
     """Voxelize a normalised model according to ``settings`` (solid grid).
 
     Hollowing is *not* applied here: the placement backend hollows the solid
     grid itself so it can restore material where stability needs it (ADR 0004).
     Use :func:`hollow` for previews and statistics.
+
+    Args:
+        model: the normalised mesh.
+        settings: voxel, scale and colour settings.
+        quantize: matches model colours to LDraw codes; needed only when
+            ``color.mode`` takes colours from a model that has some.
     """
     started = time.perf_counter()
     mesh = model.mesh
@@ -142,13 +148,25 @@ def voxelize(model: MeshModel, settings: Settings) -> VoxelizeResult:
         occupancy, min_fraction=settings.voxel.min_island_fraction
     )
     warnings.extend(island_notes)
-    occupancy, origin = _crop(occupancy, lattice)
+    # Model colours use the full lattice: surface points in empty border cells
+    # (details too thin to fill a cell) still colour their filled neighbours.
+    full_color, color_notes = model_colors(
+        occupancy, lattice, model, settings.color, quantize
+    )
+    warnings.extend(color_notes)
+    box = _crop_box(occupancy)
+    origin = _box_origin(box, lattice)
+    occupancy = np.ascontiguousarray(occupancy[box])
+    color = (
+        apply_colors(occupancy, settings.color)  # bands follow the cropped height
+        if settings.color.mode == "height_bands"
+        else np.ascontiguousarray(full_color[box])
+    )
     if not occupancy.any():
         warnings.append(
             "no voxel reached the fill threshold; the model is too small or thin "
             "for this scale (increase input.target_studs or lower voxel.threshold)"
         )
-    color = apply_colors(occupancy, settings.color)
     grid = VoxelGrid(
         occupancy=occupancy,
         color=color,
@@ -235,43 +253,17 @@ def fill_fractions(
     step = lattice.pitch / samples
     ox, oy, oz = lattice.origin
     # Ray (i, j) sits at u = i, v = j in these coordinates.
-    u = (triangles[:, :, 0] - ox) / step - 0.5 - _JITTER[0]
-    v = (triangles[:, :, 1] - oy) / step - 0.5 - _JITTER[1]
+    u = (triangles[:, :, 0] - ox) / step - 0.5 - JITTER[0]
+    v = (triangles[:, :, 1] - oy) / step - 0.5 - JITTER[1]
     w = (triangles[:, :, 2] - oz) / lattice.cell_height
-    area = (u[:, 1] - u[:, 0]) * (v[:, 2] - v[:, 0]) - (u[:, 2] - u[:, 0]) * (
-        v[:, 1] - v[:, 0]
-    )
-    keep = np.abs(area) > _MIN_AREA  # vertical faces are never crossed
-    u, v, w, area = u[keep], v[keep], w[keep], area[keep]
-    i0 = np.clip(np.ceil(u.min(axis=1)), 0, nu).astype(np.int64)
-    i1 = np.clip(np.floor(u.max(axis=1)), -1, nu - 1).astype(np.int64)
-    j0 = np.clip(np.ceil(v.min(axis=1)), 0, nv).astype(np.int64)
-    j1 = np.clip(np.floor(v.max(axis=1)), -1, nv - 1).astype(np.int64)
-    width_j = np.maximum(j1 - j0 + 1, 0)
-    counts = np.maximum(i1 - i0 + 1, 0) * width_j
-
     columns: list[NDArray[np.int64]] = []
     heights: list[NDArray[np.float64]] = []
     signs: list[NDArray[np.int8]] = []
-    for chunk in _chunks(counts, _PAIR_CHUNK):
-        if not counts[chunk].sum():
-            continue
-        tri = np.repeat(np.arange(chunk.start, chunk.stop), counts[chunk])
-        first = np.cumsum(counts[chunk]) - counts[chunk]
-        local = np.arange(len(tri)) - np.repeat(first, counts[chunk])
-        ray_i = i0[tri] + local // width_j[tri]
-        ray_j = j0[tri] + local % width_j[tri]
-        du = ray_i - u[tri, 0]
-        dv = ray_j - v[tri, 0]
-        b1 = (du * (v[tri, 2] - v[tri, 0]) - (u[tri, 2] - u[tri, 0]) * dv) / area[tri]
-        b2 = ((u[tri, 1] - u[tri, 0]) * dv - du * (v[tri, 1] - v[tri, 0])) / area[tri]
-        b0 = 1.0 - b1 - b2
-        hit = (b0 >= 0) & (b1 >= 0) & (b2 >= 0)
-        tri, b0, b1, b2 = tri[hit], b0[hit], b1[hit], b2[hit]
-        columns.append(ray_i[hit] * nv + ray_j[hit])
-        heights.append(b0 * w[tri, 0] + b1 * w[tri, 1] + b2 * w[tri, 2])
-        # Counter-clockwise from above = normal points up = the ray leaves.
-        signs.append(np.where(area[tri] > 0, -1, 1).astype(np.int8))
+    for hits in ray_hits(u, v, nu, nv):
+        tri = hits.triangle
+        columns.append(hits.ray_i * nv + hits.ray_j)
+        heights.append(np.einsum("ij,ij->i", hits.bary, w[tri]))
+        signs.append(hits.sign)
 
     filled = np.zeros(nu * nv * nz, dtype=np.float64)
     if columns:
@@ -411,33 +403,26 @@ def hollow(grid: VoxelGrid, wall_thickness: int) -> VoxelGrid:
 
 
 # --------------------------------------------------------------------------- helpers
-def _chunks(counts: NDArray[np.int64], budget: int) -> list[slice]:
-    """Split triangle indices so each chunk has at most ~``budget`` pairs."""
-    if not len(counts):
-        return []
-    total = np.cumsum(counts)
-    bounds = [0]
-    while bounds[-1] < len(counts):
-        start = bounds[-1]
-        offset = total[start - 1] if start else 0
-        stop = int(np.searchsorted(total, offset + budget, side="right"))
-        bounds.append(max(stop, start + 1))
-    return [slice(a, b) for a, b in itertools.pairwise(bounds)]
-
-
-def _crop(
-    occupancy: NDArray[np.bool_], lattice: Lattice
-) -> tuple[NDArray[np.bool_], tuple[float, float, float]]:
-    """Drop empty border cells; return the cropped mask and its new origin."""
+def _crop_box(occupancy: NDArray[np.bool_]) -> tuple[slice, slice, slice]:
+    """Index box without empty border cells (one corner cell if all empty)."""
     if not occupancy.any():
-        return np.zeros((1, 1, 1), dtype=bool), lattice.origin
+        return (slice(0, 1), slice(0, 1), slice(0, 1))
     filled = np.argwhere(occupancy)
     low, high = filled.min(axis=0), filled.max(axis=0) + 1
-    cropped = occupancy[low[0] : high[0], low[1] : high[1], low[2] : high[2]]
-    ox, oy, oz = lattice.origin
-    origin = (
-        ox + low[0] * lattice.pitch,
-        oy + low[1] * lattice.pitch,
-        oz + low[2] * lattice.cell_height,
+    return (
+        slice(int(low[0]), int(high[0])),
+        slice(int(low[1]), int(high[1])),
+        slice(int(low[2]), int(high[2])),
     )
-    return np.ascontiguousarray(cropped), origin
+
+
+def _box_origin(
+    box: tuple[slice, slice, slice], lattice: Lattice
+) -> tuple[float, float, float]:
+    """Model-space minimum corner of the first cell in ``box``."""
+    ox, oy, oz = lattice.origin
+    return (
+        ox + (box[0].start or 0) * lattice.pitch,
+        oy + (box[1].start or 0) * lattice.pitch,
+        oz + (box[2].start or 0) * lattice.cell_height,
+    )

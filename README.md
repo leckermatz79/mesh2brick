@@ -16,9 +16,9 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 2 of 8).** `mesh2brick convert` turns STL, OBJ, PLY and
-> 3MF files into an LDraw model, three parts lists and a PDF building instruction.
-> See [docs/STATUS.md](docs/STATUS.md).
+> **Status: pre-alpha (Phase 3 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
+> and STEP files into an LDraw model, three parts lists and a PDF building instruction,
+> in the model's own colours. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (development)
 
@@ -29,6 +29,7 @@ uv sync
 uv run ldraw download --yes   # once: LDraw parts library (~150 MB download)
 uv run ldraw generate --yes   # once: generate the part/colour modules
 uv run mesh2brick --help
+uv sync --extra step          # optional: STEP import (OpenCASCADE via cascadio, ~70 MB)
 ```
 
 ## Usage
@@ -47,6 +48,11 @@ uv run mesh2brick place out/bunny_lowpoly.grid.npz -o out/
 # Voxel files work too (MagicaVoxel .vox, numpy .npy)
 uv run mesh2brick place tests/fixtures/heart.vox -o out/
 
+# Colours come from the model when it has any (slicer filaments and materials in 3MF,
+# STEP colours, OBJ/glTF materials and textures, PLY vertex colours) and are matched
+# to ~40 current LEGO colours. One colour for everything instead:
+uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set color.mode=single
+
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3
 
@@ -54,7 +60,6 @@ uv run mesh2brick place model.vox --set placement.strategy=greedy --set placemen
 uv run mesh2brick render out/heart.bricks.json --step 3
 ```
 
-Planned: `mesh2brick convert model.stl` (Phase 2) runs the whole pipeline.
 All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.yaml).
 
 ## Development

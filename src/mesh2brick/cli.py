@@ -260,6 +260,7 @@ def voxelize(
     from mesh2brick.backends import BackendError  # noqa: PLC0415
     from mesh2brick.backends.legolization import color_info, color_rgb  # noqa: PLC0415
     from mesh2brick.ingest import IngestError, load_model  # noqa: PLC0415
+    from mesh2brick.pipeline import palette_for  # noqa: PLC0415
     from mesh2brick.voxel.color import colors_needed  # noqa: PLC0415
     from mesh2brick.voxel.io import save_npz, write_npy, write_vox  # noqa: PLC0415
     from mesh2brick.voxel.voxelize import hollow  # noqa: PLC0415
@@ -269,7 +270,7 @@ def voxelize(
     try:
         color_info(colors_needed(settings.color))  # fail fast on bad colours
         model = load_model(input_file, settings.input)
-        result = run_voxelize(model, settings)
+        result = run_voxelize(model, settings, quantize=palette_for(settings))
     except (IngestError, BackendError, ValueError) as error:
         _fail(str(error))
     grid, report = result.grid, result.report

@@ -15,9 +15,17 @@ from typing import TYPE_CHECKING
 from mesh2brick.backends.legolization import (
     LegolizationBackend,
     color_info,
+    color_quantizer,
     load_voxel_file,
 )
-from mesh2brick.export.bom import Bom, bom_warnings, build_bom, write_boms
+from mesh2brick.export.bom import (
+    Bom,
+    bom_warnings,
+    build_bom,
+    catalogue_colors,
+    common_colors,
+    write_boms,
+)
 from mesh2brick.ingest import load_model, supported_suffixes
 from mesh2brick.render.preview import PreviewOptions, render_preview, render_step_images
 from mesh2brick.voxel.color import colors_needed
@@ -31,6 +39,7 @@ if TYPE_CHECKING:
     from mesh2brick.backends.protocols import StabilityReport
     from mesh2brick.config import Settings
     from mesh2brick.model import BrickModel
+    from mesh2brick.voxel.color import ColorQuantizer
     from mesh2brick.voxel.grid import VoxelGrid
 
 VOXEL_SUFFIXES = (".npz", ".vox", ".npy")
@@ -162,7 +171,7 @@ def _grid(
         msg = f"unsupported input format {suffix!r}; supported: {supported}"
         raise ValueError(msg)
     model = load_model(source, settings.input)
-    result = voxelize(model, settings)
+    result = voxelize(model, settings, quantize=palette_for(settings))
     for note in (*model.warnings, *result.warnings):
         say(f"note: {note}")
     warnings.extend(result.warnings)
@@ -170,6 +179,21 @@ def _grid(
         msg = "voxelization produced no cells; increase input.target_studs"
         raise ValueError(msg)
     return result.grid
+
+
+def palette_for(settings: Settings) -> ColorQuantizer:
+    """Matcher for model colours per ``color.palette`` (ADR 0008).
+
+    ``common``: today's widely produced colours, ``solid``: every colour with
+    BrickLink and Rebrickable numbers, ``all``: every solid LDraw colour.
+    """
+    match settings.color.palette:
+        case "common":
+            return color_quantizer(common_colors())
+        case "solid":
+            return color_quantizer(catalogue_colors())
+        case _:
+            return color_quantizer()
 
 
 class _Clock:

@@ -17,9 +17,9 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 2 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY
-> und 3MF ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung. Details stehen in
-> [docs/STATUS.md](docs/STATUS.md).
+> **Stand: Vorab-Version (Phase 3 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
+> 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
+> des Modells. Details stehen in [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (Entwicklung)
 
@@ -30,6 +30,7 @@ uv sync
 uv run ldraw download --yes   # einmalig: LDraw-Teilebibliothek (~150 MB)
 uv run ldraw generate --yes   # einmalig: Teile-/Farbmodule erzeugen
 uv run mesh2brick --help
+uv sync --extra step          # optional: STEP-Import (OpenCASCADE über cascadio, ~70 MB)
 ```
 
 ## Benutzung
@@ -48,6 +49,11 @@ uv run mesh2brick place out/bunny_lowpoly.grid.npz -o out/
 # Voxeldateien gehen auch (MagicaVoxel .vox, numpy .npy)
 uv run mesh2brick place tests/fixtures/heart.vox -o out/
 
+# Farben kommen aus dem Modell, wenn es welche hat (Filamente und Materialien in 3MF,
+# STEP-Farben, OBJ/glTF-Materialien und -Texturen, PLY-Vertexfarben). Sie werden auf
+# ~40 aktuelle LEGO-Farben abgebildet. Stattdessen alles in einer Farbe:
+uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set color.mode=single
+
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
 uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placement.seed=3
 
@@ -55,9 +61,8 @@ uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placeme
 uv run mesh2brick render out/heart.bricks.json --step 3
 ```
 
-Geplant ist `mesh2brick convert modell.stl` (Phase 2), das die ganze Pipeline in einem
-Schritt ausführt. Alle Einstellungen sind in
-[examples/mesh2brick.yaml](examples/mesh2brick.yaml) beschrieben.
+Alle Einstellungen sind in [examples/mesh2brick.yaml](examples/mesh2brick.yaml)
+beschrieben.
 
 ## Entwicklung
 
