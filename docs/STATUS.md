@@ -48,8 +48,10 @@ setzt dafür keine Zeitgrenze. Was ich gemacht habe:
 
 Die 3MF-Datei aus Bambu Studio wird korrekt gelesen: 12 Teile, 2,1 Mio. Dreiecke, identisch zur STL.
 Bei 32 Noppen ergibt das 32 × 19 Noppen × 24 Bricks (25,6 × 15,2 × 23 cm), voxelisiert in 0,9 s. Die Form
-ist gut erkennbar. Das Platzieren der Steine dauert mit legolization bei dieser Größe noch sehr lange
-(Messung läuft, Ergebnis im PR). Bilder bleiben wie vereinbart lokal.
+ist gut erkennbar. Beim Platzieren der Steine steckten beide Testläufe nach 7,5 Minuten (Strategie `luo`)
+bzw. 4,5 Minuten (`greedy`) noch in der ersten Phase. legolization prüft dort immer wieder die Stabilität
+des ganzen Modells (rund 1.500 Steine). Ich habe die Läufe abgebrochen; das ist Thema 1 in Phase 2.
+Bilder bleiben wie vereinbart lokal.
 
 ## Als Nächstes (Phase 2, Issue #3)
 
