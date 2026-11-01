@@ -32,7 +32,7 @@ All are GPL-3.0-compatible.
 
 | Extra | Package | Licence | Purpose |
 |---|---|---|---|
-| `step` | cadquery ≥ 2.8 (+ cadquery-ocp / OpenCascade) | Apache-2.0 (OCCT: LGPL-2.1 with exception) | STEP import (Phase 3) |
+| `step` | cascadio 0.1.1 (pinned; bundles Open CASCADE Technology) | MIT (OCCT: LGPL-2.1-only with exception) | STEP import and tessellation (ADR 0007). Wheel 22–28 MB, installed ~70 MB. |
 | `llm` | anthropic ≥ 2.3 | MIT | Optional LLM layer (Phase 7) |
 | `blender` | – (external Blender binary, GPL-2.0-or-later, run as a separate process) | – | `.blend` import (Phase 8) |
 

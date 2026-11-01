@@ -100,3 +100,20 @@ phase is bounded by `time_budget_s`. That led to `steps.sequencing` (thorough / 
 - **Stability-checked sequencing** scales steeply with model size (11 s at 226 parts,
   ~400 s at ~1,080 parts). Up to 500 parts it is used. Above that, or when the 5-minute
   budget runs out, steps follow layer order (`steps.sequencing: auto`).
+
+## Colours from the model (Phase 3, 2026-11-01)
+
+Default settings (32 studs, `color.mode: auto`, `color.palette: common`), `mesh2brick
+convert`, two runs in parallel on the development laptop.
+
+| Model | Colour source | Colours | Parts | Steps | Buildable | Total | voxelize (incl. load) | place | PDF |
+|---|---|---:|---:|---:|---|---:|---:|---:|---:|
+| owl figure, 3MF (local) | Bambu Studio filaments, 12 parts | 5 | 1,013 | 158 | yes | 137 s | 13 s | 104 s | 20 s |
+| owl figure, single colour (Phase 2) | – | 1 | 1,077 | 171 | yes | 110 s | 11 s | 78 s | 21 s |
+| `toadstool.obj` | OBJ materials, overlapping parts | 2 | 1,240 | 184 | yes | 179 s | 0.4 s | 149 s | 30 s |
+
+The colour transfer itself (rays along three axes, vote, fill) adds about 0.6 s on the
+2.1-million-triangle owl; loading the 3MF stays at ~11 s. Colour boundaries did not raise the
+part count: the coloured owl came out with 6 % fewer parts than in one colour (the colour
+boundaries change where legolization splits and merges bricks; not investigated further).
+Both models stay well inside the 5-minute budget.

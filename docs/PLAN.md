@@ -1,4 +1,4 @@
-# Umsetzungsplan Phase 0–2
+# Umsetzungsplan Phase 0–3
 
 Stand: 2026-11-01 · Grundlage: `SPEC.md` · Fortschritt: `docs/STATUS.md`
 
@@ -75,6 +75,18 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Upstream-Kandidaten in `UPSTREAM.md` sammeln.
 - [x] Lokaler Testlauf mit Duo als erster echter Praxistest (nur lokal: nicht ins Repo, nicht in die Galerie).
 - **Abnahme:** PDF für den Hasen öffnet, Schritte vollständig, BOM-Summe = Teilezahl, `.ldr` öffnet in LDView/Studio (Screenshot in `docs/gallery/`).
+
+## Phase 3 – STEP + Farben
+
+- [x] STEP-Leser über das optionale Extra `step`: cascadio statt cadquery/OCP, gleiche OpenCASCADE-Basis, ein Drittel der Downloadgröße (ADR 0007). Toleranz in mm (`input.step_tolerance_mm`), Einheiten aus der Datei, ein Teil pro Körper.
+- [x] Mehrkörper: `input.multi_body: union | error` für alle Formate. Sich berührende, einzeln geschlossene Körper nutzen weiter die exakte Volumenmethode.
+- [x] Farbquellen pro Fläche, die Zusammenführen und Reparatur überstehen: `cad` (3MF-Materialien, Slicer-Filamente von Bambu/Orca/Prusa, STEP-Farben, OBJ/glTF-Materialien), `vertex`, `texture`.
+- [x] Farbübertragung (ADR 0008): nur die sichtbare Außenfläche zählt (Strahlen in x, y, z), Mehrheitsentscheid pro Zelle, dünne Beschichtungen färben die Zelle dahinter, Rest übernimmt die nächste Farbe. Neuer Standard `color.mode: auto`.
+- [x] Palette `common`: ~40 Farben, die LEGO heute in vielen Teilen herstellt (Rebrickable-Statistik). Kein Metallic ohne Opt-in.
+- [x] Slicer-Hilfskörper (Modifier, Negativ-Volumen) werden nicht mehr als Geometrie gelesen.
+- [x] Fixtures: STEP-Würfel und zwei farbige STEP-Körper (eigener AP214-Schreiber), Fliegenpilz (OBJ, Materialien), Vertexfarben-Kugel (PLY), Texturwürfel (OBJ).
+- [x] Duo lokal in echten Farben: unter 5 Minuten, stabil.
+- **Abnahme:** STEP-Würfel und STL-Würfel ergeben identische Gitter (Test für 3 Größen × Brick/Plate); ein farbiges OBJ-Fixture liefert ein mehrfarbiges Modell (Fliegenpilz: Rot und Weiß in Modell und Teileliste).
 
 ## Risiken und wie ich damit umgehe
 

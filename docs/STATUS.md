@@ -1,52 +1,66 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **2 – End-to-End (MVP): fertig, wartet auf Merge (PR #13)** · Nächste: **Phase 3 – STEP + Farben**
+Stand: 2026-11-01 · Aktuelle Phase: **3 – STEP + Farben: fertig, wartet auf Merge** · Nächste: **Phase 4 – Katalog und Whitelist**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
 
-`mesh2brick convert hase.stl` liefert jetzt in einem Befehl:
-- das LDraw-Modell,
-- drei Teilelisten (CSV, BrickLink, Rebrickable),
-- eine PDF-Bauanleitung.
+Modelle kommen jetzt **in ihren eigenen Farben** heraus:
+- aus Slicer-Projekten (Bambu Studio, Orca, PrusaSlicer),
+- aus CAD-Dateien,
+- aus OBJ, glTF und PLY mit Materialien, Vertexfarben oder Texturen.
 
-Der Hase hat 873 Teile, steht stabil und ist in 72 Sekunden fertig. Duo braucht 110 Sekunden statt vorher über 10 Minuten, die Zielmarke von 5 Minuten ist damit klar unterschritten.
+Zusätzlich liest mesh2brick **STEP-Dateien**. Duo wird in 137 Sekunden in Weiß, Grün, Hellgrün, Orange und Schwarz gebaut: 1.013 Teile, stabil, alle Teile in allen drei Teilelisten.
 
-| Ergebnis | PDF: Deckblatt und Schrittseite |
-|---|---|
-| ![Hase](gallery/phase2-bunny.png) | ![PDF](gallery/phase2-bunny-pdf.png) |
+| Galerie: Fliegenpilz (OBJ mit Materialien, 32 Noppen, 1.240 Teile) |
+|---|
+| ![Fliegenpilz](gallery/phase3-toadstool.png) |
 
-## Erledigt (Phase 2)
+## Erledigt (Phase 3)
 
-- **`mesh2brick convert`**: Mesh oder Voxeldatei → `.ldr`/`.mpd`, Steinmodell, Teilelisten, PDF und Vorschaubild. Jede Stufe wird mit Zeit angezeigt.
-- **Teilelisten (ADR 0005):**
-  - Formate: eigene CSV (vollständig), BrickLink-Wunschliste (XML) und Rebrickable-CSV.
-  - BrickLink und Rebrickable nummerieren teilweise anders. Beispiel: Rot ist in LDraw 4, bei BrickLink 5; aus `3070b` wird bei BrickLink `3070`.
-  - Die Übersetzungstabelle stammt aus den Katalogen selbst und ist geprüft: alle 52 Teile und 93 von 111 Farben. Die übrigen Farben sind exotisch, zum Beispiel Leuchtfarben. Sie werden gemeldet, nicht geraten.
-- **PDF:** legolizations Bauheft mit unseren eigenen Schrittbildern (LeoCAD ließ sich nicht installieren, s. u.). Pro Schritt sind die neuen Teile kräftig gefärbt, die vorherigen blass. A4/Letter nach Einstellung.
-- **Selbstkontrolle:** Jede erzeugte `.ldr` wird mit legolizations strengem LDraw-Leser wieder eingelesen. Geprüft wird, dass jedes Teil bekannt ist, auf dem Raster liegt, in einer gültigen Farbe ist und nichts sich überschneidet. Hase: 873/873, Duo: 1.077/1.077.
-- **Schneller Renderer:** Die Vorschau ist 8× schneller, 131 Schrittbilder dauern 14 s. Die Bilder werden zusätzlich verlustarm verkleinert.
-- **Fehler gefunden und behoben:**
-  - Duo hatte eine winzige lose Insel aus 2 Voxeln. Deshalb galt das ganze Modell als „nicht baubar", und legolization suchte minutenlang nach Reparaturen.
-  - Lose Inseln unter 5 % des Modells werden jetzt entfernt (`voxel.min_island_fraction`). Größere bleiben erhalten und werden gemeldet.
-- **Upstream:** Fehlerbericht [#88](https://github.com/hbmartin/legolization/issues/88) und Draft-PR [#89](https://github.com/hbmartin/legolization/pull/89) eingereicht, mit dem Hinweis auf das Vibe-Coding-Projekt. Der Link zur Beispieldatei zeigt jetzt auf `main`.
-- 307 automatische Tests, 95 % Abdeckung.
+- **STEP-Import** (`.step`, `.stp`):
+  - Über ein optionales Zusatzpaket: `uv sync --extra step`.
+  - Liest Baugruppen, Körper und Farben. Die Genauigkeit ist in Millimetern einstellbar, egal in welcher Einheit die Datei ist.
+  - Ein STEP-Würfel ergibt exakt dasselbe Gitter wie der gleiche Würfel als STL. Das war die Abnahme der SPEC.
+- **Mehrere Körper in einer Datei:** Sie werden vereinigt (Standard) oder auf Wunsch abgelehnt (`input.multi_body: error`).
+- **Farben aus dem Modell:** neuer Standard `color.mode: auto`.
+  - **3MF:** Materialfarben und die Filamentzuordnung aus Slicer-Projekten. Die Filamente gewinnen, weil sie zeigen, was wirklich gedruckt wird.
+  - **STEP:** Körper- und Flächenfarben.
+  - **OBJ, glTF und PLY:** Materialfarben, Vertexfarben und Bildtexturen.
+- **Nur sichtbare Flächen zählen:**
+  - Bei Duo stecken Teile ineinander, etwa Pupillen halb im Auge oder das Gesicht auf dem Körper. Verdeckte Flächen bestimmen deshalb keine Farbe.
+  - Dünne Beschichtungen, die keinen eigenen Stein füllen, färben den Stein dahinter.
+- **Gängige LEGO-Farben:**
+  - Modellfarben werden auf die rund 40 Farben abgebildet, die LEGO heute in vielen Teilen herstellt. Die Zahlen dazu kommen aus der Statistik von Rebrickable.
+  - Ohne diese Grenze wurde Duos Orange zu „Warm Yellowish Orange“. Diese Farbe gab es 2004 in 19 Teilen, man bekäme sie kaum.
+  - Metallic-Töne gibt es nur auf Wunsch (`color.palette: all`).
+- **Slicer-Hilfskörper** (Modifier, Negativ-Körper, Stützblocker) wurden bisher als Geometrie mitgelesen. Jetzt werden sie übersprungen.
+- **Teilelisten:** Rebrickable-Farbnummern werden jetzt auch über den exakten Namen gefunden, für 90 statt 69 Farben. Eine falsche Zahl in ADR 0005 ist korrigiert.
+- **Testdateien:** STEP-Würfel, zwei farbige STEP-Körper, Fliegenpilz, Kugel mit Vertexfarben und Würfel mit Textur. Alle sind selbst erzeugt und gemeinfrei.
+- 381 automatische Tests, 96 % Abdeckung.
 
-## So wurde Duo unter 5 Minuten gebracht (Benchmark, ADR 0006)
+## So sieht Duo jetzt aus (lokal, nicht im Repo)
 
-Drei Messrunden mit je 8–10 Varianten parallel, Details in [benchmarks.md](benchmarks.md):
+| Filament (Bambu) | wird zu LEGO-Farbe | Teile |
+|---|---|---:|
+| Weiß (Augen, Sockel) | White | 209 |
+| Grasgrün (Körper, Flügel) | Bright Green | 603 |
+| Apfelgrün (Gesicht, Federn) | Lime | 114 |
+| Mandarin-Orange (Schnabel, Füße) | Orange | 81 |
+| Schwarz (Pupillen) | Black | 6 |
 
-1. **Lose Insel entfernt.** Danach ist Duo erstmals baubar, und die Reparaturphase entfällt.
-2. **Strategie `kollsker` statt `luo`.** Sie setzt die Steine in Sekunden statt Minuten und braucht etwa gleich viele Teile.
-3. **Schrittplanung begrenzt.**
-   - legolization prüft beim Ordnen der Schritte die Stabilität jedes Zwischenstands. Das kostet bei ~1.000 Teilen allein 6–7 Minuten.
-   - Bis 500 Teile bleibt diese Prüfung (beste Anleitung). Darüber werden die Schritte schichtweise von unten nach oben gebildet, in Sekunden.
-   - Die geprüfte Planung läuft in einem eigenen Prozess mit Zeitlimit. Reicht die Zeit nicht, wird automatisch auf Schichten umgestellt, und das wird angesagt.
-4. **Nicht hilfreich:** dünnere Wände (1 statt 2 Noppen). Sie ergeben *mehr* Teile (1.566 statt 1.077), weil dünne Wände kleine Steine brauchen.
+137 s gesamt (Import 13 s, Steine 104 s, PDF 20 s), 158 Schritte, stabil, ein Stück. Die Farbübertragung selbst kostet bei 2,1 Mio. Dreiecken etwa 0,6 s.
 
-**Ergebnis Duo (lokal, 32 Noppen):** 110 s gesamt (Import 11 s, Steine 78 s, PDF 21 s). 1.077 Teile in 171 Schritten, stabil, ein Stück, PDF 10 MB.
+## Was ich entschieden habe (Details in den ADRs)
 
-## Lückenliste: legolizations PDF gegen SPEC §1 (wird in Phase 6 geschlossen)
+| Entscheidung | Warum | ADR |
+|---|---|---|
+| STEP über **cascadio** statt cadquery | Gleiche Technik (OpenCASCADE). Der Download ist 22 statt 63 MB, und es braucht keine Zusatzpakete (siehe Frage 1). | 0007 |
+| Standard `color.mode: auto` statt `single` | Wer ein farbiges Modell lädt, erwartet seine Farben. Modelle ohne Farben sehen aus wie bisher (siehe Frage 2). | 0008 |
+| Standard `color.palette: common` (~40 heutige LEGO-Farben) | Kaufbare Steine statt exakter, aber seltener Farbtöne (siehe Frage 3). | 0008 |
+| Farbabstand von legolization übernommen | Er ist erprobt und darauf abgestimmt, dass Grau grau und Schwarz schwarz bleibt. Keine eigene Farbformel. | 0008 |
+
+## Lückenliste: legolizations PDF gegen SPEC §1 (unverändert, wird in Phase 6 geschlossen)
 
 | Anforderung | Stand | Lücke |
 |---|---|---|
@@ -63,25 +77,30 @@ Drei Messrunden mit je 8–10 Varianten parallel, Details in [benchmarks.md](ben
 
 ## Als Nächstes
 
-1. **Phase 3 (Issue #4): STEP-Import und Farben aus dem Modell.**
-   - Gute Nachricht für Duo: Die Bambu-3MF enthält die Filamentfarbe jedes der 12 Teile. Duo kann damit in seinen echten Farben gebaut werden.
+1. **Phase 4 (Issue #5): Katalog und Whitelist.**
+   - Teile und Farben offline aus Rebrickable.
+   - Welche Teile gibt es in welcher Farbe wirklich?
+   - Ein vollständiger Farbabgleich LDraw ↔ BrickLink ↔ Rebrickable. Dann kommt zum Beispiel Dunkellila dazu: LDraw nennt es inzwischen „Medium Lilac“, die Kataloge „Dark Purple“.
 
 ## Bekannte Einschränkungen
 
 | Was | Einschätzung |
 |---|---|
-| Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. Bei Überhängen muss man evtl. mit der Hand stützen; das PDF sagt es. | von dir akzeptiert; Verbesserung in Phase 5/6 bzw. Upstream |
-| Die letzte Optimierung in legolization („remerge", 40–170 s) lässt sich nicht begrenzen. Die 5 Minuten sind daher Zielmarke, keine harte Garantie; Überschreitungen werden gemeldet. | Upstream-Kandidat #5 |
-| LeoCAD lässt sich per Homebrew nicht mehr installieren (seit 09/2026 gesperrt, Gatekeeper). LDView gibt es dort gar nicht. Die Schrittbilder kommen daher von unserem eigenen Renderer. | entschieden: eigener Renderer |
+| Ob ein Teil in einer Farbe wirklich existiert (z. B. Platte 1×2 in Coral), wird noch nicht geprüft. | Phase 4 |
+| Reine Computer-Grundfarben landen teils auf Nachbarfarben, etwa #FF0000 auf „Reddish Orange“. LEGOs Rot ist deutlich dunkler. Echte Filament- und CAD-Rottöne werden zu Red. | akzeptiert (Frage 3) |
+| Lila wird zu Blau, weil Dunkellila wegen der Umbenennung noch nicht in der Palette ist. | Phase 4 |
+| Bemalte Farben aus dem Slicer (Multi-Material-Painting) und Texturen in 3MF werden noch nicht gelesen. Das Programm sagt es. | bei Bedarf |
+| Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. | von dir akzeptiert; Verbesserung in Phase 5/6 bzw. Upstream |
+| Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. Die 5 Minuten sind eine Zielmarke; Überschreitungen werden gemeldet. | Upstream-Kandidat #5 |
 | Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an |
 | PDF-Text englisch. | Phase 6 |
-| `color.mode` vertex/texture/cad (Phase 3), Whitelists (Phase 4), `llm.*` (Phase 7) noch ohne Wirkung. | geplant |
+| Whitelists (Phase 4) und `llm.*` (Phase 7) sind noch ohne Wirkung. | geplant |
 
 ## Umgebung (gut zu wissen)
 
 - Die Python-Umgebung liegt außerhalb von Nextcloud (`.venv` ist ein Symlink nach `~/.local/share/venvs/mesh2brick`).
 - Die LDraw-Teilebibliothek liegt in `~/Library/Caches/pyldraw3`. `samples/` (Duo) ist von Git ausgeschlossen.
-- Neue Abhängigkeit: `pillow` (für kleinere PDF-Bilder; war schon indirekt da).
+- STEP braucht einmalig `uv sync --extra step`.
 
 ## Deine Entscheidungen
 
@@ -98,7 +117,17 @@ Drei Messrunden mit je 8–10 Varianten parallel, Details in [benchmarks.md](ben
 
 ## Fragen an dich
 
-Keine offenen Fragen. Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio (manuelle Abnahme laut SPEC). Bis dahin gilt der strenge Wieder-Einlese-Test.
+Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
+
+1. **Ist das STEP-Zusatzpaket mit 70 MB auf der Platte in Ordnung?**
+   - Der Download ist 22 MB, entpackt sind es 70 MB, weil OpenCASCADE darin steckt.
+   - CLAUDE.md verlangt ab 50 MB eine Rückfrage. Es wird aber nur installiert, wer STEP braucht.
+   - Die in der SPEC genannte Alternative (cadquery) ist schon als Download 63 MB groß.
+   - *Annahme: ja.*
+2. **Sollen Farben aus dem Modell automatisch übernommen werden?** Bisher war alles einfarbig rot, außer man hat es umgestellt. *Annahme: ja, automatisch (`color.mode: auto`).*
+3. **Lieber gängige LEGO-Farben als exakte Farbtöne?** Das heißt: nur die rund 40 Farben, die LEGO heute in vielen Teilen herstellt. Ein Farbton passt dann manchmal weniger genau, die Steine sind aber kaufbar. *Annahme: ja, gängige Farben.*
+
+Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
 
 ## Offene Kleinigkeit
 

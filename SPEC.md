@@ -47,7 +47,7 @@ Eigener Mehrwert von `mesh2brick` liegt dort, wo diese Werkzeuge nichts bieten: 
 | Paketverwaltung | `uv`, `pyproject.toml` (PEP 621), `src/`-Layout |
 | Qualität | `ruff` (lint + format), `mypy`, `pytest` + `pytest-cov`, `pre-commit` |
 | CLI | `typer`; Konfiguration via `pydantic` v2 + YAML-Datei + CLI-Overrides |
-| Geometrie | `numpy`, `scipy`, `trimesh` (STL/OBJ/3MF/PLY); STEP über optionales Extra `cadquery`/`OCP` |
+| Geometrie | `numpy`, `scipy`, `trimesh` (STL/OBJ/3MF/PLY); STEP über optionales Extra `step` (2026-11-01: `cascadio` statt `cadquery`/`OCP`, gleiche OpenCASCADE-Basis, deutlich kleiner, ADR 0007) |
 | LEGO-Pipeline | `legolization`, `pyldraw3`, `rebrickable` als reguläre Abhängigkeiten, Versionen gepinnt; Upgrade pro Minor-Release bewusst mit Changelog-Lektüre |
 | Optimierung | nur was legolization nicht abdeckt; `scipy.optimize.linprog` (HiGHS) bevorzugt, keine proprietären Solver (kein Gurobi) |
 | LLM | `anthropic` SDK, Modell per Config, Default `claude-sonnet-5-5` (nicht hartkodieren) |
@@ -75,7 +75,7 @@ src/mesh2brick/
 ├─ ingest/              # Dateiformate → trimesh.Trimesh (normalisiert, Z-up, mm)
 │   ├─ base.py          # Protocol Loader; Registry nach Dateiendung
 │   ├─ mesh_formats.py  # STL/OBJ/3MF/PLY via trimesh
-│   ├─ step.py          # STEP via cadquery (Extra "step"), Tessellierung, STEP-Farben
+│   ├─ step.py          # STEP via cascadio (Extra "step", ADR 0007), Tessellierung, STEP-Farben
 │   └─ blender.py       # .blend via `blender --background --python` (Extra "blender")
 ├─ voxel/
 │   ├─ grid.py          # VoxelGrid: occupancy bool[X,Y,Z], color int32[X,Y,Z] (LDraw-Codes), pitch, origin
@@ -120,15 +120,17 @@ input:
   scale_mode: studs     # studs|mm
   target_studs: 32      # längste Achse in Noppen (PO-Entscheidung 2026-11-01: Standard 32, 48 erst später)
   mm_per_stud: 8.0
+  multi_body: union     # union|error (Phase 3: Mehrkörper vereinigen oder ablehnen)
+  step_tolerance_mm: 0.05   # Phase 3: Tessellierungs-Toleranz für STEP
 voxel:
   height_unit: brick    # brick|plate
   fill: hollow          # solid|hollow
   wall_thickness: 2
   threshold: 0.5
 color:
-  mode: single          # single|vertex|texture|cad|height_bands
+  mode: auto            # auto|single|vertex|texture|cad|height_bands (2026-11-01: auto = Farben aus dem Modell, falls vorhanden, sonst single_color; vorher single, ADR 0008)
   single_color: 4       # LDraw-Code
-  palette: solid        # solid|all
+  palette: common       # common|solid|all (2026-11-01: common = ~40 aktuelle LEGO-Farben, Standard; solid = alle Volltonfarben mit Katalognummern; all = alle LDraw-Volltonfarben, ADR 0008)
 parts:
   categories: [brick, plate]   # slope vorübergehend opt-in (2026-11-01): legolization 0.5.0 wird damit bis zu 50x langsamer, siehe docs/UPSTREAM.md #2
   include: []
