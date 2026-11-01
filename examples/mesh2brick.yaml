@@ -9,7 +9,7 @@ input:
   up_axis: z            # x|y|z, optionally negative, e.g. -y
   auto_orient: false
   scale_mode: studs     # studs: longest axis = target_studs | mm: use mm_per_stud
-  target_studs: 48      # longest model axis in studs
+  target_studs: 32      # longest model axis in studs (~26 cm; 48 = ~38 cm)
   mm_per_stud: 8.0      # model millimetres per stud (a real stud pitch is 8 mm)
 voxel:
   height_unit: brick    # brick (9.6 mm) | plate (3.2 mm) per voxel layer

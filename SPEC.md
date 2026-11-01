@@ -118,7 +118,7 @@ input:
   up_axis: z            # x|y|z, optional negativ "-y"
   auto_orient: false
   scale_mode: studs     # studs|mm
-  target_studs: 48      # längste Achse in Noppen
+  target_studs: 32      # längste Achse in Noppen (PO-Entscheidung 2026-11-01: Standard 32, 48 erst später)
   mm_per_stud: 8.0
 voxel:
   height_unit: brick    # brick|plate

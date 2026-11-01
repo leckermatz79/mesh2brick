@@ -21,7 +21,7 @@ EXAMPLE = Path(__file__).parents[1] / "examples" / "mesh2brick.yaml"
 
 def test_defaults_match_spec() -> None:
     s = Settings()
-    assert s.input.target_studs == 48
+    assert s.input.target_studs == 32  # PO decision 2026-11-01 (SPEC said 48)
     assert s.input.mm_per_stud == 8.0
     assert s.voxel.height_unit == "brick"
     assert s.voxel.fill == "hollow"
