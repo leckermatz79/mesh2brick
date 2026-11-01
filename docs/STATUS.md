@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **5 – Strategien und Farbverfügbarkeit: fertig, wartet auf Merge** · Nächste: **Phase 6 – Anleitungsqualität**
+Stand: 2026-11-01 · Aktuelle Phase: **5 – Strategien und Farbverfügbarkeit: fertig, gemergt (#16)** · Nächste: **Phase 6 – Anleitungsqualität**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
@@ -66,7 +66,7 @@ Deine Prüfung in BrickLink Studio ersetzt jetzt den Wieder-Einlese-Test als man
 
 - **Was beigetragen wird:** nur die fehlende klare Fehlermeldung, wenn im Katalog unverzichtbare Teile fehlen, dazu Tests und Doku. Die komplette Testsuite von legolization ist grün (1.468 Tests).
 - **Unser lokaler Patch** entfällt, sobald legolization eine neue Version veröffentlicht.
-- **Veröffentlichen:** musst du selbst anstoßen, weil das Rechtesystem mir öffentliche Beiträge in fremden Projekten sperrt. Die Befehle stehen in der Antwort zu Phase 5.
+- **Veröffentlicht** (von dir, 2026-11-01): [Issue #90](https://github.com/hbmartin/legolization/issues/90) und [Draft-PR #91](https://github.com/hbmartin/legolization/pull/91). Noch keine Antwort vom Maintainer, ebenso bei #88/#89 (bisher nur automatische Prüfungen).
 
 ## Lückenliste: legolizations PDF gegen SPEC §1 (unverändert, wird in Phase 6 geschlossen)
 
@@ -90,7 +90,7 @@ Deine Prüfung in BrickLink Studio ersetzt jetzt den Wieder-Einlese-Test als man
    - Unterbaugruppen als eigene Abschnitte.
    - **Aus deinem Studio-Check:** gleichmäßigere Schrittgrößen (heute 1 bis 6 Teile, Schritt 87 hat nur ein 1×1-Plättchen).
    - Ziel: PDF unter 10 MB für den Hasen.
-2. Upstream #8 veröffentlichen (Befehle folgen).
+2. Upstream: Antworten auf #88/#89 und #90/#91 abwarten.
 
 ## Bekannte Einschränkungen
 
@@ -129,7 +129,7 @@ Deine Prüfung in BrickLink Studio ersetzt jetzt den Wieder-Einlese-Test als man
 | 2026-11-01 | Farben aus dem Modell automatisch übernehmen? | **Ja.** Einfarbig bleibt per Config erreichbar (`color.mode: single`). |
 | 2026-11-01 | Gängige LEGO-Farben statt exakter Farbtöne? | **Ja.** Eine Anleitung, deren Steine man nicht kaufen kann, ist wertlos. Für Spezialfälle gibt es `color.palette: all`. |
 | 2026-11-01 | Reines #FF0000 wird „Reddish Orange“ | **Kein Bug, sondern Farbmetrik.** Optional in Phase 4: kleine Ausnahmetabelle für reine Primärfarben. Erwähnen, nicht priorisieren. |
-| 2026-11-01 | Upstream-Vorschlag „erlaubte Teile direkt angeben“ (#8) einreichen? | **Ja, einreichen.** Derselbe Fall wie #88/#89, und den lokalen Patch will man nicht dauerhaft pflegen. Im Issue kurz auf #89 verweisen, weil der Maintainer dort noch nicht reagiert hat, damit er den Zusammenhang sieht. |
+| 2026-11-01 | Upstream-Vorschlag „erlaubte Teile direkt angeben“ (#8) einreichen? | **Ja, einreichen.** Derselbe Fall wie #88/#89, und den lokalen Patch will man nicht dauerhaft pflegen. Im Issue kurz auf #89 verweisen, weil der Maintainer dort noch nicht reagiert hat, damit er den Zusammenhang sieht. Erledigt: Issue #90, Draft-PR #91. |
 | 2026-11-01 | Steine, die es in einer Farbe nicht gibt, automatisch ersetzen? | **Ja, als Zwischenlösung** (1×8 → 2× 1×4, danach Stabilitätsprüfung). Sauber wäre, die Farbverfügbarkeit schon bei der Platzierung zu kennen (hängt am selben Upstream-Thema). **Phase 5 vergleicht beides im Benchmark an Duo:** Aufteilen danach gegen Einschränken davor. |
 | 2026-11-01 | Manuelle Prüfung in BrickLink Studio | **Erledigt** (Duo, lokal): keine Überlappungen, keine Duplikate, 0 Stabilitätsprobleme, 31 Clutch-Hinweise (Flügel, Füße). Import hängt auf dem Mac, Datei → Öffnen geht (README). Schrittgrößen → Phase 6. |
 
