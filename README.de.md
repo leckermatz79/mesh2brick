@@ -17,7 +17,7 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 4 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
+> **Stand: Vorab-Version (Phase 5 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
 > 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
 > des Modells. Details stehen in [docs/STATUS.md](docs/STATUS.md).
 

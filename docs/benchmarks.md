@@ -129,3 +129,72 @@ Both models stay well inside the 5-minute budget.
 
 Narrow whitelists double the part count here and make placement much slower. The cause was
 not investigated further; the time for single-part exclusions was not measured.
+
+## Strategies on the fixtures (Phase 5, 2026-11-01)
+
+`scripts/benchmark_placement.py`, every run in its own process, six in parallel on the
+12-core laptop, `steps.sequencing=layers` (so the numbers measure placement, not step
+planning), defaults otherwise (hollow, wall 2, brick height, bricks and plates). Cells show
+parts / wall time; **bold** = fewest parts for that model. Every completed run was
+buildable (stable, one piece).
+
+**16 studs** (time limit 300 s):
+
+| Model | greedy | luo | bond | fast | smga | beauty | kollsker |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `cube_10mm` | 180 / 10 s | 737 / 63 s | 209 / 7 s | 168 / 8 s | 256 / 48 s | 138 / 29 s | **136** / 5 s |
+| `sphere_r10` | 979 / 79 s | 399 / 70 s | 312 / 12 s | 355 / 17 s | 316 / 63 s | 303 / 55 s | **268** / 4 s |
+| `l_bracket` | 38 / 2 s | 59 / 2 s | 39 / 2 s | **32** / 2 s | 36 / 12 s | 36 / 3 s | **32** / 2 s |
+| `torus` | 143 / 2 s | 297 / 3 s | 214 / 3 s | 288 / 3 s | **69** / 13 s | 293 / 17 s | 213 / 3 s |
+| `bunny_lowpoly` | 126 / 4 s | 226 / 4 s | 114 / 3 s | 101 / 3 s | 247 / 18 s | 78 / 11 s | **74** / 2 s |
+| `toadstool` | 571 / 14 s | 569 / 73 s | 261 / 9 s | 289 / 6 s | **255** / 42 s | 256 / 46 s | 374 / 9 s |
+
+**32 studs** (time limit 420 s):
+
+| Model | greedy | luo | bond | fast | smga | beauty | kollsker |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `sphere_r10` | > 420 s | > 420 s | 1,849 / 263 s | 2,035 / 167 s | > 420 s | > 420 s | **1,499** / 84 s |
+| `bunny_lowpoly` | 1,828 / 196 s | 1,502 / 170 s | 816 / 82 s | 790 / 64 s | 954 / 210 s | **722** / 166 s | 873 / 89 s |
+| `toadstool` | > 420 s | > 420 s | 1,465 / 180 s | 1,554 / 180 s | 1,602 / 333 s | > 420 s | **1,224** / 152 s |
+
+**Reading:**
+
+- No strategy wins everywhere. `kollsker` has the fewest parts on 4 of 6 models at 16 studs
+  (one of them a tie with `fast`) and on 2 of 3 at 32 studs. It is the fastest or close to
+  it everywhere. Only `kollsker`, `bond` and `fast` finished every model within the limit,
+  and of those `kollsker` needed the fewest parts except on the 32-stud bunny and the
+  16-stud toadstool.
+- Where others win, they win at a price:
+  - `smga` builds the torus with a third of the parts (69 vs 213) and the toadstool at
+    16 studs with 255 vs 374, but it is 4-5x slower and times out on the 32-stud sphere.
+  - `beauty` saves 17 % on the bunny at 32 studs (722 vs 873) in twice the time and times
+    out on the other two.
+- `greedy` and `luo` are never the best and time out on the larger models.
+
+Decision (ADR 0010): `kollsker` stays the default, and no own strategy. Choosing among the
+existing strategies per model (e.g. "try `smga` when there is time left") is possible later
+without new placement code.
+
+## Parts LEGO does not make in a colour (Phase 5, 2026-11-01)
+
+Real model (owl figure, local, 32 studs, `kollsker`, layer steps), the three
+`parts.availability` modes, one run each, three in parallel:
+
+| Mode | Parts | Steps | Stable, one piece | Not made in that colour | Time |
+|---|---:|---:|---|---:|---:|
+| `report` (flag only) | 1,013 | 158 | yes | 36 | 106 s |
+| `split` (shorter bricks afterwards) | 1,049 | 165 | yes | 0 | 130 s |
+| `exclude` (leave out beforehand) | 1,025 | 164 | yes | 0 | 70 s |
+
+The model needs 20 bricks 2 x 8 and 16 bricks 1 x 8 in Bright Green, which LEGO does not
+make (Rebrickable elements).
+
+- `split` replaces those 36 bricks by 72 shorter ones (2 x 4, 1 x 4, joints staggered
+  against the layers above and below) and takes 23 s longer than `report` (it includes a
+  second stability check; the split of that time was not measured).
+- `exclude` leaves 3007 and 3008 out of placement for the whole model. legolization then
+  plans with the shorter bricks from the start: 12 more parts instead of 36, and the final
+  merge took 40 instead of 74 s.
+
+`exclude` becomes the default. The more precise "per colour" restriction needs legolization
+to accept allowed parts per colour (follow-up to upstream #8).

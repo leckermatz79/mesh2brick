@@ -1,4 +1,4 @@
-# Umsetzungsplan Phase 0–4
+# Umsetzungsplan Phase 0–5
 
 Stand: 2026-11-01 · Grundlage: `SPEC.md` · Fortschritt: `docs/STATUS.md`
 
@@ -97,6 +97,14 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] CLI `catalog list/show`.
 - [x] Teileliste: Rebrickable-Namen, Spalte „in dieser Farbe produziert“, Warnung bei Kombinationen, die es nicht gibt.
 - **Abnahme:** `mesh2brick catalog list --category slope` läuft offline (Test sperrt Netzwerkzugriffe); die BOM zeigt Rebrickable-Namen.
+
+## Phase 5 – Strategien und Farbverfügbarkeit
+
+- [x] Benchmark aller 7 legolization-Strategien auf 6 Fixtures (16 Noppen) und 3 Fixtures (32 Noppen): Laufzeit, Teilezahl, Stabilität.
+- [x] Entscheidung „eigene Strategie: nein“ (ADR 0010). Die Lücken sind Abwägungen zwischen vorhandenen Strategien, keine fehlende Fähigkeit. `kollsker` bleibt Standard.
+- [x] `parts.availability`: `exclude` (Standard), `split`, `report`. Das Aufteilen danach liegt in `place/split.py` und wird im Backend angewendet.
+- [x] Vergleich an Duo (Vorgabe des PO): Einschränken davor gewinnt (1.025 statt 1.049 Teile, 70 statt 130 s, beide stabil, null nicht produzierte Teile).
+- **Abnahme:** Benchmark-Tabelle vorhanden; Entscheidung als ADR.
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)
 
