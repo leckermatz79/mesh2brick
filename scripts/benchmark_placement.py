@@ -105,6 +105,7 @@ def _worker(job: dict[str, Any]) -> None:
 
     from mesh2brick.backends.legolization import LegolizationBackend  # noqa: PLC0415
     from mesh2brick.config import load_settings  # noqa: PLC0415
+    from mesh2brick.export.bom import build_bom  # noqa: PLC0415
     from mesh2brick.ingest import load_model  # noqa: PLC0415
     from mesh2brick.pipeline import palette_for  # noqa: PLC0415
     from mesh2brick.voxel.io import load_npz  # noqa: PLC0415
@@ -133,6 +134,7 @@ def _worker(job: dict[str, Any]) -> None:
     with telemetry.record(span_sink=sink):
         placement = LegolizationBackend().place(grid, settings, name=path.stem)
     model, stability = placement.model, placement.stability
+    absent = build_bom(model).not_produced()
     emit(
         "result",
         data={
@@ -142,12 +144,23 @@ def _worker(job: dict[str, Any]) -> None:
             "stable": stability.stable,
             "buildable": stability.buildable,
             "components": stability.component_count,
+            "not_produced": sum(line.quantity for line in absent),
+            "notes": list(placement.notes),
         },
     )
 
 
 def _print_table(results: list[dict[str, Any]]) -> None:
-    header = ["input", "config", "status", "wall_s", *PHASES, "parts", "buildable"]
+    header = [
+        "input",
+        "config",
+        "status",
+        "wall_s",
+        *PHASES,
+        "parts",
+        "buildable",
+        "not_produced",
+    ]
     print("| " + " | ".join(header) + " | stuck in |")
     print("|" + "---|" * (len(header) + 1))
     for row in results:

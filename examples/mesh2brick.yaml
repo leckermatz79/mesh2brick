@@ -29,6 +29,7 @@ parts:
   include: []           # whitelist of LDraw numbers, e.g. [3001, 3003]; see `mesh2brick catalog list`
   exclude: []           # blacklist, e.g. [3008, 3007]; 3005 and 3024 are always needed
   max_parts: 5000
+  availability: exclude # parts LEGO does not make in a model colour: exclude | split | report
 placement:
   backend: legolization
   strategy: kollsker    # passed to the backend (also: luo, greedy, bond, fast, smga, beauty)
