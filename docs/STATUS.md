@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **2 – End-to-End (MVP): fertig, wartet auf Merge** · Nächste: **Phase 3 – STEP + Farben**
+Stand: 2026-11-01 · Aktuelle Phase: **2 – End-to-End (MVP): fertig, wartet auf Merge (PR #13)** · Nächste: **Phase 3 – STEP + Farben**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
@@ -29,7 +29,7 @@ Der Hase hat 873 Teile, steht stabil und ist in 72 Sekunden fertig. Duo braucht 
 - **Fehler gefunden und behoben:**
   - Duo hatte eine winzige lose Insel aus 2 Voxeln. Deshalb galt das ganze Modell als „nicht baubar", und legolization suchte minutenlang nach Reparaturen.
   - Lose Inseln unter 5 % des Modells werden jetzt entfernt (`voxel.min_island_fraction`). Größere bleiben erhalten und werden gemeldet.
-- **Upstream:** Fehlerbericht [#88](https://github.com/hbmartin/legolization/issues/88) und Draft-PR [#89](https://github.com/hbmartin/legolization/pull/89) eingereicht, mit dem Hinweis auf das Vibe-Coding-Projekt.
+- **Upstream:** Fehlerbericht [#88](https://github.com/hbmartin/legolization/issues/88) und Draft-PR [#89](https://github.com/hbmartin/legolization/pull/89) eingereicht, mit dem Hinweis auf das Vibe-Coding-Projekt. Der Link zur Beispieldatei zeigt jetzt auf `main`.
 - 307 automatische Tests, 95 % Abdeckung.
 
 ## So wurde Duo unter 5 Minuten gebracht (Benchmark, ADR 0006)
@@ -65,7 +65,6 @@ Drei Messrunden mit je 8–10 Varianten parallel, Details in [benchmarks.md](ben
 
 1. **Phase 3 (Issue #4): STEP-Import und Farben aus dem Modell.**
    - Gute Nachricht für Duo: Die Bambu-3MF enthält die Filamentfarbe jedes der 12 Teile. Duo kann damit in seinen echten Farben gebaut werden.
-2. Nach dem Merge von PR #11 den Reproduktions-Link in legolization-Issue #88 auf `main` umstellen. Der Link zeigt bisher auf den Phase-1-Branch.
 
 ## Bekannte Einschränkungen
 
