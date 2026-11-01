@@ -38,7 +38,11 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 
 ## Upstream #8 (von dir freigegeben)
 
-Die Änderung für legolization („erlaubte Teile direkt angeben“) wird gerade lokal vorbereitet und getestet. Das Veröffentlichen musst du selbst anstoßen, weil das Rechtesystem mir öffentliche Beiträge in fremden Projekten sperrt. Die Befehle bekommst du, sobald alles bereitliegt.
+**Überraschung beim Vorbereiten:** legolization kann das in der Entwicklungsversion schon. `run()` nimmt dort einen eigenen Katalog an, nur ist das noch in keiner Veröffentlichung enthalten.
+
+- **Was beigetragen wird:** nur die fehlende klare Fehlermeldung, wenn im Katalog unverzichtbare Teile fehlen, dazu Tests und Doku. Die komplette Testsuite von legolization ist grün (1.468 Tests).
+- **Unser lokaler Patch** entfällt, sobald legolization eine neue Version veröffentlicht.
+- **Veröffentlichen:** musst du selbst anstoßen, weil das Rechtesystem mir öffentliche Beiträge in fremden Projekten sperrt. Die Befehle stehen in der Antwort zu Phase 5.
 
 ## Lückenliste: legolizations PDF gegen SPEC §1 (unverändert, wird in Phase 6 geschlossen)
 

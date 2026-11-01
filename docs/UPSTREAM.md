@@ -11,7 +11,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | # | Where | What | Remove when |
 |---|---|---|---|
 | 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`) | Adds a 5 s time limit to every stability-LP attempt except the last, in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`). | legolization ships per-attempt time limits (candidate #2) |
-| 8 | `src/mesh2brick/backends/legolization.py` (`_placement_catalog`) | During `run()`, `legolization.pipeline.default_catalog` returns a catalogue reduced to the whitelisted parts; restored afterwards (also on errors). | `PipelineConfig` accepts a catalogue or part filter (candidate #8) |
+| 8 | `src/mesh2brick/backends/legolization.py` (`_placement_catalog`) | During `run()`, `legolization.pipeline.default_catalog` returns a catalogue reduced to the whitelisted parts; restored afterwards (also on errors). | a legolization release contains `run(..., catalog=...)` (on `main` since 65d6afb); then pass the catalogue instead |
 
 ## Candidates
 
@@ -24,7 +24,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | 5 | legolization | Time budget for `final_remerge` and step sequencing | Both ignore `time_budget_s` in 0.5.0 and dominate large models (remerge 40–170 s, sequencing 4–7 min at ~1,000 parts, docs/benchmarks.md). mesh2brick works around sequencing with a child process and a layer-order fallback (ADR 0006). | idea | – |
 | 6 | legolization | `plan_instructions` ignores `InstructionsConfig.mode="layer"`; booklet only English, fonts not embedded | A cheap layer plan helper (mesh2brick's `layer_plan`) and i18n/embedded fonts would help every user. | idea | – |
 | 7 | trimesh | glTF `baseColorFactor` is kept as bytes of the *linear* value | Converting back to sRGB loses up to ±3 levels in dark tones (STEP 0.1 grey arrives as 28 instead of 26). Harmless for LEGO colours; storing floats would be exact. | idea | – |
-| 8 | legolization | **Part whitelist: `PipelineConfig.catalog` (or `allowed_parts`) for `run()`** | `run()` always places from `default_catalog()`; users cannot exclude parts they do not own or want. mesh2brick patches `default_catalog` for the duration of `run()`. Also worth documenting: the 1 x 1 brick/plate and the three slopes are looked up by name, so a filtered catalogue must keep them (else `KeyError`). Draft below. Approved by the product owner on 2026-11-01 (refer to #89 in the issue). | approved | – |
+| 8 | legolization | **Part whitelist: `PipelineConfig.catalog` (or `allowed_parts`) for `run()`** | `run()` always places from `default_catalog()`; users cannot exclude parts they do not own or want. mesh2brick patches `default_catalog` for the duration of `run()`. Also worth documenting: the 1 x 1 brick/plate and the three slopes are looked up by name, so a filtered catalogue must keep them (else `KeyError`). Approved by the product owner on 2026-11-01. **Update:** upstream `main` already has `run(grid, config, *, catalog=None)` (commit 65d6afb, not in a release yet), so no new field is needed; what remains is failing early with a clear error when a catalogue lacks the parts placed by key (prepared: branch `feat/pipeline-catalog` on the fork, 3 files, +115/−2, legolization's full test suite green). Remove our local patch #8 once a release contains `run(catalog=)`. | approved, ready to publish | – |
 | 9 | legolization | Allowed parts **per colour** (follow-up to #8) | Rebrickable shows which part/colour pairs LEGO makes (e.g. no 2 x 8 brick in Bright Green). mesh2brick currently leaves such parts out for the whole model or splits them afterwards (ADR 0010); per-colour availability in placement would keep long bricks in the colours that have them. Mention in the #8 discussion first. | idea | – |
 | 10 | legolization | Larger plates in placement | Plates beyond 2 x 8 (2 x 10, 2 x 12, 2 x 16, 4 x 4 ...) are in the catalogue for import only; using them would cut part counts on flat areas. | idea | – |
 
@@ -55,7 +55,7 @@ optional pipeline deadline already on `main`. A follow-up question worth a look:
 slope-substituted layouts make the LP so much harder for presolve (degenerate or
 near-duplicate contact rows?).
 
-## Draft #8 (approved 2026-11-01; the product owner publishes it, see STATUS)
+## Draft #8 (approved 2026-11-01; superseded: upstream `main` already accepts `catalog=`, the prepared contribution only adds the early check)
 
 **Title:** Allow placing from a custom catalogue: `PipelineConfig.catalog`
 
