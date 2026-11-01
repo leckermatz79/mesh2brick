@@ -6,6 +6,28 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-01 - Phase 4: catalogue and whitelist
+
+### Added
+- `mesh2brick catalog list [--category] [--all] [--json]` and `catalog show PART`, offline:
+  size, studs, BrickLink/Rebrickable numbers, Rebrickable name, colours a part is made in,
+  and whether the current `parts.*` settings allow it (ADR 0009).
+- `PartSpec` derived from the LDraw geometry through pyldraw3 (footprint, height, top
+  studs, category), cached as JSON per LDraw release in the user cache directory; checked
+  against legolization's cell model for all 29 placeable parts.
+- Whitelist/blacklist: `parts.include` and `parts.exclude` now reach placement (local patch
+  of `legolization.pipeline.default_catalog` during `run()`, upstream draft #8). Impossible
+  settings fail early with a clear message; the 1 x 1 fillers are added to include lists.
+- Parts lists: Rebrickable part names and a `produced_in_color` column; part/colour pairs
+  LEGO never produced are reported.
+- `id_maps.json` schema 3 (moved to `mesh2brick/catalog/`): Rebrickable names, available
+  colours per part (Rebrickable `elements.csv`), renamed colours via ID + RGB and
+  Rebrickable's name (LDraw "Medium Lilac" = "Dark Purple"), match provenance.
+
+### Changed
+- The `common` palette gains Dark Purple (42 colours).
+- Direct dependency: platformdirs.
+
 ## [0.3.0] - 2026-11-01 - Phase 3: STEP and colours
 
 ### Added

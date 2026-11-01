@@ -10,7 +10,7 @@ Versions are the ones locked in `uv.lock` at the time of the last update. Run
 |---|---|---|---|
 | legolization | 0.5.0 (pinned) | GPL-3.0-or-later | Placement, stability, repair, steps, LDraw export, booklet |
 | pyldraw3 | 1.7.0 (pinned) | GPL-3.0-or-later | LDraw library access, part/colour modules, `.ldr`/`.mpd` writing |
-| rebrickable | 1.1.0 (pinned) | GPL-3.0-or-later | Offline catalogue, part metadata, LDraw bridge |
+| rebrickable | 1.1.0 (pinned) | GPL-3.0-or-later | BOM parsers used to cross-check our exports in tests; catalogue data comes from Rebrickable's CSV dumps via `scripts/make_id_maps.py` (ADR 0009) |
 | numpy | ≥ 2.5 | BSD-3-Clause (+ bundled 0BSD/MIT/Zlib/CC0) | Arrays |
 | scipy | ≥ 1.18 | BSD-3-Clause | Morphology, optimisation (HiGHS) |
 | trimesh | ≥ 5.2 | MIT | Mesh loading (STL/OBJ/3MF/PLY), voxelization helpers |
@@ -20,6 +20,7 @@ Versions are the ones locked in `uv.lock` at the time of the last update. Run
 | typer | ≥ 0.27 | MIT | CLI |
 | pillow | ≥ 11 | MIT-CMU | Palette compression of PDF step images |
 | networkx | ≥ 3.5 | BSD-3-Clause | Graph algorithms trimesh needs for mesh repair (hole filling) |
+| platformdirs | ≥ 4.14 | MIT | User cache directory for the part-spec cache (was already installed through pyldraw3) |
 
 ## Notable transitive dependencies
 
