@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **3 – STEP + Farben: fertig, wartet auf Merge** · Nächste: **Phase 4 – Katalog und Whitelist**
+Stand: 2026-11-01 · Aktuelle Phase: **4 – Katalog und Whitelist: in Arbeit** · Zuletzt fertig: **Phase 3 – STEP + Farben (`v0.3.0`)**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
@@ -87,7 +87,7 @@ Zusätzlich liest mesh2brick **STEP-Dateien**. Duo wird in 137 Sekunden in Weiß
 | Was | Einschätzung |
 |---|---|
 | Ob ein Teil in einer Farbe wirklich existiert (z. B. Platte 1×2 in Coral), wird noch nicht geprüft. | Phase 4 |
-| Reine Computer-Grundfarben landen teils auf Nachbarfarben, etwa #FF0000 auf „Reddish Orange“. LEGOs Rot ist deutlich dunkler. Echte Filament- und CAD-Rottöne werden zu Red. | akzeptiert (Frage 3) |
+| Reine Computer-Grundfarben landen teils auf Nachbarfarben, etwa #FF0000 auf „Reddish Orange“. LEGOs Rot ist deutlich dunkler. Echte Filament- und CAD-Rottöne werden zu Red. | von dir als Farbmetrik akzeptiert; optional eine kleine Ausnahmetabelle für reine Primärfarben (niedrige Priorität) |
 | Lila wird zu Blau, weil Dunkellila wegen der Umbenennung noch nicht in der Palette ist. | Phase 4 |
 | Bemalte Farben aus dem Slicer (Multi-Material-Painting) und Texturen in 3MF werden noch nicht gelesen. Das Programm sagt es. | bei Bedarf |
 | Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. | von dir akzeptiert; Verbesserung in Phase 5/6 bzw. Upstream |
@@ -114,20 +114,14 @@ Zusätzlich liest mesh2brick **STEP-Dateien**. Duo wird in 137 Sekunden in Weiß
 | 2026-11-01 | Manuelle Prüfung der `.ldr` in BrickLink Studio? | **Ja, Screenshot kommt später.** Bis dahin gilt der strenge Wieder-Einlese-Test als Prüfung. |
 | 2026-11-01 | LeoCAD manuell installieren und nutzen? | **Nein.** Schrittbilder kommen vom eigenen Renderer. |
 | 2026-11-01 | Schichtschritte für große Modelle (> 500 Teile)? | **Ja**, in Ordnung. |
+| 2026-11-01 | STEP-Zusatzpaket mit 70 MB (über der 50-MB-Regel)? | **In Ordnung.** Ein vollständiger CAD-Kern rechtfertigt die Größe, er wird nur bei Bedarf installiert. Die Rückfrage war richtig: So soll die 50-MB-Regel funktionieren. |
+| 2026-11-01 | Farben aus dem Modell automatisch übernehmen? | **Ja.** Einfarbig bleibt per Config erreichbar (`color.mode: single`). |
+| 2026-11-01 | Gängige LEGO-Farben statt exakter Farbtöne? | **Ja.** Eine Anleitung, deren Steine man nicht kaufen kann, ist wertlos. Für Spezialfälle gibt es `color.palette: all`. |
+| 2026-11-01 | Reines #FF0000 wird „Reddish Orange“ | **Kein Bug, sondern Farbmetrik.** Optional in Phase 4: kleine Ausnahmetabelle für reine Primärfarben. Erwähnen, nicht priorisieren. |
 
 ## Fragen an dich
 
-Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
-
-1. **Ist das STEP-Zusatzpaket mit 70 MB auf der Platte in Ordnung?**
-   - Der Download ist 22 MB, entpackt sind es 70 MB, weil OpenCASCADE darin steckt.
-   - CLAUDE.md verlangt ab 50 MB eine Rückfrage. Es wird aber nur installiert, wer STEP braucht.
-   - Die in der SPEC genannte Alternative (cadquery) ist schon als Download 63 MB groß.
-   - *Annahme: ja.*
-2. **Sollen Farben aus dem Modell automatisch übernommen werden?** Bisher war alles einfarbig rot, außer man hat es umgestellt. *Annahme: ja, automatisch (`color.mode: auto`).*
-3. **Lieber gängige LEGO-Farben als exakte Farbtöne?** Das heißt: nur die rund 40 Farben, die LEGO heute in vielen Teilen herstellt. Ein Farbton passt dann manchmal weniger genau, die Steine sind aber kaufbar. *Annahme: ja, gängige Farben.*
-
-Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
+Keine offenen Fragen. Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
 
 ## Offene Kleinigkeit
 
