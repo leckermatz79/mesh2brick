@@ -198,3 +198,47 @@ make (Rebrickable elements).
 
 `exclude` becomes the default. The more precise "per colour" restriction needs legolization
 to accept allowed parts per colour (follow-up to upstream #8).
+
+## Studio check against legolization (Phase 5, 2026-11-01)
+
+The product owner opened the owl's `.ldr` (32 studs, `kollsker`, 1,013 parts) in BrickLink
+Studio:
+
+- 0 overlaps, 0 duplicates, 0 stability issues.
+- 31 "clutch power" hints (12 warnings, 19 cautions), concentrated on one wing and the feet.
+
+The same file through legolization's analysis and graph checks (`layout_from_ldraw`, then
+`analyze`):
+
+| Check | Result |
+|---|---|
+| legolization stability | stable; highest load 0.020 of a stud's clutch capacity |
+| Where the highest loads are | wing tip (x 1–2, layer 42: 0.020) and the legs above the feet (0.006–0.015) – the regions Studio marks |
+| Groups hanging on one connection (bridge in the stud graph) | none holding 3 or more bricks; largest group behind a single brick: 3 bricks |
+| Wing thickness | mostly 2–3 studs; 1-stud cross-sections: 10 % (left), 7 % (right); bricks in 1-stud walls: 25 of 1,013 |
+| Vertical joints continuing straight through a brick interface | 41 % (834 of 2,032) |
+
+Both tools agree there is no stability problem. Studio's clutch hints are about robustness
+when the model is handled (pulling, pushing); legolization only checks gravity. Its most
+loaded bricks are in the same places, at 2 % of capacity.
+
+Levers tried against the stacked joints (owl, layer steps):
+
+| Variant | Parts | Stacked joints | Time |
+|---|---:|---:|---:|
+| `kollsker` (default) | 1,013–1,025 | 41–43 % | 70–104 s |
+| `bond` strategy | 1,208 | 47 % | 118 s |
+| `kollsker`, stretcher-bond penalty ×3 / ×10 (`bond_alpha1` 12 / 40) | 1,013 | 41 % | 104 s |
+| `kollsker`, `refine=False` | 1,013 | 41 % | 104 s |
+| own post-pass: re-cut rows of equal bricks with staggered joints | 1,013 | 41 % (834 → 824) | < 1 s |
+
+None of them helps:
+
+- The bond weight and `refine` do not change `kollsker`'s layout at all.
+- `bond` needs 18 % more parts.
+- The own post-pass finds only 10 rows to re-cut, because stacked joints mostly sit where
+  bricks of different width or height meet. The pass was removed again; the joint metric
+  stays (`stacked_joints`, reported by `scripts/benchmark_placement.py`).
+
+Decision (ADR 0010, addendum): no minimum wall thickness and no own offset pass. Bond-aware
+placement is an upstream topic (candidate #11).

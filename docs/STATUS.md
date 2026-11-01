@@ -24,6 +24,30 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
   - `split`: Sie werden danach in kürzere Steine derselben Farbe aufgeteilt. Die Fugen liegen dabei versetzt zu den Schichten darüber und darunter, danach wird die Stabilität neu geprüft.
   - `report`: Sie werden nur gemeldet.
 
+## Dein Studio-Check (geschlossen)
+
+Deine Prüfung in BrickLink Studio ersetzt jetzt den Wieder-Einlese-Test als manuelle Abnahme. Die Screenshots bleiben lokal in `out/studio/`.
+
+| Befund | Bewertung |
+|---|---|
+| Studios „Import“ hängt auf dem Mac bei jeder Datei, „Datei → Öffnen“ geht sofort. | Studio-Eigenheit. Steht jetzt in beiden READMEs. |
+| Keine Überlappungen, keine Duplikate. | Bestätigt die eigene Prüfung beim Export. |
+| 0 Stabilitätsprobleme, aber 31 Clutch-Power-Hinweise (Flügel, Füße). | Siehe unten. |
+| Schrittgrößen schwanken zwischen 1 und 6 Teilen, Schritt 87 hat nur ein 1×1-Plättchen. | Phase 6 |
+
+**Clutch-Power gegen legolization:**
+- **Stabilität:** Beide Programme sind sich einig, das Modell ist stabil. legolizations höchste Belastung liegt bei nur 2 % dessen, was eine Noppe hält, und zwar genau an der Flügelspitze und an den Beinen, wo Studio warnt.
+- **Was Studio meldet:** Studios Hinweise betreffen die Festigkeit beim Anfassen, also Ziehen und Drücken. legolization prüft nur die Schwerkraft.
+- **Schwachstellen:** Es gibt keine Stelle, an der ein größeres Stück an einer einzigen schwachen Verbindung hängt.
+
+**Mindestwandstärke oder Versatzmuster?**
+- **Mindestwandstärke: nein.** Die Flügel sind meist 2–3 Noppen dick, nur 25 von 1.013 Steinen liegen in echten 1-Noppen-Wänden.
+- **Versatzmuster:** Hier gibt es eine echte Schwäche. 41 % der senkrechten Fugen laufen über eine Steinlage hinweg durch, statt versetzt zu sein. Ich habe vier Hebel ausprobiert, keiner hilft:
+  - legolizations Mauerwerks-Strategie `bond` (mehr Teile, eher mehr durchlaufende Fugen),
+  - zwei Einstellungen in legolization (keine Wirkung),
+  - ein eigener Nachbearbeitungsschritt (nur 1 % besser, wieder entfernt).
+- **Fazit:** Der richtige Ort ist die Platzierung selbst in legolization (Upstream-Kandidat #11). Die Messgröße „durchlaufende Fugen“ bleibt im Benchmark, damit spätere Verbesserungen sichtbar werden.
+
 ## Dein Vergleich an Duo
 
 | Weg | Teile | Zeit | stabil | Teile, die es so nicht gibt |
@@ -64,6 +88,7 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 1. **Phase 6 (Issue #7): Anleitungsqualität.**
    - Eigenes PDF-Layout, falls legolizations Heft nicht reicht: Deckblatt mit Bild und Maßen, Teileliste mit Bildern, Callouts, 1–4 Schritte pro Seite, Deutsch und Englisch.
    - Unterbaugruppen als eigene Abschnitte.
+   - **Aus deinem Studio-Check:** gleichmäßigere Schrittgrößen (heute 1 bis 6 Teile, Schritt 87 hat nur ein 1×1-Plättchen).
    - Ziel: PDF unter 10 MB für den Hasen.
 2. Upstream #8 veröffentlichen (Befehle folgen).
 
@@ -106,10 +131,11 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 | 2026-11-01 | Reines #FF0000 wird „Reddish Orange“ | **Kein Bug, sondern Farbmetrik.** Optional in Phase 4: kleine Ausnahmetabelle für reine Primärfarben. Erwähnen, nicht priorisieren. |
 | 2026-11-01 | Upstream-Vorschlag „erlaubte Teile direkt angeben“ (#8) einreichen? | **Ja, einreichen.** Derselbe Fall wie #88/#89, und den lokalen Patch will man nicht dauerhaft pflegen. Im Issue kurz auf #89 verweisen, weil der Maintainer dort noch nicht reagiert hat, damit er den Zusammenhang sieht. |
 | 2026-11-01 | Steine, die es in einer Farbe nicht gibt, automatisch ersetzen? | **Ja, als Zwischenlösung** (1×8 → 2× 1×4, danach Stabilitätsprüfung). Sauber wäre, die Farbverfügbarkeit schon bei der Platzierung zu kennen (hängt am selben Upstream-Thema). **Phase 5 vergleicht beides im Benchmark an Duo:** Aufteilen danach gegen Einschränken davor. |
+| 2026-11-01 | Manuelle Prüfung in BrickLink Studio | **Erledigt** (Duo, lokal): keine Überlappungen, keine Duplikate, 0 Stabilitätsprobleme, 31 Clutch-Hinweise (Flügel, Füße). Import hängt auf dem Mac, Datei → Öffnen geht (README). Schrittgrößen → Phase 6. |
 
 ## Fragen an dich
 
-Keine offenen Fragen. Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
+Keine offenen Fragen.
 
 ## Offene Kleinigkeit
 

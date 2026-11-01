@@ -55,6 +55,27 @@ On the real model, `exclude` beat `split` on every measure: 1,025 vs 1,049 parts
 130 s, both stable with no parts that do not exist. The cause: legolization plans with the
 shorter bricks from the start instead of having its long bricks cut up afterwards.
 
+## Addendum: Studio check, thin walls and joint offsets (2026-11-01)
+
+The product owner checked the owl in BrickLink Studio:
+
+- no overlaps, no duplicates, no stability issues;
+- 31 clutch-power hints, on one wing and the feet.
+
+He asked whether a minimum wall thickness or an offset pattern for thin walls is needed.
+Measurements are in docs/benchmarks.md ("Studio check").
+
+- **Stability:** legolization agrees with Studio. The model is stable; its highest loads
+  (at most 2 % of a stud's clutch capacity) sit at the wing tip and the legs, where Studio
+  marks clutch hints. Nothing hangs on a single weak connection; the largest group behind
+  one brick is 3 bricks.
+- **Minimum wall thickness: no.** The wings are mostly 2–3 studs thick, and only 25 of
+  1,013 bricks lie in 1-stud walls. Thickening would change the shape for little gain.
+- **Offset pattern: no own pass.** 41 % of vertical joints continue through a brick
+  interface. None of legolization's levers changes that, and a post-pass that re-cuts rows
+  of equal bricks reached only 41 → 40 %. Bond-aware placement is upstream candidate #11.
+  The metric `stacked_joints` stays, to measure future changes.
+
 ## Consequences
 
 - Parts lists of default conversions contain only part/colour pairs LEGO makes. The

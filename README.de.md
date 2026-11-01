@@ -72,6 +72,14 @@ uv run mesh2brick render out/heart.bricks.json --step 3
 Alle Einstellungen sind in [examples/mesh2brick.yaml](examples/mesh2brick.yaml)
 beschrieben.
 
+## Ergebnisse in anderen Programmen öffnen
+
+- **BrickLink Studio:** die `.ldr`/`.mpd` über **Datei → Öffnen** laden. Unter macOS hing
+  Studios **Import** in unserem Test bei jeder Datei (auch bei Studios eigenem Export);
+  Datei → Öffnen lädt dieselbe Datei sofort. Eine Duo-Testdatei zeigte in Studio keine
+  Überlappungen, keine Duplikate und keine Stabilitätsprobleme.
+- LDraw-Betrachter (LDView, LeoCAD) öffnen die Dateien direkt.
+
 ## Entwicklung
 
 ```sh

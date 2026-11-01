@@ -104,6 +104,7 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Entscheidung „eigene Strategie: nein“ (ADR 0010). Die Lücken sind Abwägungen zwischen vorhandenen Strategien, keine fehlende Fähigkeit. `kollsker` bleibt Standard.
 - [x] `parts.availability`: `exclude` (Standard), `split`, `report`. Das Aufteilen danach liegt in `place/split.py` und wird im Backend angewendet.
 - [x] Vergleich an Duo (Vorgabe des PO): Einschränken davor gewinnt (1.025 statt 1.049 Teile, 70 statt 130 s, beide stabil, null nicht produzierte Teile).
+- [x] Studio-Check des PO gegen legolizations Stabilitätsurteil gehalten. Mindestwandstärke: nein. Eigenes Versatzmuster: gemessen, kein Hebel wirkt, daher Upstream-Kandidat #11. Messgröße „durchlaufende Fugen“ im Benchmark.
 - **Abnahme:** Benchmark-Tabelle vorhanden; Entscheidung als ADR.
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)
