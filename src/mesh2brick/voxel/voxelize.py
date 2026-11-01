@@ -64,6 +64,7 @@ _JITTER: Final = (1.234567e-6, 2.345678e-6)
 _MIN_AREA: Final = 1e-12
 _SURFACE_SAMPLES_PER_RAY: Final = 4
 _MAX_SURFACE_SAMPLES: Final = 5_000_000
+_FACES: Final = ndimage.generate_binary_structure(3, 1)
 
 Method = Literal["volume", "surface"]
 
@@ -137,6 +138,10 @@ def voxelize(model: MeshModel, settings: Settings) -> VoxelizeResult:
     else:
         method = "surface"
         occupancy = surface_occupancy(mesh, lattice)
+    occupancy, island_notes = remove_islands(
+        occupancy, min_fraction=settings.voxel.min_island_fraction
+    )
+    warnings.extend(island_notes)
     occupancy, origin = _crop(occupancy, lattice)
     if not occupancy.any():
         warnings.append(
@@ -338,6 +343,44 @@ def surface_occupancy(mesh: trimesh.Trimesh, lattice: Lattice) -> NDArray[np.boo
     return filled
 
 
+def remove_islands(
+    occupancy: NDArray[np.bool_], *, min_fraction: float
+) -> tuple[NDArray[np.bool_], list[str]]:
+    """Drop face-disconnected islands smaller than ``min_fraction`` of all cells.
+
+    A brick model has to be one connected piece; tiny islands (a thin tip that
+    rounding cut off) would otherwise make the whole model unbuildable and
+    send the backend into long rescue searches. Larger islands are kept and
+    reported, because removing them would change the model visibly.
+    """
+    labels, count = ndimage.label(occupancy, structure=_FACES)
+    if count <= 1:
+        return occupancy, []
+    sizes = np.bincount(labels.ravel())[1:]
+    total = int(sizes.sum())
+    largest = int(np.argmax(sizes))
+    drop = [
+        i
+        for i, size in enumerate(sizes)
+        if i != largest and size < min_fraction * total
+    ]
+    notes: list[str] = []
+    result = occupancy
+    if drop:
+        result = occupancy & ~np.isin(labels, np.asarray(drop) + 1)
+        removed = int(sizes[drop].sum())
+        notes.append(
+            f"removed {len(drop)} loose voxel island(s) with {removed} cell(s) "
+            f"(below voxel.min_island_fraction={min_fraction:g})"
+        )
+    if kept := count - 1 - len(drop):
+        notes.append(
+            f"the model has {kept + 1} separate pieces; bricks cannot connect them "
+            "(lower voxel.min_island_fraction or join them in the 3D model)"
+        )
+    return result, notes
+
+
 def hollow(grid: VoxelGrid, wall_thickness: int) -> VoxelGrid:
     """Keep only cells within ``wall_thickness`` cells of the outside.
 
@@ -353,7 +396,7 @@ def hollow(grid: VoxelGrid, wall_thickness: int) -> VoxelGrid:
         raise ValueError(msg)
     core = ndimage.binary_erosion(
         grid.occupancy,
-        structure=ndimage.generate_binary_structure(3, 1),
+        structure=_FACES,
         iterations=wall_thickness,
         border_value=0,
     )

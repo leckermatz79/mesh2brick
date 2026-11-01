@@ -18,12 +18,13 @@ Versions are the ones locked in `uv.lock` at the time of the last update. Run
 | pydantic | ≥ 2.14 | MIT | Configuration schema |
 | PyYAML | ≥ 6.0.3 | MIT | Configuration files |
 | typer | ≥ 0.27 | MIT | CLI |
+| pillow | ≥ 11 | MIT-CMU | Palette compression of PDF step images |
 | networkx | ≥ 3.5 | BSD-3-Clause | Graph algorithms trimesh needs for mesh repair (hole filling) |
 
 ## Notable transitive dependencies
 
 Pulled in mainly by legolization: cvxpy (Apache-2.0), highspy (MIT), clarabel (Apache-2.0),
-osqp (Apache-2.0), scs (MIT), reportlab (BSD), pillow (MIT-CMU), requests (Apache-2.0),
+osqp (Apache-2.0), scs (MIT), reportlab (BSD), requests (Apache-2.0),
 certifi (MPL-2.0), httpx2/httpcore2 (BSD-3-Clause), aiosqlite (MIT), defusedxml (PSF).
 All are GPL-3.0-compatible.
 

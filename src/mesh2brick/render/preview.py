@@ -1,24 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 mesh2brick contributors
-"""Quick PNG previews of a :class:`~mesh2brick.model.BrickModel`.
+"""PNG previews and step images of a :class:`~mesh2brick.model.BrickModel`.
 
-A tiny orthographic painter's-algorithm renderer on top of matplotlib's 2-D
-``PolyCollection``: every occupied grid cell (1 x 1 stud x 1 plate) is drawn
-back to front, only faces that are exposed and facing the camera, with dark
-strips along part boundaries and studs on exposed tops. Because all cells are
-translates of one box on a lattice, back-to-front ordering by cell depth is
-exact - unlike matplotlib's own 3-D mode, which mis-sorts large faces.
+A small orthographic painter's-algorithm renderer on top of matplotlib's 2-D
+``PolyCollection``, vectorised with numpy. Every occupied grid cell
+(1 x 1 stud x 1 plate) contributes its exposed, camera-facing faces, dark
+strips along part boundaries, and a stud on open tops. All polygons are drawn
+back to front by cell depth; because all cells are translates of one box on a
+lattice, that order is exact - unlike matplotlib's own 3-D mode.
 
-It is meant for self-checks, STATUS reports and as fallback instruction images
-when no LDraw renderer (LeoCAD/LDView) is installed. Slopes are drawn as their
-bounding cells for now.
-
-Only matplotlib's object-oriented API is used (no ``pyplot``), so rendering
-never touches global GUI state.
+Used for self-checks, STATUS reports and as instruction images in the PDF
+(no external LDraw renderer needed). Slopes are drawn as their bounding cells.
+Only matplotlib's object-oriented API is used (no ``pyplot``).
 """
 
 from __future__ import annotations
 
+import io
 import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
@@ -28,31 +26,37 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
+from PIL import Image
 
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.voxel.grid import LDU_PER_PLATE, LDU_PER_STUD
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     from numpy.typing import NDArray
 
-    from mesh2brick.model import Cell
     from mesh2brick.voxel.grid import VoxelGrid
 
 STUDS_PER_PLATE: Final = LDU_PER_PLATE / LDU_PER_STUD  # cell height: 0.4 studs
 STUD_RADIUS: Final = 0.3  # 4.8 mm stud diameter / 8 mm pitch
 STUD_HEIGHT: Final = 0.21  # 1.7 mm / 8 mm
 _EDGE_WIDTH: Final = 0.035  # boundary strip width in studs
-_STUD_SEGMENTS: Final = 20
+_STUD_SEGMENTS: Final = 16
 _FALLBACK_RGB: Final = "#9ba19d"
 _GHOST_MIX: Final = 0.72
+_EDGE_DARKEN: Final = 0.35
 _FACING_EPS: Final = 1e-9
 _DPI: Final = 100
+STEP_IMAGE_COLORS: Final = 64
+"""Palette size for step images: flat shading needs few colours, and a
+palette PNG is ~3x smaller, which keeps big instruction PDFs small."""
 _NO_STUD_CATEGORIES: Final = frozenset({"tile", "slope", "voxel"})
+_SCALE: Final = np.array([1.0, 1.0, STUDS_PER_PLATE])
 
-# Face normals and a fake directional light (brightness per face direction).
-_DIRECTIONS: Final[tuple[tuple[Cell, float], ...]] = (
+# Face normal -> brightness (fake directional light).
+_DIRECTIONS: Final[tuple[tuple[tuple[int, int, int], float], ...]] = (
     ((0, 0, 1), 1.0),
     ((0, 0, -1), 0.45),
     ((1, 0, 0), 0.66),
@@ -60,8 +64,10 @@ _DIRECTIONS: Final[tuple[tuple[Cell, float], ...]] = (
     ((0, 1, 0), 0.9),
     ((0, -1, 0), 0.74),
 )
+_STUD_SIDE_SHADE: Final = 0.62
+_STUD_TOP_SHADE: Final = 1.08
 
-Color = tuple[float, float, float]
+Extent = tuple[float, float, float, float]
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,8 +82,8 @@ class PreviewOptions:
     """Camera azimuth, degrees (matplotlib convention: -90 looks along +y)."""
     title: str | None = None
     up_to_step: int | None = None
-    """Draw only steps ``<= up_to_step`` (0-based): that step in full colour,
-    earlier ones faded. ``None`` draws the finished model."""
+    """Show the model as built after this 0-based step (see :func:`step_view`):
+    that step in full colour, earlier parts faded. ``None`` = finished model."""
     background: str = "#ffffff"
 
 
@@ -98,14 +104,14 @@ class _Camera:
             ]
         )
         right = np.array([-math.sin(azim), math.cos(azim), 0.0])
-        up = np.cross(toward, right)
-        return cls(right=right, up=up, toward_viewer=toward)
+        return cls(right=right, up=np.cross(toward, right), toward_viewer=toward)
 
     def project(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
-        """World points ``(n, 3)`` (studs, z in studs) -> screen ``(n, 2)``."""
+        """World points ``(..., 3)`` (studs) -> screen ``(..., 2)``."""
         return np.stack([points @ self.right, points @ self.up], axis=-1)
 
 
+# --------------------------------------------------------------------------- API
 def render_preview(
     model: BrickModel,
     path: Path,
@@ -117,59 +123,118 @@ def render_preview(
         ValueError: if the model (or the step selection) has no parts.
     """
     options = options or PreviewOptions()
-    parts = [
-        p
-        for p in model.parts
-        if options.up_to_step is None or p.step <= options.up_to_step
-    ]
-    if not parts:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(render_png(model, options))
+    return path
+
+
+def render_png(
+    model: BrickModel,
+    options: PreviewOptions | None = None,
+    *,
+    extent: Extent | None = None,
+) -> bytes:
+    """Render ``model`` (or one build step of it) and return PNG bytes.
+
+    ``extent`` fixes the visible screen window, so a series of step images
+    keeps the model in place; by default it fits the drawn parts.
+
+    Raises:
+        ValueError: if nothing is visible.
+    """
+    options = options or PreviewOptions()
+    if options.up_to_step is None:
+        visible = frozenset(range(model.part_count))
+        highlight: frozenset[int] | None = None
+    else:
+        visible, highlight = step_view(model, options.up_to_step)
+    if not visible:
         msg = "nothing to render: the model (or step selection) has no parts"
         raise ValueError(msg)
-
     camera = _Camera.from_angles(options.elevation, options.azimuth)
-    background = to_rgb(options.background)
-    owner: dict[Cell, int] = {}
-    colour: dict[int, Color] = {}
-    studded: dict[int, bool] = {}
-    for index, part in enumerate(parts):
-        base = to_rgb(_rgb_hex(model, part.color))
-        if options.up_to_step is not None and part.step < options.up_to_step:
-            base = _mix(base, background, _GHOST_MIX)
-        colour[index] = base
-        studded[index] = part.category not in _NO_STUD_CATEGORIES
-        for cell in part.cells:
-            owner[cell] = index
+    polygons, fills = _scene(model, visible, highlight, camera, options.background)
+    return _draw(polygons, fills, options, extent)
 
-    polygons, fills = _draw_cells(owner, colour, studded, camera)
 
-    fig = Figure(
-        figsize=(options.width_px / _DPI, options.height_px / _DPI),
-        dpi=_DPI,
-        facecolor=options.background,
-    )
-    FigureCanvasAgg(fig)
-    ax = fig.add_axes((0.02, 0.02, 0.96, 0.9 if options.title else 0.96))
-    ax.add_collection(
-        PolyCollection(
-            polygons,
-            facecolors=fills,
-            edgecolors=fills,
-            linewidths=0.6,
-            antialiased=True,
+def step_view(model: BrickModel, step: int) -> tuple[frozenset[int], frozenset[int]]:
+    """Which parts are visible / newly placed after build step ``step``.
+
+    A subassembly step shows only that subassembly (built on the table); a
+    main-model step shows the main model plus every subassembly attached so
+    far; an attach step highlights the whole attached subassembly.
+
+    Raises:
+        ValueError: for a step outside the model.
+    """
+    if not 0 <= step < model.step_count:
+        msg = f"step {step} outside 0..{model.step_count - 1}"
+        raise ValueError(msg)
+    steps = model.steps
+    current = steps[step]
+    if current.submodel is not None:
+        visible = {
+            i
+            for i, p in enumerate(model.parts)
+            if p.step <= step and steps[p.step].submodel == current.submodel
+        }
+        return frozenset(visible), frozenset(
+            i for i in visible if model.parts[i].step == step
         )
-    )
-    every = np.concatenate(polygons)
-    (xmin, ymin), (xmax, ymax) = every.min(axis=0), every.max(axis=0)
-    pad = 0.04 * max(xmax - xmin, ymax - ymin)
-    ax.set_xlim(xmin - pad, xmax + pad)
-    ax.set_ylim(ymin - pad, ymax + pad)
-    ax.set_aspect("equal")
-    ax.set_axis_off()
-    if options.title:
-        fig.suptitle(options.title, fontsize=14)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, facecolor=options.background)
-    return path
+    attached = {s.attaches for s in steps[: step + 1] if s.attaches is not None}
+    visible = {
+        i
+        for i, p in enumerate(model.parts)
+        if p.step <= step
+        and (steps[p.step].submodel is None or steps[p.step].submodel in attached)
+    }
+    if current.attaches is not None:
+        new = {
+            i
+            for i in visible
+            if steps[model.parts[i].step].submodel == current.attaches
+        }
+    else:
+        new = {i for i in visible if model.parts[i].step == step}
+    return frozenset(visible), frozenset(new)
+
+
+def render_step_images(
+    model: BrickModel, options: PreviewOptions | None = None
+) -> list[bytes]:
+    """One PNG per build step.
+
+    Main-model steps are framed like the finished model, subassembly steps
+    like the finished subassembly, so nothing jumps around between pages.
+    """
+    options = options or PreviewOptions()
+    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    frames: dict[str | None, Extent] = {
+        None: _fit_extent(_screen_bounds(model.parts, camera))
+    }
+    for name in model.submodels:
+        members = [p for p in model.parts if model.steps[p.step].submodel == name]
+        frames[name] = _fit_extent(_screen_bounds(members, camera))
+    images: list[bytes] = []
+    for step in range(model.step_count):
+        extent = frames[model.steps[step].submodel]
+        visible, highlight = step_view(model, step)
+        if not visible:  # an empty step (should not happen) gets a blank frame
+            images.append(_draw([], [], options, extent))
+            continue
+        polygons, fills = _scene(model, visible, highlight, camera, options.background)
+        images.append(_palette_png(_draw(polygons, fills, options, extent)))
+    return images
+
+
+def _palette_png(png: bytes, colors: int = STEP_IMAGE_COLORS) -> bytes:
+    """Re-encode an RGB(A) PNG with a small colour palette."""
+    with Image.open(io.BytesIO(png)) as image:
+        quantized = image.convert("RGB").quantize(
+            colors=colors, method=Image.Quantize.MEDIANCUT
+        )
+    buffer = io.BytesIO()
+    quantized.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
 
 
 def render_grid_preview(
@@ -215,121 +280,163 @@ def grid_to_model(
     )
 
 
-def _draw_cells(
-    owner: dict[Cell, int],
-    colour: dict[int, Color],
-    studded: dict[int, bool],
+# --------------------------------------------------------------------------- scene
+def _scene(
+    model: BrickModel,
+    visible: frozenset[int],
+    highlight: frozenset[int] | None,
     camera: _Camera,
-) -> tuple[list[NDArray[np.float64]], list[Color]]:
-    """Polygons (screen space) and fill colours in back-to-front order."""
-    view = camera.toward_viewer
-    scale = np.array([1.0, 1.0, STUDS_PER_PLATE])
-    visible_dirs = [
-        (np.array(d), shade)
-        for d, shade in _DIRECTIONS
-        if np.dot(d, view) > _FACING_EPS
-    ]
-    # Only cells with an exposed, camera-facing side (or an open top for a
-    # stud) contribute; skipping the rest keeps big solid grids fast.
-    steps = [d for d, _ in _DIRECTIONS if np.dot(d, view) > _FACING_EPS]
-    exposed = [
-        c
-        for c in owner
-        if (c[0], c[1], c[2] + 1) not in owner
-        or any((c[0] + d[0], c[1] + d[1], c[2] + d[2]) not in owner for d in steps)
-    ]
-    vx, vy, vz = float(view[0]), float(view[1]), float(view[2]) * STUDS_PER_PLATE
-    cells = sorted(exposed, key=lambda c: c[0] * vx + c[1] * vy + c[2] * vz)
-    polygons: list[NDArray[np.float64]] = []
-    fills: list[Color] = []
-    for cell in cells:
-        part = owner[cell]
-        base = colour[part]
-        edge = (base[0] * 0.35, base[1] * 0.35, base[2] * 0.35)
-        origin = np.array(cell, dtype=np.float64)
-        for normal, shade in visible_dirs:
-            neighbour = _offset(cell, normal)
-            if neighbour in owner:
-                continue
-            corners = _face_corners(origin, normal) * scale
-            polygons.append(camera.project(corners))
-            fills.append(_shaded(base, shade))
-            for strip in _boundary_strips(cell, normal, corners, owner):
-                polygons.append(camera.project(strip))
-                fills.append(edge)
-        top = _offset(cell, np.array([0, 0, 1]))
-        is_top_of_part = owner.get(top) != part
-        if studded[part] and is_top_of_part and top not in owner:
-            centre = (origin + np.array([0.5, 0.5, 1.0])) * scale
-            for polygon, shade in _stud(centre, camera):
-                polygons.append(polygon)
-                fills.append(_shaded(base, shade))
-    return polygons, fills
-
-
-def _offset(cell: Cell, direction: NDArray[np.int_]) -> Cell:
-    return (
-        cell[0] + int(direction[0]),
-        cell[1] + int(direction[1]),
-        cell[2] + int(direction[2]),
+    background: str,
+) -> tuple[list[NDArray[np.float64]], NDArray[np.float64]]:
+    """Back-to-front polygons (screen space) and their RGB fills."""
+    index = np.fromiter(sorted(visible), dtype=np.int64)
+    cells, owner_of_cell = _cells(model, index)
+    base = _part_colours(model, index, highlight, background)
+    studded = np.array(
+        [model.parts[i].category not in _NO_STUD_CATEGORIES for i in index]
     )
+    low = cells.min(axis=0) - 1
+    shape = cells.max(axis=0) - low + 2
+    owner = np.full(tuple(int(n) for n in shape), -1, dtype=np.int64)
+    local = cells - low
+    owner[local[:, 0], local[:, 1], local[:, 2]] = owner_of_cell  # position in index
+    occupied = owner >= 0
+    view = camera.toward_viewer
+
+    groups_poly: list[NDArray[np.float64]] = []
+    groups_rgb: list[NDArray[np.float64]] = []
+    groups_key: list[NDArray[np.float64]] = []
+    groups_order: list[NDArray[np.int64]] = []
+
+    for direction, shade in _DIRECTIONS:
+        d = np.array(direction)
+        if float(np.dot(d, view)) <= _FACING_EPS:
+            continue
+        exposed = occupied & ~np.roll(occupied, shift=-d, axis=(0, 1, 2))
+        at = np.argwhere(exposed)
+        if not len(at):
+            continue
+        part_pos = owner[at[:, 0], at[:, 1], at[:, 2]]
+        world = (at + low).astype(np.float64)
+        depth = (world * _SCALE) @ view
+        corners = _face_corners(world, d) * _SCALE
+        groups_poly.append(camera.project(corners))
+        groups_rgb.append(np.clip(base[part_pos] * shade, 0.0, 1.0))
+        groups_key.append(depth)
+        groups_order.append(np.zeros(len(at), dtype=np.int64))
+        for strip, keep in _strips(at, d, corners, owner, exposed):
+            groups_poly.append(camera.project(strip))
+            groups_rgb.append(base[part_pos[keep]] * _EDGE_DARKEN)
+            groups_key.append(depth[keep])
+            groups_order.append(np.ones(int(keep.sum()), dtype=np.int64))
+        if direction == (0, 0, 1):
+            with_stud = studded[part_pos]
+            if with_stud.any():
+                centres = (world[with_stud] + np.array([0.5, 0.5, 1.0])) * _SCALE
+                for template, shade_stud, order in _stud_templates(camera):
+                    screen = camera.project(centres)[:, None, :] + template[None]
+                    groups_poly.append(screen)
+                    groups_rgb.append(
+                        np.clip(base[part_pos[with_stud]] * shade_stud, 0.0, 1.0)
+                    )
+                    groups_key.append(depth[with_stud])
+                    groups_order.append(np.full(int(with_stud.sum()), order))
+
+    if not groups_poly:
+        return [], np.zeros((0, 3))
+    keys = np.concatenate(groups_key)
+    orders = np.concatenate(groups_order)
+    rgb = np.concatenate(groups_rgb)
+    flat: list[NDArray[np.float64]] = [poly for group in groups_poly for poly in group]
+    permutation = np.lexsort((orders, keys))
+    return [flat[i] for i in permutation], rgb[permutation]
+
+
+def _cells(
+    model: BrickModel, index: NDArray[np.int64]
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """All cells of the selected parts and, per cell, its part's position."""
+    chunks = [np.asarray(model.parts[i].cells, dtype=np.int64) for i in index]
+    owners = [np.full(len(c), pos, dtype=np.int64) for pos, c in enumerate(chunks)]
+    return np.concatenate(chunks), np.concatenate(owners)
+
+
+def _part_colours(
+    model: BrickModel,
+    index: NDArray[np.int64],
+    highlight: frozenset[int] | None,
+    background: str,
+) -> NDArray[np.float64]:
+    cache: dict[int, tuple[float, float, float]] = {}
+    rows = []
+    for i in index:
+        code = model.parts[i].color
+        if code not in cache:
+            info = model.colors.get(code)
+            cache[code] = to_rgb(info.rgb_hex if info is not None else _FALLBACK_RGB)
+        rows.append(cache[code])
+    base = np.asarray(rows, dtype=np.float64)
+    if highlight is not None:
+        faded = np.array([i not in highlight for i in index])
+        bg = np.asarray(to_rgb(background))
+        base[faded] = base[faded] * (1 - _GHOST_MIX) + bg * _GHOST_MIX
+    return base
 
 
 def _face_corners(
-    origin: NDArray[np.float64], normal: NDArray[np.int_]
+    world: NDArray[np.float64], normal: NDArray[np.int_]
 ) -> NDArray[np.float64]:
-    """The four corners (unit-cell space) of the face of a cell along ``normal``."""
+    """``(n, 4, 3)`` corners (unit-cell space) of the faces along ``normal``."""
     axis = int(np.flatnonzero(normal)[0])
     u_axis, v_axis = [a for a in range(3) if a != axis]
-    base = origin.copy()
+    offsets = np.zeros((4, 3))
     if normal[axis] > 0:
-        base[axis] += 1.0
-    corners = np.repeat(base[None, :], 4, axis=0)
-    corners[1, u_axis] += 1.0
-    corners[2, u_axis] += 1.0
-    corners[2, v_axis] += 1.0
-    corners[3, v_axis] += 1.0
-    return corners
+        offsets[:, axis] = 1.0
+    offsets[1, u_axis] = offsets[2, u_axis] = 1.0
+    offsets[2, v_axis] = offsets[3, v_axis] = 1.0
+    result: NDArray[np.float64] = world[:, None, :] + offsets[None]
+    return result
 
 
-def _boundary_strips(
-    cell: Cell,
+def _strips(
+    at: NDArray[np.int64],
     normal: NDArray[np.int_],
     corners: NDArray[np.float64],
-    owner: dict[Cell, int],
-) -> list[NDArray[np.float64]]:
-    """Thin dark strips along face edges that are part boundaries or creases."""
+    owner: NDArray[np.int64],
+    exposed: NDArray[np.bool_],
+) -> list[tuple[NDArray[np.float64], NDArray[np.bool_]]]:
+    """Dark strips along face edges that are part boundaries or creases."""
     axis = int(np.flatnonzero(normal)[0])
-    part = owner[cell]
-    strips: list[NDArray[np.float64]] = []
-    # Edges in corner order: (0,1) along u at v=0, (1,2) along v at u=1, ...
-    edges = ((0, 1), (1, 2), (2, 3), (3, 0))
     u_axis, v_axis = [a for a in range(3) if a != axis]
-    steps = (
-        (v_axis, -1),
-        (u_axis, +1),
-        (v_axis, +1),
-        (u_axis, -1),
+    # Corners 0-1-2-3; edge (0,1) lies at v=0, (1,2) at u=1, (2,3) at v=1, (3,0) at u=0.
+    edges = (
+        ((0, 1), v_axis, -1),
+        ((1, 2), u_axis, 1),
+        ((2, 3), v_axis, 1),
+        ((3, 0), u_axis, -1),
     )
-    for (a, b), (step_axis, sign) in zip(edges, steps, strict=True):
-        delta = np.zeros(3, dtype=np.int_)
+    own = owner[at[:, 0], at[:, 1], at[:, 2]]
+    result = []
+    for (a, b), step_axis, sign in edges:
+        delta = np.zeros(3, dtype=np.int64)
         delta[step_axis] = sign
-        beside = _offset(cell, delta)
-        continues = owner.get(beside) == part and _offset(beside, normal) not in owner
-        if continues:
+        beside = at + delta
+        continues = (owner[beside[:, 0], beside[:, 1], beside[:, 2]] == own) & exposed[
+            beside[:, 0], beside[:, 1], beside[:, 2]
+        ]
+        keep = ~continues
+        if not keep.any():
             continue
-        # A rectangle reaching perpendicularly into the face, so strips of
-        # neighbouring cells join into one continuous line.
         inward = -delta.astype(np.float64) * _EDGE_WIDTH
-        p, q = corners[a], corners[b]
-        strips.append(np.array([p, q, q + inward, p + inward]))
-    return strips
+        p, q = corners[keep, a], corners[keep, b]
+        result.append((np.stack([p, q, q + inward, p + inward], axis=1), keep))
+    return result
 
 
-def _stud(
-    centre: NDArray[np.float64], camera: _Camera
-) -> list[tuple[NDArray[np.float64], float]]:
-    """Polygons for one stud on a top face: shaded side band, then the cap."""
+def _stud_templates(
+    camera: _Camera,
+) -> list[tuple[NDArray[np.float64], float, int]]:
+    """Screen-space stud polygons relative to the stud's base centre."""
     angles = np.linspace(0.0, 2 * math.pi, _STUD_SEGMENTS, endpoint=False)
     ring = np.stack(
         [
@@ -339,18 +446,25 @@ def _stud(
         ],
         axis=-1,
     )
-    bottom = camera.project(centre + ring)
-    top = camera.project(centre + ring + np.array([0.0, 0.0, STUD_HEIGHT]))
-    # Side band = convex hull of both projected rings (a cylinder's silhouette).
+    bottom = camera.project(ring)
+    top = camera.project(ring + np.array([0.0, 0.0, STUD_HEIGHT]))
     side = _convex_hull(np.concatenate([bottom, top]))
-    return [(side, 0.62), (top, 1.08)]
+    # Pad the hull to the ring length so all studs stack into one array.
+    side = _resample_closed(side, _STUD_SEGMENTS * 2)
+    top = _resample_closed(top, _STUD_SEGMENTS * 2)
+    return [(side, _STUD_SIDE_SHADE, 2), (top, _STUD_TOP_SHADE, 3)]
+
+
+def _resample_closed(polygon: NDArray[np.float64], count: int) -> NDArray[np.float64]:
+    """Repeat vertices so a polygon has exactly ``count`` points (same shape)."""
+    picks = np.floor(np.arange(count) * len(polygon) / count).astype(np.int64)
+    result: NDArray[np.float64] = polygon[picks]
+    return result
 
 
 def _convex_hull(points: NDArray[np.float64]) -> NDArray[np.float64]:
     """Monotone-chain convex hull of 2-D points (counter-clockwise)."""
     ordered = sorted({(float(x), float(y)) for x, y in points})
-    if len(ordered) < 3:  # noqa: PLR2004 - a hull needs three points
-        return np.array(ordered)
 
     def cross(
         o: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
@@ -370,22 +484,66 @@ def _convex_hull(points: NDArray[np.float64]) -> NDArray[np.float64]:
     return np.array(lower[:-1] + upper[:-1])
 
 
-def _rgb_hex(model: BrickModel, code: int) -> str:
-    info = model.colors.get(code)
-    return info.rgb_hex if info is not None else _FALLBACK_RGB
-
-
-def _shaded(base: Color, shade: float) -> Color:
-    return (
-        min(1.0, base[0] * shade),
-        min(1.0, base[1] * shade),
-        min(1.0, base[2] * shade),
+# --------------------------------------------------------------------------- drawing
+def _screen_bounds(parts: Sequence[PlacedPart], camera: _Camera) -> Extent:
+    cells = np.concatenate([np.asarray(p.cells, dtype=np.float64) for p in parts])
+    lo, hi = cells.min(axis=0), cells.max(axis=0) + 1
+    hi = hi + np.array([0.0, 0.0, STUD_HEIGHT / STUDS_PER_PLATE])
+    box = np.array(
+        [
+            [x, y, z]
+            for x in (lo[0], hi[0])
+            for y in (lo[1], hi[1])
+            for z in (lo[2], hi[2])
+        ]
     )
+    screen = camera.project(box * _SCALE)
+    (x0, y0), (x1, y1) = screen.min(axis=0), screen.max(axis=0)
+    return (float(x0), float(x1), float(y0), float(y1))
 
 
-def _mix(a: Color, b: Color, t: float) -> Color:
-    return (
-        a[0] * (1 - t) + b[0] * t,
-        a[1] * (1 - t) + b[1] * t,
-        a[2] * (1 - t) + b[2] * t,
+def _fit_extent(bounds: Extent) -> Extent:
+    x0, x1, y0, y1 = bounds
+    pad = 0.04 * max(x1 - x0, y1 - y0, 1e-6)
+    return (x0 - pad, x1 + pad, y0 - pad, y1 + pad)
+
+
+def _draw(
+    polygons: list[NDArray[np.float64]],
+    fills: NDArray[np.float64] | list[object],
+    options: PreviewOptions,
+    extent: Extent | None,
+) -> bytes:
+    fig = Figure(
+        figsize=(options.width_px / _DPI, options.height_px / _DPI),
+        dpi=_DPI,
+        facecolor=options.background,
     )
+    FigureCanvasAgg(fig)
+    ax = fig.add_axes((0.02, 0.02, 0.96, 0.9 if options.title else 0.96))
+    if polygons:
+        ax.add_collection(
+            PolyCollection(
+                polygons,
+                facecolors=fills,
+                edgecolors=fills,
+                linewidths=0.6,
+                antialiased=True,
+            )
+        )
+    if extent is None:
+        if polygons:
+            every = np.concatenate(polygons)
+            (x0, y0), (x1, y1) = every.min(axis=0), every.max(axis=0)
+            extent = _fit_extent((float(x0), float(x1), float(y0), float(y1)))
+        else:
+            extent = (0.0, 1.0, 0.0, 1.0)
+    ax.set_xlim(extent[0], extent[1])
+    ax.set_ylim(extent[2], extent[3])
+    ax.set_aspect("equal")
+    ax.set_axis_off()
+    if options.title:
+        fig.suptitle(options.title, fontsize=14)
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", facecolor=options.background)
+    return buffer.getvalue()

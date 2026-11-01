@@ -27,12 +27,20 @@ def test_defaults_match_spec() -> None:
     assert s.voxel.fill == "hollow"
     assert s.color.single_color == 4
     assert s.parts.categories == ("brick", "plate")  # slope opt-in (UPSTREAM #2)
-    assert s.placement.strategy == "luo"
+    assert s.placement.strategy == "kollsker"  # benchmark choice (SPEC said luo)
+    assert s.placement.time_limit_s == 300
+    assert s.steps.sequencing == "auto"
     assert s.stability.max_repair_iterations == 20
     assert s.steps.parts_per_step == 7
     assert s.llm.enabled is False
     assert s.llm.model == DEFAULT_LLM_MODEL
-    assert s.output.formats == ("ldr", "bom_csv", "bom_bricklink", "pdf")
+    assert s.output.formats == (
+        "ldr",
+        "bom_csv",
+        "bom_bricklink",
+        "bom_rebrickable",
+        "pdf",
+    )
 
 
 def test_example_file_equals_defaults() -> None:

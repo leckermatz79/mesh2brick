@@ -2,18 +2,22 @@
 # SPDX-FileCopyrightText: 2026 mesh2brick contributors
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import numpy as np
 import pytest
 from matplotlib.image import imread
+from PIL import Image
 
-from mesh2brick.model import BrickModel, ColorInfo
+from mesh2brick.model import BrickModel, BuildStep, ColorInfo
 from mesh2brick.render.preview import (
     PreviewOptions,
     grid_to_model,
     render_grid_preview,
     render_preview,
+    render_step_images,
+    step_view,
 )
 from mesh2brick.voxel.grid import VoxelGrid
 
@@ -75,3 +79,45 @@ def test_grid_preview(tmp_path: Path) -> None:
         colors={4: ColorInfo("Red", "#c91a09"), 15: ColorInfo("White", "#ffffff")},
     )
     assert _pixels(path).shape[:2] == (200, 300)
+
+
+def subassembly_model() -> BrickModel:
+    """Step 0 main base, steps 1-2 build 'roof' on the table, step 3 attaches it."""
+    from tests.helpers import make_brick  # noqa: PLC0415
+
+    return BrickModel(
+        name="house",
+        parts=(
+            make_brick("3001", 0, 0, 0, 0),
+            make_brick("3001", 0, 0, 3, 1),
+            make_brick("3003", 0, 0, 6, 2, w=2, d=2),
+        ),
+        steps=(
+            BuildStep(),
+            BuildStep(submodel="roof"),
+            BuildStep(submodel="roof"),
+            BuildStep(attaches="roof"),
+        ),
+        colors={4: ColorInfo("Red", "#c91a09")},
+    )
+
+
+def test_step_view_handles_subassemblies() -> None:
+    model = subassembly_model()
+    assert step_view(model, 0) == (frozenset({0}), frozenset({0}))
+    # Building the roof on the table: only roof parts are visible.
+    assert step_view(model, 1) == (frozenset({1}), frozenset({1}))
+    assert step_view(model, 2) == (frozenset({1, 2}), frozenset({2}))
+    # Attaching it: everything visible, the whole roof highlighted.
+    assert step_view(model, 3) == (frozenset({0, 1, 2}), frozenset({1, 2}))
+    with pytest.raises(ValueError, match="outside"):
+        step_view(model, 4)
+
+
+def test_render_step_images_one_png_per_step() -> None:
+    model = subassembly_model()
+    images = render_step_images(model, PreviewOptions(width_px=200, height_px=150))
+    assert len(images) == model.step_count
+    assert all(image.startswith(b"\x89PNG") for image in images)
+    with Image.open(io.BytesIO(images[0])) as first:
+        assert first.mode == "P"  # palette PNG keeps PDFs small
