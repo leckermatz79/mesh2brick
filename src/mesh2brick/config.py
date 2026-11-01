@@ -55,8 +55,11 @@ class InputConfig(_Section):
     up_axis: Axis = "z"
     auto_orient: bool = False
     scale_mode: Literal["studs", "mm"] = "studs"
-    target_studs: Annotated[int, Field(gt=0, le=512)] = 48
-    """Length of the longest model axis in studs (``scale_mode: studs``)."""
+    target_studs: Annotated[int, Field(gt=0, le=512)] = 32
+    """Length of the longest model axis in studs (``scale_mode: studs``).
+
+    Default 32 (~26 cm) by product-owner decision of 2026-11-01; SPEC §4 had 48.
+    """
     mm_per_stud: Annotated[float, Field(gt=0)] = 8.0
     """Model millimetres per stud (``scale_mode: mm``); a real stud pitch is 8 mm."""
 

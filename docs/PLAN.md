@@ -69,15 +69,15 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 ## Phase 2 – End-to-End (MVP)
 
 - [ ] `mesh2brick convert bunny_lowpoly.stl` → `.ldr` + BOM (CSV, BrickLink-XML, Rebrickable-CSV) + PDF.
-- [ ] PDF zunächst über legolizations Booklet. Für die Schrittbilder nehmen wir LeoCAD bzw. LDView, wenn vorhanden, sonst unsere matplotlib-Bilder.
+- [ ] PDF zunächst über legolizations Booklet. Für die Schrittbilder wird LeoCAD per Homebrew installiert (von dir freigegeben). Ohne Renderer, z. B. in CI, nehmen wir unsere matplotlib-Bilder.
 - [ ] Prüfung: BOM-Summe = Teilezahl = Anzahl `1`-Zeilen in der `.ldr`, jeder Stein steckt in genau einem Schritt.
 - [ ] Abgleich legolization-PDF ↔ SPEC §1 und Lückenliste in `STATUS.md` (wird in Phase 6 geschlossen).
 - [ ] Upstream-Kandidaten in `UPSTREAM.md` sammeln.
-- [ ] Lokaler Testlauf mit Duo (nicht im Repo) als erster echter Praxistest.
+- [ ] Lokaler Testlauf mit Duo als erster echter Praxistest (nur lokal: nicht ins Repo, nicht in die Galerie).
 - **Abnahme:** PDF für den Hasen öffnet, Schritte vollständig, BOM-Summe = Teilezahl, `.ldr` öffnet in LDView/Studio (Screenshot in `docs/gallery/`).
 
 ## Risiken und wie ich damit umgehe
 
-- **Laufzeit großer Modelle:** legolization optimiert Stabilität mit LP-Solvern. Bei `target_studs: 48` können Modelle mit tausenden Steinen entstehen. Gegenmaßnahme: Zeitbudget (`time_budget_s`) durchreichen und Laufzeiten in `docs/benchmarks.md` festhalten.
+- **Laufzeit großer Modelle:** legolization optimiert Stabilität mit LP-Solvern. Standard sind jetzt 32 Noppen, 48 kommt später. Bei 48 können Modelle mit tausenden Steinen entstehen. Gegenmaßnahme: Zeitbudget (`time_budget_s`) durchreichen und Laufzeiten in `docs/benchmarks.md` festhalten.
 - **CI-Dauer:** Die Bibliothek ist 147 MB groß. Die Generierung wird gecacht, Schlüssel ist die Bibliotheksversion.
 - **Nextcloud + Git:** Das `.git`-Verzeichnis wird mitsynchronisiert. Das ist unkritisch, solange nur ein Rechner gleichzeitig daran arbeitet.

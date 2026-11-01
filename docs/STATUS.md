@@ -27,8 +27,7 @@ das Thema von Phase 1.
   - ein Test, dass nur der Adapter die Fremdbibliotheken benutzt,
   - ein Test, dass jede Datei den Lizenz-Header hat.
 - Dokumente: README (de/en), CLAUDE.md, ADR 0001/0002, Lizenzübersicht, Upstream-Liste.
-
-- GitHub: öffentliches Repo, Tag `v0.0.0` mit Release, Issues #1–#9 (eins pro Phase mit Abnahme-Checkliste), `main` geschützt (Änderungen ab jetzt per Pull Request).
+- GitHub: öffentliches Repo, Tag `v0.0.0`, Issues #1–#9 (eins pro Phase mit Abnahme-Checkliste), `main` geschützt (Änderungen ab jetzt per Pull Request).
 - Commits laufen unter deiner GitHub-noreply-Adresse; die gmx-Adresse taucht im Repo nirgends auf.
 
 ## Als Nächstes
@@ -52,10 +51,20 @@ Phase 1 (Issue #2): Mesh-Import (STL/OBJ/3MF/PLY) und eigene Voxelisierung, sieh
 - Die LDraw-Teilebibliothek (147 MB Download, 623 MB entpackt) liegt in `~/Library/Caches/pyldraw3`.
 - `samples/` (Duo) ist von Git ausgeschlossen: zu groß und markenrechtlich nicht für ein öffentliches Repo geeignet.
 
+## Deine Entscheidungen
+
+| Datum | Frage | Entscheidung |
+|---|---|---|
+| 2026-11-01 | Erster echter Testfall? | Duo (Eule aus `samples/`), **nur lokal**: nicht im Repo, nicht in der Galerie. |
+| 2026-11-01 | Typische Modellgröße? | **32 Noppen** auf der längsten Achse (≈ 26 cm) als Standard, 48 erst später. Ist in Config, Beispieldatei und SPEC §4 eingetragen. |
+| 2026-11-01 | LeoCAD für PDF-Schrittbilder installieren? | **Ja**, per Homebrew zu Beginn von Phase 2. |
+
 ## Fragen an dich
 
-Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
+Keine offenen Fragen.
 
-1. **Ist Duo (die Eule in `samples/`) dein erster echter Testfall?** *Annahme: ja. Ich teste lokal mit Duo, nehme ihn aber nicht ins Repo und nicht in die öffentliche Galerie auf. Dort zeige ich nur freie Testmodelle.*
-2. **Wie groß sollen typische Modelle werden?** *Annahme: wie in der SPEC 48 Noppen auf der längsten Achse (≈ 38 cm). Das ergibt bei Duo voraussichtlich weit über 1000 Teile. Wenn du eher Schreibtischgröße willst, wären 24–32 Noppen sinnvoll.*
-3. **Darf ich für die Schrittbilder im PDF (Phase 2) LeoCAD per Homebrew installieren?** *Annahme: ja. Ohne LeoCAD nutze ich meine eigenen, einfacheren Vorschaubilder.*
+## Offene Kleinigkeit
+
+Die Release-Seite für `v0.0.0` auf GitHub fehlt noch, der Tag existiert. Das Anlegen der
+öffentlichen Seite wurde vom Rechtesystem blockiert. Wer sie haben möchte:
+`awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`

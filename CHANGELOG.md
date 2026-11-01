@@ -6,6 +6,9 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+### Changed
+- Default `input.target_studs` is now 32 (was 48 per SPEC §4), by product-owner decision.
+
 ## [0.0.0] - 2026-11-01 - Phase 0: skeleton
 
 ### Added
