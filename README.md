@@ -16,8 +16,9 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 0 of 8).** The project skeleton and the backend
-> adapter work; mesh import arrives in Phase 1. See [docs/STATUS.md](docs/STATUS.md).
+> **Status: pre-alpha (Phase 1 of 8).** Mesh import (STL, OBJ, PLY, 3MF) and
+> voxelization work; the one-command pipeline with parts lists and PDF arrives in
+> Phase 2. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (development)
 
@@ -33,7 +34,13 @@ uv run mesh2brick --help
 ## Usage
 
 ```sh
-# Phase 0: place bricks on a voxel model and write LDraw + preview
+# 1. Voxelize a mesh onto the stud grid (longest axis = 32 studs by default)
+uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+
+# 2. Place bricks on the grid: LDraw file, brick model JSON, PNG preview
+uv run mesh2brick place out/bunny_lowpoly.grid.npz -o out/
+
+# Voxel files work too (MagicaVoxel .vox, numpy .npy)
 uv run mesh2brick place tests/fixtures/heart.vox -o out/
 
 # Override any setting from mesh2brick.yaml on the command line

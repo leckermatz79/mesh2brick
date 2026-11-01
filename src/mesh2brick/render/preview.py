@@ -29,6 +29,7 @@ from matplotlib.collections import PolyCollection
 from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
 
+from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.voxel.grid import LDU_PER_PLATE, LDU_PER_STUD
 
 if TYPE_CHECKING:
@@ -36,7 +37,8 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from mesh2brick.model import BrickModel, Cell
+    from mesh2brick.model import Cell
+    from mesh2brick.voxel.grid import VoxelGrid
 
 STUDS_PER_PLATE: Final = LDU_PER_PLATE / LDU_PER_STUD  # cell height: 0.4 studs
 STUD_RADIUS: Final = 0.3  # 4.8 mm stud diameter / 8 mm pitch
@@ -47,7 +49,7 @@ _FALLBACK_RGB: Final = "#9ba19d"
 _GHOST_MIX: Final = 0.72
 _FACING_EPS: Final = 1e-9
 _DPI: Final = 100
-_NO_STUD_CATEGORIES: Final = frozenset({"tile", "slope"})
+_NO_STUD_CATEGORIES: Final = frozenset({"tile", "slope", "voxel"})
 
 # Face normals and a fake directional light (brightness per face direction).
 _DIRECTIONS: Final[tuple[tuple[Cell, float], ...]] = (
@@ -170,6 +172,49 @@ def render_preview(
     return path
 
 
+def render_grid_preview(
+    grid: VoxelGrid,
+    path: Path,
+    options: PreviewOptions | None = None,
+    colors: dict[int, ColorInfo] | None = None,
+) -> Path:
+    """Render a voxel grid (each cell as its own block, no studs) to PNG.
+
+    Raises:
+        ValueError: if the grid is empty.
+    """
+    return render_preview(grid_to_model(grid, colors), path, options)
+
+
+def grid_to_model(
+    grid: VoxelGrid, colors: dict[int, ColorInfo] | None = None
+) -> BrickModel:
+    """Wrap every occupied cell as a one-cell part so it can be rendered."""
+    per_cell = grid.plates_per_cell
+    parts = tuple(
+        PlacedPart(
+            part="voxel",
+            color=int(grid.color[x, y, z]),
+            x=int(x),
+            y=int(y),
+            layer=int(z) * per_cell,
+            yaw=0,
+            cells=tuple(
+                (int(x), int(y), int(z) * per_cell + k) for k in range(per_cell)
+            ),
+            step=0,
+            category="voxel",
+        )
+        for x, y, z in np.argwhere(grid.occupancy)
+    )
+    return BrickModel(
+        name="voxels",
+        parts=parts,
+        steps=(BuildStep(),) if parts else (),
+        colors=dict(colors or {}),
+    )
+
+
 def _draw_cells(
     owner: dict[Cell, int],
     colour: dict[int, Color],
@@ -184,7 +229,17 @@ def _draw_cells(
         for d, shade in _DIRECTIONS
         if np.dot(d, view) > _FACING_EPS
     ]
-    cells = sorted(owner, key=lambda c: float(np.dot(np.array(c) * scale, view)))
+    # Only cells with an exposed, camera-facing side (or an open top for a
+    # stud) contribute; skipping the rest keeps big solid grids fast.
+    steps = [d for d, _ in _DIRECTIONS if np.dot(d, view) > _FACING_EPS]
+    exposed = [
+        c
+        for c in owner
+        if (c[0], c[1], c[2] + 1) not in owner
+        or any((c[0] + d[0], c[1] + d[1], c[2] + d[2]) not in owner for d in steps)
+    ]
+    vx, vy, vz = float(view[0]), float(view[1]), float(view[2]) * STUDS_PER_PLATE
+    cells = sorted(exposed, key=lambda c: c[0] * vx + c[1] * vy + c[2] * vz)
     polygons: list[NDArray[np.float64]] = []
     fills: list[Color] = []
     for cell in cells:

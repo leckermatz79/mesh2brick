@@ -1,70 +1,100 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **0 – Gerüst: abgeschlossen ✅** · Nächste: **Phase 1 – Ingest + Voxelisierung**
-Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · CI grün auf Linux + macOS, Python 3.12/3.13
-Plan für Phase 0–2: [PLAN.md](PLAN.md)
+Stand: 2026-11-01 · Aktuelle Phase: **1 – Ingest + Voxelisierung: fertig, wartet auf Merge** · Nächste: **Phase 2 – End-to-End (MVP)**
+Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
 
-Das Grundgerüst steht. mesh2brick kann bereits ein fertiges Voxelmodell (das Herz-Beispiel)
-an legolization übergeben und bekommt ein stabiles Modell mit 18 Steinen in 8 Bauschritten
-zurück, inklusive LDraw-Datei und Vorschaubild. Der Mesh-Import (STL/3MF …) fehlt noch, er ist
-das Thema von Phase 1.
+mesh2brick liest jetzt echte 3D-Dateien (STL, OBJ, PLY und 3MF, auch Bambu-Studio-Projekte) und
+macht daraus ein Noppenraster, das das Volumen fast exakt trifft (Kugel: 0,1 % Abweichung).
+Der Hase hat bei 16 Noppen 226 Teile, steht stabil und ist in 9 Sekunden fertig. Größere Modelle
+brauchen in legolization aber noch sehr lange, das ist das große Thema für Phase 2.
 
-![Phase 0: Herz](gallery/phase0-heart.png)
+| Voxel (Hase, 16 Noppen) | Steine (legolization) |
+|---|---|
+| ![Voxel](gallery/phase1-bunny-voxels.png) | ![Steine](gallery/phase1-bunny-bricks.png) |
 
-## Erledigt (Phase 0)
+## Erledigt (Phase 1)
 
-- Projekt mit `uv`, Python 3.12, alle Werkzeuge eingerichtet (ruff, mypy strict, pytest, pre-commit, GitHub Actions für Linux + macOS × Python 3.12/3.13).
-- legolization 0.5.0, pyldraw3 1.7.0 und rebrickable 1.1.0 eingebunden und exakt gepinnt.
-- Komplette Konfiguration nach SPEC §4 mit verständlichen Fehlermeldungen. Jede Einstellung lässt sich per `--set bereich.feld=wert` überschreiben.
-- Adapter zu legolization: Gitter → Platzierung → Stabilität → Bauschritte → `.ldr`/`.mpd`. Bauteile, die separat vorgebaut und dann angesetzt werden (Unterbaugruppen), sind korrekt erfasst.
-- Eigener Vorschau-Renderer (Steine mit Kanten und Noppen, einzelne Bauschritte darstellbar).
-- CLI: `place` und `render` funktionieren, die anderen Befehle sagen, in welcher Phase sie kommen.
-- 137 automatische Tests (95 % Abdeckung), darunter:
-  - der Smoke-Test (Herz → `.ldr`),
-  - ein Test, dass die Umrechnung ins LDraw-Koordinatensystem für jeden Stein stimmt,
-  - ein Test, dass nur der Adapter die Fremdbibliotheken benutzt,
-  - ein Test, dass jede Datei den Lizenz-Header hat.
-- Dokumente: README (de/en), CLAUDE.md, ADR 0001/0002, Lizenzübersicht, Upstream-Liste.
-- GitHub: öffentliches Repo, Tag `v0.0.0`, Issues #1–#9 (eins pro Phase mit Abnahme-Checkliste), `main` geschützt (Änderungen ab jetzt per Pull Request).
-- Commits laufen unter deiner GitHub-noreply-Adresse; die gmx-Adresse taucht im Repo nirgends auf.
+- **Import:** STL, OBJ, PLY über trimesh. Für 3MF gibt es einen eigenen Leser, weil Slicer-Dateien die Geometrie in Unterdateien auslagern und gängige Leser diese übersehen. Einheiten (mm, cm, Zoll …) werden umgerechnet, Bauteile zusammengeführt.
+- **Aufbereitung:** Hochachse einstellbar (`input.up_axis`), optional „auf die stabilste Seite legen" (`input.auto_orient`). Löcher, verdrehte Flächen und kaputte Dreiecke werden repariert. Wenn das nicht reicht: Warnung und Ersatzverfahren.
+- **Voxelisierung (ADR 0003):** 16 Messstrahlen pro Noppe. Ein Feld gilt als gefüllt, wenn es mindestens zur Hälfte im Modell liegt (`voxel.threshold`). Brick- oder Plate-Höhe ist wählbar, überlappende Teile werden vereinigt, Hohlräume bleiben leer. Für 2 Millionen Dreiecke unter 1 Sekunde.
+- **Rundungsregel:** Breite und Tiefe werden auf ganze Noppen gerundet und das Modell mittig darauf gesetzt. Das Raster beginnt am tiefsten Punkt des Modells.
+- **Farben:** `single` (eine Farbe) und `height_bands` (Farbstreifen von unten nach oben, `color.bands`).
+- **Dateien:** `.grid.npz` (eigenes Format), `.npy` und `.vox` im Format, das legolization liest; Round-Trip mit allen Volltonfarben getestet.
+- **CLI:** `mesh2brick voxelize modell.stl` zeigt Größe in Noppen und cm, Volumenabweichung, Teile-Schätzung und schreibt ein Vorschaubild. `mesh2brick place modell.grid.npz` setzt die Steine.
+- **Testmodelle:** Würfel, Kugel, L-Winkel, Torus und ein selbst erzeugter Low-Poly-Hase (CC0). Einen frei lizenzierten Scan-Hasen gibt es nicht.
+- **Abnahme erfüllt:**
+  - Würfel 10 mm → 1 × 1 Noppe, 1 Brick hoch.
+  - Kugel bei 32 Noppen: 0,1 % Volumenabweichung (Grenze 15 %).
+  - Alle Testmodelle laufen fehlerfrei durch legolization.
+- 257 automatische Tests, 96 % Abdeckung.
 
-## Als Nächstes
+## Wichtiger Fund: legolization kann sich aufhängen
 
-Phase 1 (Issue #2): Mesh-Import (STL/OBJ/3MF/PLY) und eigene Voxelisierung, siehe PLAN.md.
+Mit Schrägsteinen (Slopes) blieb legolization beim Hasen (16 Noppen) **unbegrenzt hängen**. Ursache ist der
+LP-Löser HiGHS, der bei manchen Stabilitätsrechnungen in seiner Vorverarbeitung festläuft. legolization
+setzt dafür keine Zeitgrenze. Was ich gemacht habe:
+
+1. **Lokaler Patch:** Jeder Lösungsversuch bekommt 5 Sekunden. Danach übernimmt der nächste Versuch, der
+   dieselbe Rechnung in 2–3 Sekunden schafft. Der Patch ist dokumentiert, mit einem Regressionstest abgesichert
+   und in `docs/UPSTREAM.md` vermerkt.
+2. **Slopes sind vorerst abgeschaltet** (`parts.categories: [brick, plate]`). Auch mit Patch braucht der Hase mit
+   Slopes 443 s statt 9 s. Wer sie trotzdem will: `--set parts.categories=[brick,plate,slope]`.
+3. **Fehlerbericht für legolization liegt fertig vor** (`docs/UPSTREAM.md`, Entwurf #2), mit
+   Reproduktionsdatei. Eingereicht wird er nur mit deinem OK.
+
+## Lokaler Praxistest: Duo
+
+Die 3MF-Datei aus Bambu Studio wird korrekt gelesen: 12 Teile, 2,1 Mio. Dreiecke, identisch zur STL.
+Bei 32 Noppen ergibt das 32 × 19 Noppen × 24 Bricks (25,6 × 15,2 × 23 cm), voxelisiert in 0,9 s. Die Form
+ist gut erkennbar. Das Platzieren der Steine dauert mit legolization bei dieser Größe noch sehr lange
+(Messung läuft, Ergebnis im PR). Bilder bleiben wie vereinbart lokal.
+
+## Als Nächstes (Phase 2, Issue #3)
+
+1. `mesh2brick convert modell.stl` in einem Schritt: Voxel → Steine → `.ldr` + drei Teilelisten + PDF.
+2. **Laufzeit großer Modelle** angehen. legolization bekommt ein Zeitbudget, wir vergleichen die Strategien
+   (`greedy` vs. `luo`) an Duo-Größe, und die Laufzeit wird während der Berechnung angezeigt.
+3. LeoCAD installieren (von dir freigegeben) für die Schrittbilder im PDF.
 
 ## Bekannte Einschränkungen
 
 | Was | Einschätzung |
 |---|---|
-| Viele Einstellungen haben noch keine Wirkung, weil ihre Phase noch nicht dran ist: `input.*`, `voxel.threshold`, `color.*`, `parts.include/exclude/max_parts`, `llm.*`, `output.language/page_size` und die BOM-/PDF-Formate. | eigener Code (Phase 1–7) |
-| `steps.keep_symmetry: false` wirkt nicht, weil legolization symmetrische Hälften immer zusammenhält. | akzeptieren; nur bei Bedarf Upstream-Option |
-| Bricks und Plates lassen sich nicht abwählen, weil legolization beide immer verwendet. | Phase 4 prüft Whitelists, ggf. Upstream-PR |
-| Die Vorschau zeichnet Schrägsteine (Slopes) als Quader. | eigener Code (spätestens Phase 6) |
-| Die erste Platzierung dauert ca. 10 s, weil beim Start die Solver-Bibliotheken geladen werden. | akzeptieren |
-| In einer flachen `.ldr` sind Unterbaugruppen eingeebnet (5 statt 8 Schritte). In `.mpd` bleiben sie erhalten. | so gewollt (legolization-Verhalten) |
+| Slopes vorerst aus (siehe oben). | Upstream-Fix (#2), danach wieder Standard |
+| Große Modelle (Duo bei 32 Noppen, ~4.500 Felder) brauchen beim Platzieren sehr lange. Fast die ganze Zeit geht in legolizations Stabilitätsrechnung. | Phase 2: Zeitbudget, Strategiewahl; ggf. Upstream |
+| Noch ohne Wirkung: `color.mode` vertex/texture/cad (Phase 3), `parts.include/exclude/max_parts` (Phase 4), `llm.*` (Phase 7), `output.language/page_size` und BOM-/PDF-Formate (Phase 2). | eigener Code, geplant |
+| `steps.keep_symmetry: false` wirkt nicht, weil legolization symmetrische Hälften immer zusammenhält. | akzeptieren |
+| Bricks und Plates lassen sich nicht abwählen. | Phase 4 |
+| Die Vorschau zeichnet Slopes als Quader. | spätestens Phase 6 |
+| `voxelize` schätzt die zu bauenden Felder („~2.417 von 4.509"). legolization rechnet beim Aushöhlen leicht anders (ADR 0004). | akzeptieren |
+| Dünne Teile unter einer halben Noppe (z. B. Schnabel bei kleiner Größe) fallen beim Voxelisieren weg. | so gewollt (`voxel.threshold`); bei Bedarf kleiner stellen |
 
 ## Umgebung (gut zu wissen)
 
 - Die Python-Umgebung liegt außerhalb von Nextcloud (`.venv` ist ein Symlink nach `~/.local/share/venvs/mesh2brick`).
-- Die LDraw-Teilebibliothek (147 MB Download, 623 MB entpackt) liegt in `~/Library/Caches/pyldraw3`.
-- `samples/` (Duo) ist von Git ausgeschlossen: zu groß und markenrechtlich nicht für ein öffentliches Repo geeignet.
+- Die LDraw-Teilebibliothek liegt in `~/Library/Caches/pyldraw3`.
+- `samples/` (Duo) ist von Git ausgeschlossen.
+- Neue Abhängigkeit: `networkx` (klein, BSD-Lizenz), weil trimesh es zum Löcherstopfen braucht.
 
 ## Deine Entscheidungen
 
 | Datum | Frage | Entscheidung |
 |---|---|---|
 | 2026-11-01 | Erster echter Testfall? | Duo (Eule aus `samples/`), **nur lokal**: nicht im Repo, nicht in der Galerie. |
-| 2026-11-01 | Typische Modellgröße? | **32 Noppen** auf der längsten Achse (≈ 26 cm) als Standard, 48 erst später. Ist in Config, Beispieldatei und SPEC §4 eingetragen. |
+| 2026-11-01 | Typische Modellgröße? | **32 Noppen** auf der längsten Achse (≈ 26 cm) als Standard, 48 erst später. |
 | 2026-11-01 | LeoCAD für PDF-Schrittbilder installieren? | **Ja**, per Homebrew zu Beginn von Phase 2. |
 
 ## Fragen an dich
 
-Keine offenen Fragen.
+Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
+
+1. **Darf ich den Fehlerbericht #2 bei legolization einreichen?** Er betrifft das Aufhängen bei Slopes; der Entwurf steht in `docs/UPSTREAM.md`. *Annahme: nein, erst wenn du ihn gelesen hast. Bis dahin bleiben der lokale Patch und „Slopes aus" aktiv.*
+2. **Wie lange darf eine Umwandlung dauern?** *Annahme: bis 5 Minuten wie in der SPEC (§9). Wenn legolization länger braucht, liefere ich das beste bis dahin gefundene stabile Ergebnis und sage das an.*
 
 ## Offene Kleinigkeit
 
-Die Release-Seite für `v0.0.0` auf GitHub fehlt noch, der Tag existiert. Das Anlegen der
-öffentlichen Seite wurde vom Rechtesystem blockiert. Wer sie haben möchte:
+Die Release-Seiten auf GitHub fehlen, die Tags existieren. Das Anlegen öffentlicher Seiten wurde vom
+Rechtesystem blockiert. Befehl für `v0.0.0`:
 `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`

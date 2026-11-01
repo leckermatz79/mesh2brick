@@ -26,7 +26,7 @@ def test_defaults_match_spec() -> None:
     assert s.voxel.height_unit == "brick"
     assert s.voxel.fill == "hollow"
     assert s.color.single_color == 4
-    assert s.parts.categories == ("brick", "plate", "slope")
+    assert s.parts.categories == ("brick", "plate")  # slope opt-in (UPSTREAM #2)
     assert s.placement.strategy == "luo"
     assert s.stability.max_repair_iterations == 20
     assert s.steps.parts_per_step == 7

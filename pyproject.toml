@@ -1,6 +1,6 @@
 [project]
 name = "mesh2brick"
-version = "0.0.0"
+version = "0.1.0"
 description = "Turn 3D models (STL, OBJ, 3MF, PLY, STEP) into buildable LEGO-compatible models with LDraw files, parts lists and PDF instructions."
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -26,6 +26,7 @@ dependencies = [
     "rebrickable==1.1.0",
     # Core
     "matplotlib>=3.11",
+    "networkx>=3.5",
     "numpy>=2.5",
     "pydantic>=2.14",
     "pyyaml>=6.0.3",
@@ -88,9 +89,9 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PLR2004", "ARG", "FBT", "S101", "TC"]
+"tests/**" = ["D", "PLR2004", "ARG", "FBT", "S101", "TC", "E501"]  # inline XML fixtures
 "scripts/**" = ["D", "T201"]
-"src/mesh2brick/cli.py" = ["FBT001", "FBT002"]  # typer options are boolean parameters
+"src/mesh2brick/cli.py" = ["FBT001", "FBT002", "PLR0917"]  # typer options are boolean parameters
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]

@@ -17,9 +17,9 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 0 von 8).** Das Projektgerüst und die Anbindung an
-> legolization funktionieren, der Mesh-Import kommt in Phase 1. Details stehen in
-> [docs/STATUS.md](docs/STATUS.md).
+> **Stand: Vorab-Version (Phase 1 von 8).** Mesh-Import (STL, OBJ, PLY, 3MF) und
+> Voxelisierung funktionieren. Der Ein-Befehl-Ablauf mit Teilelisten und PDF kommt in
+> Phase 2. Details stehen in [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (Entwicklung)
 
@@ -35,7 +35,13 @@ uv run mesh2brick --help
 ## Benutzung
 
 ```sh
-# Phase 0: Steine auf ein Voxelmodell setzen, LDraw + Vorschaubild schreiben
+# 1. Mesh auf das Noppenraster voxelisieren (längste Achse standardmäßig 32 Noppen)
+uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+
+# 2. Steine auf das Gitter setzen: LDraw-Datei, Steinmodell (JSON), PNG-Vorschau
+uv run mesh2brick place out/bunny_lowpoly.grid.npz -o out/
+
+# Voxeldateien gehen auch (MagicaVoxel .vox, numpy .npy)
 uv run mesh2brick place tests/fixtures/heart.vox -o out/
 
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben

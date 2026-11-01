@@ -13,24 +13,38 @@ world and legolization (which in turn owns the LDraw -Y-up transform):
 
 Backend-specific options (``placement.backend_options``) are passed through
 to ``PipelineConfig`` after validation against its real field names.
+
+Local patch (transitional, see docs/UPSTREAM.md #2): legolization 0.5.0 tries
+three HiGHS variants for every stability LP (presolve on, presolve off,
+interior point) but gives none of them a time limit. HiGHS presolve can stall
+on some LPs (reproducer: the low-poly bunny at 16 studs, after the slope pass
+and again during step sequencing), which hangs the whole pipeline. We add a
+time limit to all but the last attempt - in both LP paths (scipy ``linprog``
+and direct ``highspy``) - so a stalled variant gives up and the next one,
+which solves such LPs in seconds, takes over.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import importlib.metadata
+import math
+import types
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Final
 
+import highspy
 import numpy as np
-from legolization import PipelineConfig, PipelineResult, run
+from legolization import MeshOptions, PipelineConfig, PipelineResult, run
 from legolization import VoxelGrid as LegoGrid
 from legolization.color import default_palette
 from legolization.graph import ConnectionGraph
 from legolization.instructions.sequencer import InstructionsConfig, plan_instructions
 from legolization.ldraw_out import write_model
+from legolization.mesh import grid_from_mesh
 from legolization.placement.registry import strategy_names
 from legolization.placement.repair import RepairConfig
+from legolization.stability import solver as _lego_solver
 from legolization.stability.solver import StabilityResult, analyze
 
 from mesh2brick.backends.protocols import BackendError, Placement, StabilityReport
@@ -38,9 +52,10 @@ from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.voxel.grid import EMPTY, VoxelGrid
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
     from pathlib import Path
 
+    import trimesh
     from legolization.instructions.sequencer import InstructionPlan
     from legolization.layout import Layout
 
@@ -69,6 +84,65 @@ _MANAGED_FIELDS: Final = frozenset(
     }
 )
 _DEFAULT_STEP_SPREAD: Final = 3
+LP_ATTEMPT_TIME_LIMIT_S: Final = 5.0
+"""Wall-clock limit for every LP attempt except the last (local patch)."""
+
+
+def _limit_lp_attempts() -> None:
+    """Give legolization's LP attempts a time limit (idempotent local patch).
+
+    Raises:
+        BackendError: if legolization changed in a way the patch does not expect.
+    """
+    attempts = getattr(_lego_solver, "_LP_ATTEMPTS", None)
+    if not isinstance(attempts, tuple) or len(attempts) < 2:  # noqa: PLR2004
+        msg = (
+            f"legolization {VERSION}: unexpected LP attempt table; "
+            "revisit the local patch in backends/legolization.py"
+        )
+        raise BackendError(msg)
+    patched = (
+        *(
+            (method, {**(options or {}), "time_limit": LP_ATTEMPT_TIME_LIMIT_S})
+            for method, options in attempts[:-1]
+        ),
+        attempts[-1],
+    )
+    _lego_solver._LP_ATTEMPTS = patched  # documented local patch
+    _lego_solver.__dict__["highspy"] = _HIGHSPY_SHIM
+
+
+class TimeLimitedHighs(highspy.Highs):
+    """``Highs`` that limits every run but the last of legolization's attempts.
+
+    legolization's direct path runs up to three attempts on one instance;
+    runs 1 and 2 get :data:`LP_ATTEMPT_TIME_LIMIT_S`, later runs no limit,
+    so a solution is still found whenever HiGHS can find one.
+    """
+
+    final_attempt: int = 3
+
+    def run(self) -> highspy.HighsStatus:
+        """Run HiGHS with a per-attempt time limit."""
+        runs = self.__dict__.get("_runs", 0) + 1
+        self.__dict__["_runs"] = runs
+        limit = LP_ATTEMPT_TIME_LIMIT_S if runs < self.final_attempt else math.inf
+        self.setOptionValue("time_limit", self.getRunTime() + limit)
+        status: highspy.HighsStatus = super().run()
+        return status
+
+
+class _HighspyShim(types.ModuleType):
+    """The ``highspy`` module as legolization's solver sees it after the patch."""
+
+    Highs = TimeLimitedHighs
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(highspy, name)
+
+
+_HIGHSPY_SHIM: Final = _HighspyShim("highspy")
+_limit_lp_attempts()
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +300,59 @@ class LegolizationBackend:
     def _say(self, message: str) -> None:
         if self._progress is not None:
             self._progress(message)
+
+
+# ---------------------------------------------------------------- palette
+def solid_color_codes() -> frozenset[int]:
+    """LDraw codes of the opaque solid palette that placement accepts."""
+    return frozenset(int(code) for code in default_palette().codes)
+
+
+def color_info(codes: Iterable[int]) -> dict[int, ColorInfo]:
+    """Name and display colour for each LDraw code.
+
+    Raises:
+        BackendError: for codes outside the solid palette.
+    """
+    palette = default_palette()
+    if unknown := sorted(set(codes) - solid_color_codes()):
+        msg = (
+            f"LDraw colour code(s) {unknown} are not solid colours in the local "
+            "LDraw library (see ldraw.org colour chart)"
+        )
+        raise BackendError(msg)
+    result: dict[int, ColorInfo] = {}
+    for code in sorted(set(codes)):
+        r, g, b = palette.rgb_of(code)
+        result[code] = ColorInfo(
+            name=palette.name_of(code), rgb_hex=f"#{r:02x}{g:02x}{b:02x}"
+        )
+    return result
+
+
+def color_rgb(codes: Iterable[int]) -> dict[int, tuple[int, int, int]]:
+    """RGB triple per LDraw code (for ``.vox`` export)."""
+    return {code: _hex_to_rgb(info.rgb_hex) for code, info in color_info(codes).items()}
+
+
+def _hex_to_rgb(text: str) -> tuple[int, int, int]:
+    value = int(text.removeprefix("#"), 16)
+    return ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
+
+
+# ---------------------------------------------------------------- reference voxelizer
+def reference_voxelize(
+    mesh: trimesh.Trimesh, *, pitch_mm: float, color: int = 7
+) -> VoxelGrid:
+    """Legolization's own mesh voxelizer, as a benchmark reference.
+
+    It voxelizes the surface at plate resolution and floods the inside, without
+    volume fractions; the result is a plate-unit grid.
+    """
+    lego_grid = grid_from_mesh(
+        mesh, options=MeshOptions(pitch=pitch_mm, up="z", colour_code=color)
+    )
+    return from_lego_grid(lego_grid, height_unit="plate", pitch_mm=pitch_mm)
 
 
 # ---------------------------------------------------------------- conversions

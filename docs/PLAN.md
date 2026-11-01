@@ -56,14 +56,14 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 
 ## Phase 1 – Ingest + Voxelisierung
 
-- [ ] `ingest/`: Loader-Registry nach Dateiendung, STL/OBJ/3MF/PLY via trimesh. Normalisierung: Hochachse → Z, Einheit mm (3MF-Einheiten auswerten), Wasserdichtheit prüfen und reparieren, sonst Warnung und Fallback auf Oberflächen-Voxelisierung.
-- [ ] `voxel/voxelize.py`: **Spalten-Rasterung**. Pro Noppe 4×4 Abtaststrahlen in Z-Richtung. Pro Strahl werden die Ein- und Austrittspunkte am Mesh bestimmt (Windungszahl, robust gegen überlappende Teile), daraus folgt exakt, wie viel jeder Voxel in der Höhe gefüllt ist. Belegt ist ein Voxel ab `threshold` (Standard 0,5). Das ist schnell genug für Meshes mit Millionen Dreiecken (Duo-STL: ~2 Mio.).
-- [ ] Nicht-kubische Voxel: 1 × 1 Noppe × 1,2 Noppen (`brick`) oder × 0,4 (`plate`). Skalierung über `target_studs` oder `mm_per_stud`.
-- [ ] Rundungsregel (wird dokumentiert): Das Gitter beginnt am Boden des Modells (Z = 0). In X/Y wird das Modell im Gitter zentriert, die Zahl der Voxel ist `round(Ausdehnung / Raster)`, mindestens 1. Würfel 10 mm bei 8 mm/Noppe → 1,25 → 1 Noppe; Höhe 10 mm / 9,6 mm → 1 Brick.
-- [ ] `voxel/grid.py` (`VoxelGrid`, unveränderlich), `voxel/color.py` (Modi `single`, `height_bands`), Aushöhlen per Erosion.
-- [ ] `voxel/io.py`: `.npz` intern; `.npy` (int-Codes, `-1` leer) und `.vox` (MagicaVoxel, mit RGBA-Palette) genau so, wie legolization sie liest. Round-Trip-Tests über legolizations eigenen Loader.
-- [ ] Fixtures per Skript erzeugt (`tests/fixtures/make_fixtures.py`): Würfel, Kugel, L-Winkel, Torus. Dazu ein CC-lizenzierter Low-Poly-Hase mit dokumentierter Quelle.
-- [ ] CLI `voxelize` mit PNG-Vorschau, `docs/benchmarks.md` (eigene Voxelisierung gegen legolization.mesh).
+- [x] `ingest/`: Loader-Registry nach Dateiendung, STL/OBJ/PLY via trimesh, 3MF mit eigenem Leser (inkl. Production Extension der Slicer). Normalisierung: Hochachse → Z, Einheit mm (3MF-Einheiten auswerten), Wasserdichtheit prüfen und reparieren, sonst Warnung und Fallback auf Oberflächen-Voxelisierung.
+- [x] `voxel/voxelize.py`: **Spalten-Rasterung**. Pro Noppe 4×4 Abtaststrahlen in Z-Richtung. Pro Strahl werden die Ein- und Austrittspunkte am Mesh bestimmt (Windungszahl, robust gegen überlappende Teile), daraus folgt exakt, wie viel jeder Voxel in der Höhe gefüllt ist. Belegt ist ein Voxel ab `threshold` (Standard 0,5). Das ist schnell genug für Meshes mit Millionen Dreiecken (Duo-STL: ~2 Mio.).
+- [x] Nicht-kubische Voxel: 1 × 1 Noppe × 1,2 Noppen (`brick`) oder × 0,4 (`plate`). Skalierung über `target_studs` oder `mm_per_stud`.
+- [x] Rundungsregel (wird dokumentiert): Das Gitter beginnt am Boden des Modells (Z = 0). In X/Y wird das Modell im Gitter zentriert, die Zahl der Voxel ist `round(Ausdehnung / Raster)`, mindestens 1. Würfel 10 mm bei 8 mm/Noppe → 1,25 → 1 Noppe; Höhe 10 mm / 9,6 mm → 1 Brick.
+- [x] `voxel/grid.py` (`VoxelGrid`, unveränderlich), `voxel/color.py` (Modi `single`, `height_bands`), Aushöhlen per Erosion.
+- [x] `voxel/io.py`: `.npz` intern; `.npy` (int-Codes, `-1` leer) und `.vox` (MagicaVoxel, mit RGBA-Palette) genau so, wie legolization sie liest. Round-Trip-Tests über legolizations eigenen Loader.
+- [x] Fixtures per Skript erzeugt (`scripts/make_fixtures.py`, CC0): Würfel, Kugel, L-Winkel, Torus und ein selbst gebauter Low-Poly-Hase. Einen CC-lizenzierten Scan-Hasen gibt es nicht.
+- [x] CLI `voxelize` mit PNG-Vorschau, `docs/benchmarks.md` (eigene Voxelisierung gegen legolization.mesh).
 - **Abnahme:** Würfel → 1×1×1; Kugel bei `target_studs: 32` < 15 % Volumenabweichung; alle Fixtures laufen ohne Fehler durch legolization.
 
 ## Phase 2 – End-to-End (MVP)
