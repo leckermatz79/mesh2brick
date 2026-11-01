@@ -40,14 +40,14 @@ Die Teileliste zeigt jetzt Rebrickable-Namen und warnt, wenn ein Teil in einer F
 Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Diese Kombination stellt LEGO laut Rebrickable gar nicht her. Die Teileliste sagt das jetzt.
 
 - **Abhilfe heute:** `--set "parts.exclude=[3007, 3008]"`. Dann nimmt legolization kürzere Steine, allerdings in allen Farben.
-- **Besser wäre**, solche Steine automatisch durch kürzere gleicher Farbe zu ersetzen (siehe Frage 2).
+- **Phase 5:** Zwei Wege werden an Duo verglichen. Erstens solche Steine danach durch kürzere gleicher Farbe ersetzen, zweitens sie gar nicht erst wählen lassen.
 
 ## Was ich entschieden habe (Details in ADR 0009)
 
 | Entscheidung | Warum |
 |---|---|
 | Katalogdaten in der mitgelieferten Tabelle statt in der Datenbank des `rebrickable`-Pakets | Die Datenbank wäre ein großer Download (alle Rebrickable-Tabellen inkl. Set-Inventare). BrickLink-Nummern bekäme man dort nur mit API-Schlüssel. So funktioniert alles offline und ohne Konto. |
-| Whitelist über einen eng begrenzten lokalen Patch | legolization nimmt im Hauptablauf immer den vollen Katalog. Der Patch gilt nur während der Platzierung und wird danach (auch bei Fehlern) zurückgenommen. Ein Upstream-Vorschlag liegt bereit (Frage 1). |
+| Whitelist über einen eng begrenzten lokalen Patch | legolization nimmt im Hauptablauf immer den vollen Katalog. Der Patch gilt nur während der Platzierung und wird danach (auch bei Fehlern) zurückgenommen. Upstream-Vorschlag #8 ist von dir freigegeben. |
 | Fehlende 1×1-Teile in einer Whitelist werden ergänzt (mit Hinweis), statt einen Fehler zu melden | Wer „nur 2×4 und 2×2“ schreibt, meint die großen Steine. Ohne 1×1 ginge es gar nicht. |
 
 ## Lückenliste: legolizations PDF gegen SPEC §1 (unverändert, wird in Phase 6 geschlossen)
@@ -68,13 +68,14 @@ Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Die
 ## Als Nächstes
 
 1. **Phase 5 (Issue #6): Benchmark aller legolization-Strategien, eigene Erweiterungen nur bei messbaren Lücken.**
-   - Kandidat aus Phase 4: Teile, die es in einer Farbe nicht gibt, automatisch ersetzen (Frage 2).
+   - Auf deinen Wunsch: Teile, die es in einer Farbe nicht gibt, an Duo auf zwei Wegen behandeln und im Benchmark vergleichen. Erstens aufteilen danach (1×8 → 2× 1×4, Stabilität neu prüfen), zweitens einschränken davor (erlaubte Teile pro Farbe schon bei der Platzierung).
+2. **Upstream #8 einreichen** (von dir freigegeben). Issue und PR-Entwurf sind vorbereitet. Das Veröffentlichen musst du selbst anstoßen, weil das Rechtesystem mir öffentliche Beiträge sperrt. Die Befehle stehen in der Antwort zu Phase 4.
 
 ## Bekannte Einschränkungen
 
 | Was | Einschätzung |
 |---|---|
-| Teile, die es in einer Farbe nicht gibt, werden nur gemeldet, nicht vermieden (Duo: 2×8 und 1×8 in Bright Green). | Frage 2 / Phase 5 |
+| Teile, die es in einer Farbe nicht gibt, werden nur gemeldet, nicht vermieden (Duo: 2×8 und 1×8 in Bright Green). | Phase 5: Aufteilen vs. Einschränken, Benchmark an Duo |
 | Sehr schmale Whitelists kosten Teile und Zeit: Hase mit nur 2×4/2×2/1×2 hat 356 statt 177 Teile und braucht 85 statt 5 s. | in Ordnung, ist dokumentiert |
 | legolization setzt nur 29 Teile (Platten bis 2×8, keine großen Platten, keine Ecken). `catalog list --all` zeigt mehr, die lassen sich aber nicht verwenden. | Phase 5 bzw. Upstream |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert; optional eine kleine Ausnahmetabelle für reine Primärfarben (niedrige Priorität) |
@@ -108,18 +109,12 @@ Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Die
 | 2026-11-01 | Farben aus dem Modell automatisch übernehmen? | **Ja.** Einfarbig bleibt per Config erreichbar (`color.mode: single`). |
 | 2026-11-01 | Gängige LEGO-Farben statt exakter Farbtöne? | **Ja.** Eine Anleitung, deren Steine man nicht kaufen kann, ist wertlos. Für Spezialfälle gibt es `color.palette: all`. |
 | 2026-11-01 | Reines #FF0000 wird „Reddish Orange“ | **Kein Bug, sondern Farbmetrik.** Optional in Phase 4: kleine Ausnahmetabelle für reine Primärfarben. Erwähnen, nicht priorisieren. |
+| 2026-11-01 | Upstream-Vorschlag „erlaubte Teile direkt angeben“ (#8) einreichen? | **Ja, einreichen.** Derselbe Fall wie #88/#89, und den lokalen Patch will man nicht dauerhaft pflegen. Im Issue kurz auf #89 verweisen, weil der Maintainer dort noch nicht reagiert hat, damit er den Zusammenhang sieht. |
+| 2026-11-01 | Steine, die es in einer Farbe nicht gibt, automatisch ersetzen? | **Ja, als Zwischenlösung** (1×8 → 2× 1×4, danach Stabilitätsprüfung). Sauber wäre, die Farbverfügbarkeit schon bei der Platzierung zu kennen (hängt am selben Upstream-Thema). **Phase 5 vergleicht beides im Benchmark an Duo:** Aufteilen danach gegen Einschränken davor. |
 
 ## Fragen an dich
 
-Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
-
-1. **Darf ich bei legolization vorschlagen, dass man die erlaubten Teile direkt angeben kann (Issue plus PR-Entwurf, mit dem Vibe-Coding-Hinweis wie bei #88)?**
-   - Dann könnten wir unseren lokalen Patch irgendwann streichen.
-   - Der Text liegt in `docs/UPSTREAM.md` (#8).
-   - *Annahme: nein, er bleibt Entwurf, bis du zustimmst.*
-2. **Sollen Steine, die es in einer Farbe nicht gibt, automatisch durch kürzere gleicher Farbe ersetzt werden?** Beispiel: 1×8 in Bright Green wird zu 1×4 + 1×4. Das Modell hat dann etwas mehr Teile, und die Stabilität wird neu geprüft. *Annahme: ja, als Teil von Phase 5.*
-
-Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
+Keine offenen Fragen. Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
 
 ## Offene Kleinigkeit
 

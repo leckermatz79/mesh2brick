@@ -98,6 +98,13 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Teileliste: Rebrickable-Namen, Spalte „in dieser Farbe produziert“, Warnung bei Kombinationen, die es nicht gibt.
 - **Abnahme:** `mesh2brick catalog list --category slope` läuft offline (Test sperrt Netzwerkzugriffe); die BOM zeigt Rebrickable-Namen.
 
+## Vorgabe für Phase 5 (vom PO, 2026-11-01)
+
+- Teile, die es in einer Farbe nicht gibt, auf zwei Wegen behandeln und **an Duo im Benchmark vergleichen**:
+  1. **Aufteilen danach:** 1×8 → 2× 1×4 usw. in derselben Farbe, danach Stabilität neu prüfen. Das ist die pragmatische Zwischenlösung.
+  2. **Einschränken davor:** erlaubte Teile pro Farbe schon bei der Platzierung, damit gar nicht erst Ersatz nötig ist. Das hängt am Upstream-Thema #8.
+- Messen: Teilezahl, Stabilität, Laufzeit, verbleibende nicht produzierte Kombinationen.
+
 ## Risiken und wie ich damit umgehe
 
 - **Laufzeit großer Modelle:** legolization optimiert Stabilität mit LP-Solvern. Standard sind jetzt 32 Noppen, 48 kommt später. Bei 48 können Modelle mit tausenden Steinen entstehen. Gegenmaßnahme: Zeitbudget (`time_budget_s`) durchreichen und Laufzeiten in `docs/benchmarks.md` festhalten.

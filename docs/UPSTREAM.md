@@ -24,7 +24,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | 5 | legolization | Time budget for `final_remerge` and step sequencing | Both ignore `time_budget_s` in 0.5.0 and dominate large models (remerge 40–170 s, sequencing 4–7 min at ~1,000 parts, docs/benchmarks.md). mesh2brick works around sequencing with a child process and a layer-order fallback (ADR 0006). | idea | – |
 | 6 | legolization | `plan_instructions` ignores `InstructionsConfig.mode="layer"`; booklet only English, fonts not embedded | A cheap layer plan helper (mesh2brick's `layer_plan`) and i18n/embedded fonts would help every user. | idea | – |
 | 7 | trimesh | glTF `baseColorFactor` is kept as bytes of the *linear* value | Converting back to sRGB loses up to ±3 levels in dark tones (STEP 0.1 grey arrives as 28 instead of 26). Harmless for LEGO colours; storing floats would be exact. | idea | – |
-| 8 | legolization | **Part whitelist: `PipelineConfig.catalog` (or `allowed_parts`) for `run()`** | `run()` always places from `default_catalog()`; users cannot exclude parts they do not own or want. mesh2brick patches `default_catalog` for the duration of `run()`. Also worth documenting: the 1 x 1 brick/plate and the three slopes are looked up by name, so a filtered catalogue must keep them (else `KeyError`). Draft below. | draft ready | – |
+| 8 | legolization | **Part whitelist: `PipelineConfig.catalog` (or `allowed_parts`) for `run()`** | `run()` always places from `default_catalog()`; users cannot exclude parts they do not own or want. mesh2brick patches `default_catalog` for the duration of `run()`. Also worth documenting: the 1 x 1 brick/plate and the three slopes are looked up by name, so a filtered catalogue must keep them (else `KeyError`). Draft below. Approved by the product owner on 2026-11-01 (refer to #89 in the issue). | approved | – |
 
 ## Draft #2 (as filed in issue #88)
 
@@ -53,7 +53,7 @@ optional pipeline deadline already on `main`. A follow-up question worth a look:
 slope-substituted layouts make the LP so much harder for presolve (degenerate or
 near-duplicate contact rows?).
 
-## Draft #8 (not opened yet, needs the product owner's OK)
+## Draft #8 (approved 2026-11-01; the product owner publishes it, see STATUS)
 
 **Title:** Allow placing from a custom catalogue: `PipelineConfig.catalog`
 
