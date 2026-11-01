@@ -142,6 +142,12 @@ class PartsConfig(_Section):
     exclude: PartNumbers = ()
     """LDraw part numbers to forbid (blacklist, Phase 4)."""
     max_parts: Annotated[int, Field(gt=0)] = 5000
+    availability: Literal["report", "split", "exclude"] = "exclude"
+    """Parts LEGO does not make in a colour (Rebrickable data, ADR 0010):
+    ``exclude`` (default, measured best on a real model) keeps such parts out
+    of placement for the whole model, ``split`` replaces each by shorter parts
+    of the same colour after placement and re-checks stability, ``report``
+    only flags them in the parts list."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:

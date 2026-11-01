@@ -1,54 +1,72 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **4 – Katalog und Whitelist: fertig, wartet auf Merge** · Nächste: **Phase 5 – eigene Platzierungs-/Stabilitätserweiterungen (nur bei Bedarf)**
+Stand: 2026-11-01 · Aktuelle Phase: **5 – Strategien und Farbverfügbarkeit: fertig, wartet auf Merge** · Nächste: **Phase 6 – Anleitungsqualität**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
 
-mesh2brick hat jetzt einen **Teilekatalog**, der offline funktioniert.
-- `mesh2brick catalog list` und `catalog show` zeigen zu jedem Teil:
-  - Größe und Noppen (aus der LDraw-Geometrie),
-  - BrickLink- und Rebrickable-Nummer, Namen,
-  - die Farben, in denen LEGO das Teil herstellt.
-- Mit `parts.include` und `parts.exclude` legst du fest, welche Teile verwendet werden dürfen.
+- **Strategien:** Alle 7 Platzierungsstrategien von legolization habe ich an den Testmodellen gemessen. `kollsker` bleibt die beste Wahl, eine eigene Strategie lohnt sich nicht (ADR 0010).
+- **Farbverfügbarkeit:** Steine, die LEGO in einer Farbe nicht herstellt, landen nicht mehr im Modell. An Duo habe ich deinen Vergleich gemacht: Einschränken vorher schlägt Aufteilen danach deutlich.
 
-Die Teileliste zeigt jetzt Rebrickable-Namen und warnt, wenn ein Teil in einer Farbe gar nicht produziert wird.
-
-| Galerie: derselbe Hase mit allen Teilen (links) und nur mit 2×4, 2×2, 1×2 (rechts) |
+| Galerie: Strategien bei 32 Noppen (weniger Teile = tiefer, schneller = weiter links) |
 |---|
-| ![Whitelist](gallery/phase4-whitelist.png) |
+| ![Strategien](gallery/phase5-strategies.png) |
 
-## Erledigt (Phase 4)
+## Erledigt (Phase 5)
 
-- **Teilekatalog** (`mesh2brick catalog list --category slope`, `catalog show 3001`):
-  - Er läuft offline; ein Test sperrt dabei jeden Netzwerkzugriff.
-  - Größe, Höhe, Noppen und Kategorie werden aus der LDraw-Geometrie berechnet und pro LDraw-Version zwischengespeichert.
-  - Abgleich mit legolizations eigenem Modell: Alle 29 platzierbaren Teile stimmen überein.
-  - `--all` zeigt zusätzlich Teile aus der LDraw-Bibliothek, die legolization (noch) nicht setzen kann. Das sind z. B. 218 Slopes ohne bedruckte Varianten.
-- **Whitelist und Blacklist** wirken jetzt bei der Platzierung.
-  - Unmögliches wird mit klarer Meldung abgelehnt: ein Tippfehler in der Teilenummer, ein Teil, das legolization nicht setzen kann, oder das Entfernen der unverzichtbaren 1×1-Teile.
-  - Grund für Letzteres: legolization braucht 1×1-Stein und 1×1-Platte, um beliebige Formen zu füllen. Das habe ich gemessen, indem ich jedes Teil einzeln entfernt habe.
-- **Teileliste:** Spalten für den Rebrickable-Namen und „in dieser Farbe produziert“, dazu eine Warnung bei Kombinationen, die es nicht gibt.
-- **Farbabgleich verbessert:** LDraw hat einige Farben auf LEGOs offizielle Namen umbenannt. Sie werden jetzt über Nummer und Farbwert sicher zugeordnet.
-  - Dunkellila („Medium Lilac“ = „Dark Purple“) ist dadurch in der Standardpalette. Lila wird nicht mehr zu Blau.
-  - Hellorange („Spud Orange“ = „Light Orange“) ist ebenfalls zugeordnet, ist aber eine alte Farbe und daher nicht in der Standardpalette.
-- **Daten:** Rebrickable-Namen und die Verfügbarkeit (welches Teil gibt es in welcher Farbe) stecken in der mitgelieferten Tabelle. Es braucht keinen Download, kein Konto und keine große Datenbank (ADR 0009).
-- 424 automatische Tests, 96 % Abdeckung.
+- **Benchmark aller Strategien** auf 6 Testmodellen bei 16 Noppen und 3 bei 32 Noppen (Tabellen in [benchmarks.md](benchmarks.md)).
+  - Alle fertigen Läufe waren stabil und aus einem Stück.
+  - `kollsker` braucht in 6 von 9 Fällen die wenigsten Teile und ist fast immer am schnellsten.
+  - Andere Strategien sind bei einzelnen Modellen besser, etwa `smga` beim Torus mit 69 statt 213 Teilen. Dafür brauchen sie 2- bis 5-mal so lange und scheitern bei anderen Modellen am Zeitlimit.
+  - **Entscheidung:** keine eigene Strategie. Die Unterschiede sind Abwägungen zwischen vorhandenen Strategien, keine fehlende Fähigkeit.
+- **Steine, die es in einer Farbe nicht gibt** (neue Einstellung `parts.availability`):
+  - `exclude` (Standard): Solche Teile werden vor der Platzierung für das ganze Modell weggelassen.
+  - `split`: Sie werden danach in kürzere Steine derselben Farbe aufgeteilt. Die Fugen liegen dabei versetzt zu den Schichten darüber und darunter, danach wird die Stabilität neu geprüft.
+  - `report`: Sie werden nur gemeldet.
 
-## Ein echter Fund bei Duo
+## Dein Studio-Check (geschlossen)
 
-Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Diese Kombination stellt LEGO laut Rebrickable gar nicht her. Die Teileliste sagt das jetzt.
+Deine Prüfung in BrickLink Studio ersetzt jetzt den Wieder-Einlese-Test als manuelle Abnahme. Die Screenshots bleiben lokal in `out/studio/`.
 
-- **Abhilfe heute:** `--set "parts.exclude=[3007, 3008]"`. Dann nimmt legolization kürzere Steine, allerdings in allen Farben.
-- **Phase 5:** Zwei Wege werden an Duo verglichen. Erstens solche Steine danach durch kürzere gleicher Farbe ersetzen, zweitens sie gar nicht erst wählen lassen.
-
-## Was ich entschieden habe (Details in ADR 0009)
-
-| Entscheidung | Warum |
+| Befund | Bewertung |
 |---|---|
-| Katalogdaten in der mitgelieferten Tabelle statt in der Datenbank des `rebrickable`-Pakets | Die Datenbank wäre ein großer Download (alle Rebrickable-Tabellen inkl. Set-Inventare). BrickLink-Nummern bekäme man dort nur mit API-Schlüssel. So funktioniert alles offline und ohne Konto. |
-| Whitelist über einen eng begrenzten lokalen Patch | legolization nimmt im Hauptablauf immer den vollen Katalog. Der Patch gilt nur während der Platzierung und wird danach (auch bei Fehlern) zurückgenommen. Upstream-Vorschlag #8 ist von dir freigegeben. |
-| Fehlende 1×1-Teile in einer Whitelist werden ergänzt (mit Hinweis), statt einen Fehler zu melden | Wer „nur 2×4 und 2×2“ schreibt, meint die großen Steine. Ohne 1×1 ginge es gar nicht. |
+| Studios „Import“ hängt auf dem Mac bei jeder Datei, „Datei → Öffnen“ geht sofort. | Studio-Eigenheit. Steht jetzt in beiden READMEs. |
+| Keine Überlappungen, keine Duplikate. | Bestätigt die eigene Prüfung beim Export. |
+| 0 Stabilitätsprobleme, aber 31 Clutch-Power-Hinweise (Flügel, Füße). | Siehe unten. |
+| Schrittgrößen schwanken zwischen 1 und 6 Teilen, Schritt 87 hat nur ein 1×1-Plättchen. | Phase 6 |
+
+**Clutch-Power gegen legolization:**
+- **Stabilität:** Beide Programme sind sich einig, das Modell ist stabil. legolizations höchste Belastung liegt bei nur 2 % dessen, was eine Noppe hält, und zwar genau an der Flügelspitze und an den Beinen, wo Studio warnt.
+- **Was Studio meldet:** Studios Hinweise betreffen die Festigkeit beim Anfassen, also Ziehen und Drücken. legolization prüft nur die Schwerkraft.
+- **Schwachstellen:** Es gibt keine Stelle, an der ein größeres Stück an einer einzigen schwachen Verbindung hängt.
+
+**Mindestwandstärke oder Versatzmuster?**
+- **Mindestwandstärke: nein.** Die Flügel sind meist 2–3 Noppen dick, nur 25 von 1.013 Steinen liegen in echten 1-Noppen-Wänden.
+- **Versatzmuster:** Hier gibt es eine echte Schwäche. 41 % der senkrechten Fugen laufen über eine Steinlage hinweg durch, statt versetzt zu sein. Ich habe vier Hebel ausprobiert, keiner hilft:
+  - legolizations Mauerwerks-Strategie `bond` (mehr Teile, eher mehr durchlaufende Fugen),
+  - zwei Einstellungen in legolization (keine Wirkung),
+  - ein eigener Nachbearbeitungsschritt (nur 1 % besser, wieder entfernt).
+- **Fazit:** Der richtige Ort ist die Platzierung selbst in legolization (Upstream-Kandidat #11). Die Messgröße „durchlaufende Fugen“ bleibt im Benchmark, damit spätere Verbesserungen sichtbar werden.
+
+## Dein Vergleich an Duo
+
+| Weg | Teile | Zeit | stabil | Teile, die es so nicht gibt |
+|---|---:|---:|---|---:|
+| nur melden (bisher) | 1.013 | 106 s | ja | 36 |
+| aufteilen danach | 1.049 | 130 s | ja | 0 |
+| **einschränken davor** | **1.025** | **70 s** | ja | 0 |
+
+**Warum Einschränken gewinnt:** legolization plant die kürzeren Steine gleich mit, statt dass lange Steine nachträglich zerschnitten werden. Das ergibt weniger zusätzliche Teile, und sogar der letzte Optimierungsschritt wird schneller.
+
+**Einschränkung:** Das Weglassen gilt heute für das ganze Modell. Ein 2×8, den es in Grün nicht gibt, fehlt dann auch in Weiß. Bei Duo kostet das nichts, weil Grün überwiegt. Wirklich pro Farbe einschränken geht erst, wenn legolization erlaubte Teile pro Farbe annimmt. Das ist als Upstream-Kandidat #9 vermerkt und hängt an #8.
+
+## Upstream #8 (von dir freigegeben)
+
+**Überraschung beim Vorbereiten:** legolization kann das in der Entwicklungsversion schon. `run()` nimmt dort einen eigenen Katalog an, nur ist das noch in keiner Veröffentlichung enthalten.
+
+- **Was beigetragen wird:** nur die fehlende klare Fehlermeldung, wenn im Katalog unverzichtbare Teile fehlen, dazu Tests und Doku. Die komplette Testsuite von legolization ist grün (1.468 Tests).
+- **Unser lokaler Patch** entfällt, sobald legolization eine neue Version veröffentlicht.
+- **Veröffentlichen:** musst du selbst anstoßen, weil das Rechtesystem mir öffentliche Beiträge in fremden Projekten sperrt. Die Befehle stehen in der Antwort zu Phase 5.
 
 ## Lückenliste: legolizations PDF gegen SPEC §1 (unverändert, wird in Phase 6 geschlossen)
 
@@ -67,30 +85,32 @@ Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Die
 
 ## Als Nächstes
 
-1. **Phase 5 (Issue #6): Benchmark aller legolization-Strategien, eigene Erweiterungen nur bei messbaren Lücken.**
-   - Auf deinen Wunsch: Teile, die es in einer Farbe nicht gibt, an Duo auf zwei Wegen behandeln und im Benchmark vergleichen. Erstens aufteilen danach (1×8 → 2× 1×4, Stabilität neu prüfen), zweitens einschränken davor (erlaubte Teile pro Farbe schon bei der Platzierung).
-2. **Upstream #8 einreichen** (von dir freigegeben). Issue und PR-Entwurf sind vorbereitet. Das Veröffentlichen musst du selbst anstoßen, weil das Rechtesystem mir öffentliche Beiträge sperrt. Die Befehle stehen in der Antwort zu Phase 4.
+1. **Phase 6 (Issue #7): Anleitungsqualität.**
+   - Eigenes PDF-Layout, falls legolizations Heft nicht reicht: Deckblatt mit Bild und Maßen, Teileliste mit Bildern, Callouts, 1–4 Schritte pro Seite, Deutsch und Englisch.
+   - Unterbaugruppen als eigene Abschnitte.
+   - **Aus deinem Studio-Check:** gleichmäßigere Schrittgrößen (heute 1 bis 6 Teile, Schritt 87 hat nur ein 1×1-Plättchen).
+   - Ziel: PDF unter 10 MB für den Hasen.
+2. Upstream #8 veröffentlichen (Befehle folgen).
 
 ## Bekannte Einschränkungen
 
 | Was | Einschätzung |
 |---|---|
-| Teile, die es in einer Farbe nicht gibt, werden nur gemeldet, nicht vermieden (Duo: 2×8 und 1×8 in Bright Green). | Phase 5: Aufteilen vs. Einschränken, Benchmark an Duo |
-| Sehr schmale Whitelists kosten Teile und Zeit: Hase mit nur 2×4/2×2/1×2 hat 356 statt 177 Teile und braucht 85 statt 5 s. | in Ordnung, ist dokumentiert |
-| legolization setzt nur 29 Teile (Platten bis 2×8, keine großen Platten, keine Ecken). `catalog list --all` zeigt mehr, die lassen sich aber nicht verwenden. | Phase 5 bzw. Upstream |
-| Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert; optional eine kleine Ausnahmetabelle für reine Primärfarben (niedrige Priorität) |
+| „Teile weglassen“ gilt fürs ganze Modell, nicht pro Farbe. | Upstream #9 (nach #8) |
+| 1×1-Stein und 1×1-Platte lassen sich weder weglassen noch aufteilen. Gibt es sie in einer Modellfarbe nicht, meldet die Teileliste das. | selten; akzeptiert |
+| legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
+| Sehr schmale Whitelists kosten Teile und Zeit. | dokumentiert |
+| Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert; optional Ausnahmetabelle |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. | von dir akzeptiert; Verbesserung in Phase 5/6 bzw. Upstream |
+| Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. | von dir akzeptiert; Phase 6 bzw. Upstream |
 | Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. | Upstream-Kandidat #5 |
 | Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an |
 | PDF-Text englisch. | Phase 6 |
-| `llm.*` (Phase 7) ist noch ohne Wirkung. | geplant |
 
 ## Umgebung (gut zu wissen)
 
 - Die Python-Umgebung liegt außerhalb von Nextcloud (`.venv` ist ein Symlink nach `~/.local/share/venvs/mesh2brick`).
-- Die LDraw-Teilebibliothek liegt in `~/Library/Caches/pyldraw3`. `samples/` (Duo) ist von Git ausgeschlossen.
-- Neu: mesh2brick legt einen kleinen Zwischenspeicher für Teilebeschreibungen in `~/Library/Caches/mesh2brick` an. Er lässt sich gefahrlos löschen.
+- Die LDraw-Teilebibliothek liegt in `~/Library/Caches/pyldraw3`, der Zwischenspeicher für Teilebeschreibungen in `~/Library/Caches/mesh2brick`. `samples/` (Duo) ist von Git ausgeschlossen.
 - STEP braucht einmalig `uv sync --extra step`.
 
 ## Deine Entscheidungen
@@ -111,10 +131,11 @@ Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Die
 | 2026-11-01 | Reines #FF0000 wird „Reddish Orange“ | **Kein Bug, sondern Farbmetrik.** Optional in Phase 4: kleine Ausnahmetabelle für reine Primärfarben. Erwähnen, nicht priorisieren. |
 | 2026-11-01 | Upstream-Vorschlag „erlaubte Teile direkt angeben“ (#8) einreichen? | **Ja, einreichen.** Derselbe Fall wie #88/#89, und den lokalen Patch will man nicht dauerhaft pflegen. Im Issue kurz auf #89 verweisen, weil der Maintainer dort noch nicht reagiert hat, damit er den Zusammenhang sieht. |
 | 2026-11-01 | Steine, die es in einer Farbe nicht gibt, automatisch ersetzen? | **Ja, als Zwischenlösung** (1×8 → 2× 1×4, danach Stabilitätsprüfung). Sauber wäre, die Farbverfügbarkeit schon bei der Platzierung zu kennen (hängt am selben Upstream-Thema). **Phase 5 vergleicht beides im Benchmark an Duo:** Aufteilen danach gegen Einschränken davor. |
+| 2026-11-01 | Manuelle Prüfung in BrickLink Studio | **Erledigt** (Duo, lokal): keine Überlappungen, keine Duplikate, 0 Stabilitätsprobleme, 31 Clutch-Hinweise (Flügel, Füße). Import hängt auf dem Mac, Datei → Öffnen geht (README). Schrittgrößen → Phase 6. |
 
 ## Fragen an dich
 
-Keine offenen Fragen. Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
+Keine offenen Fragen.
 
 ## Offene Kleinigkeit
 

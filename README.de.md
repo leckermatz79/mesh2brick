@@ -17,7 +17,7 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 4 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
+> **Stand: Vorab-Version (Phase 5 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
 > 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
 > des Modells. Details stehen in [docs/STATUS.md](docs/STATUS.md).
 
@@ -71,6 +71,14 @@ uv run mesh2brick render out/heart.bricks.json --step 3
 
 Alle Einstellungen sind in [examples/mesh2brick.yaml](examples/mesh2brick.yaml)
 beschrieben.
+
+## Ergebnisse in anderen Programmen öffnen
+
+- **BrickLink Studio:** die `.ldr`/`.mpd` über **Datei → Öffnen** laden. Unter macOS hing
+  Studios **Import** in unserem Test bei jeder Datei (auch bei Studios eigenem Export);
+  Datei → Öffnen lädt dieselbe Datei sofort. Eine Duo-Testdatei zeigte in Studio keine
+  Überlappungen, keine Duplikate und keine Stabilitätsprobleme.
+- LDraw-Betrachter (LDView, LeoCAD) öffnen die Dateien direkt.
 
 ## Entwicklung
 

@@ -56,6 +56,7 @@ from legolization.instructions.sequencer import (
     InstructionsConfig,
     plan_instructions,
 )
+from legolization.layout import CollisionError
 from legolization.ldraw_in import LdrawImportError, layout_from_ldraw
 from legolization.ldraw_out import write_model
 from legolization.mesh import grid_from_mesh
@@ -66,6 +67,7 @@ from legolization.stability.solver import StabilityResult, analyze
 
 from mesh2brick.backends.protocols import BackendError, Placement, StabilityReport
 from mesh2brick.backends.pyldraw import part_exists
+from mesh2brick.catalog.rebrickable import available_colors
 from mesh2brick.catalog.whitelist import (
     BackendRules,
     PlaceablePart,
@@ -73,6 +75,7 @@ from mesh2brick.catalog.whitelist import (
     allowed_parts,
 )
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
+from mesh2brick.place.split import choose_split
 from mesh2brick.voxel.grid import EMPTY, VoxelGrid
 
 if TYPE_CHECKING:
@@ -81,7 +84,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import trimesh
-    from legolization.layout import Layout
+    from legolization.layout import Layout, PlacedBrick
     from numpy.typing import NDArray
 
     from mesh2brick.config import Settings
@@ -265,6 +268,272 @@ def restricted_catalog(parts: frozenset[str]) -> Catalog:
     )
 
 
+# ---------------------------------------------------------------- colour availability
+@dataclass(frozen=True, slots=True)
+class SplitReport:
+    """What :func:`split_unavailable` changed."""
+
+    replaced: int = 0
+    """Bricks replaced by shorter ones."""
+    added: int = 0
+    """Bricks that took their place."""
+    unresolved: tuple[tuple[str, int], ...] = ()
+    """(LDraw part, colour) pairs that could not be replaced."""
+
+
+def produced_in(part: str, colour: int) -> bool | None:
+    """Whether LEGO makes ``part`` in ``colour`` (``None``: unknown)."""
+    colours = available_colors(part)
+    return None if colours is None else colour in colours
+
+
+def unavailable_parts(
+    colours: Iterable[int],
+    settings: Settings,
+    produced: Callable[[str, int], bool | None] = produced_in,
+) -> frozenset[str]:
+    """Enabled placeable parts LEGO does not make in one of ``colours``.
+
+    The 1 x 1 fillers stay (legolization cannot do without them); a coupled
+    group (the slopes) goes completely if one member has to go.
+    """
+    used = tuple(colours)
+    rules = backend_rules()
+    enabled = set(settings.parts.categories)
+    gone = {
+        p.part
+        for p in placeable_parts()
+        if p.category in enabled
+        and p.part not in rules.required
+        and any(produced(p.part, c) is False for c in used)
+    }
+    for group in rules.coupled:
+        if gone & group and "slope" in settings.parts.categories:
+            gone |= group
+    return frozenset(gone)
+
+
+def _rect_dims(part: Any) -> tuple[int, int, int] | None:
+    """(width, length, height) of a full-rectangle part, else ``None``."""
+    cells = part.occupied_cells
+    xs = {c[0] for c in cells}
+    ys = {c[1] for c in cells}
+    zs = {c[2] for c in cells}
+    if len(cells) != len(xs) * len(ys) * len(zs):
+        return None
+    width, length = sorted((len(xs), len(ys)))
+    return (width, length, len(zs))
+
+
+def split_unavailable(
+    layout: Layout, produced: Callable[[str, int], bool | None] = produced_in
+) -> SplitReport:
+    """Replace bricks/plates LEGO does not make in their colour (in place).
+
+    Each is split along its long side into shorter parts of the same width,
+    height, family and colour that exist (two 1-wide rows as a fallback for
+    2-wide parts), with joints away from the joints directly above and below
+    (:func:`mesh2brick.place.split.choose_split`). Only parts of
+    ``layout.catalog`` are used, so whitelists still hold.
+    """
+    pieces = _split_pieces(layout, produced)
+    replaced = added = 0
+    unresolved: list[tuple[str, int]] = []
+    for brick in list(layout):
+        part = layout.part_of(brick)
+        if produced(part.ldraw_part, brick.colour_code) is not False:
+            continue
+        new = _replace_brick(layout, brick, pieces)
+        if new is None:
+            unresolved.append((part.ldraw_part, brick.colour_code))
+        else:
+            replaced += 1
+            added += new
+    return SplitReport(replaced=replaced, added=added, unresolved=tuple(unresolved))
+
+
+_PieceKey = tuple[str, int, int, int]  # (category, width, height, colour)
+
+
+def _split_pieces(
+    layout: Layout, produced: Callable[[str, int], bool | None]
+) -> Callable[[_PieceKey], dict[int, str]]:
+    """Lookup (category, width, height, colour) -> {length: part key}."""
+    shapes: list[tuple[str, int, int, int, str, str]] = []
+    for key, part in layout.catalog.parts.items():
+        category = part.category.value
+        dims = _rect_dims(part)
+        if category in ("brick", "plate") and dims is not None:
+            shapes.append((category, dims[0], dims[1], dims[2], key, part.ldraw_part))
+    memo: dict[_PieceKey, dict[int, str]] = {}
+
+    def lookup(wanted: _PieceKey) -> dict[int, str]:
+        if wanted not in memo:
+            category, width, height, colour = wanted
+            memo[wanted] = {
+                length: key
+                for cat, w, length, h, key, ldraw in sorted(shapes)
+                if (cat, w, h) == (category, width, height)
+                and produced(ldraw, colour) is not False
+            }
+        return memo[wanted]
+
+    return lookup
+
+
+def _replace_brick(
+    layout: Layout,
+    brick: PlacedBrick,
+    pieces: Callable[[_PieceKey], dict[int, str]],
+) -> int | None:
+    """Swap ``brick`` for existing shorter parts; number added or ``None``."""
+    part = layout.part_of(brick)
+    cells = layout.cells_of(brick)
+    if part.category.value not in ("brick", "plate") or _rect_dims(part) is None:
+        return None
+    xs = sorted({c[0] for c in cells})
+    ys = sorted({c[1] for c in cells})
+    layers = sorted({c[2] for c in cells})
+    axis = 0 if len(xs) >= len(ys) else 1
+    along, across = (xs, ys) if axis == 0 else (ys, xs)
+    category = part.category.value
+    plan = None
+    for rows in ([across], [[a] for a in across]):  # whole width, then 1-wide rows
+        plan = _strip_plan(
+            layout,
+            brick,
+            along=along,
+            rows=rows,
+            axis=axis,
+            layers=layers,
+            pieces=pieces,
+            category=category,
+        )
+        if plan is not None or len(across) == 1:
+            break
+    if plan is None:
+        return None
+    layout.remove(brick.brick_id)
+    added: list[int] = []
+    for key, target in plan:
+        placed = _place_exact(layout, key, target, layers[0], brick.colour_code)
+        if placed is None:
+            layout.remove_many(added)
+            layout.add(
+                brick.part_key,
+                brick.x,
+                brick.y,
+                brick.layer,
+                brick.yaw,
+                brick.colour_code,
+            )
+            return None
+        added.append(placed)
+    return len(added)
+
+
+def _strip_plan(
+    layout: Layout,
+    brick: PlacedBrick,
+    *,
+    along: list[int],
+    rows: list[list[int]],
+    axis: int,
+    layers: list[int],
+    pieces: Callable[[_PieceKey], dict[int, str]],
+    category: str,
+) -> list[tuple[str, frozenset[tuple[int, int, int]]]] | None:
+    """Split plan for ``rows`` (each a set of cross coordinates) or ``None``."""
+    plan: list[tuple[str, frozenset[tuple[int, int, int]]]] = []
+    for row in rows:
+        available = pieces((category, len(row), len(layers), brick.colour_code))
+        avoid = _neighbour_joints(layout, along, row, axis, layers)
+        split = choose_split(len(along), available, avoid)
+        if split is None:
+            return None
+        start = 0
+        for piece in split:
+            span = along[start : start + piece]
+            target = frozenset(
+                (a, c, z) if axis == 0 else (c, a, z)
+                for a in span
+                for c in row
+                for z in layers
+            )
+            plan.append((available[piece], target))
+            start += piece
+    return plan
+
+
+def _neighbour_joints(
+    layout: Layout, along: list[int], row: list[int], axis: int, layers: list[int]
+) -> set[int]:
+    """Offsets along the brick where bricks directly above or below meet."""
+    found: set[int] = set()
+    for z in (layers[0] - 1, layers[-1] + 1):
+        for c in row:
+            ids = []
+            for a in along:
+                cell = (a, c, z) if axis == 0 else (c, a, z)
+                hit = layout.brick_at(cell)
+                ids.append(None if hit is None else hit.brick_id)
+            found.update(
+                i
+                for i in range(1, len(ids))
+                if ids[i] is not None
+                and ids[i - 1] is not None
+                and ids[i] != ids[i - 1]
+            )
+    return found
+
+
+def _place_exact(
+    layout: Layout,
+    key: str,
+    target: frozenset[tuple[int, int, int]],
+    layer: int,
+    colour: int,
+) -> int | None:
+    """Add ``key`` so it covers exactly ``target``; its brick id or ``None``."""
+    part = layout.catalog[key]
+    tx = min(c[0] for c in target)
+    ty = min(c[1] for c in target)
+    for yaw in part.orientations:
+        cells = part.cells_at(0, 0, layer, yaw)
+        x = tx - min(c[0] for c in cells)
+        y = ty - min(c[1] for c in cells)
+        if frozenset(part.cells_at(x, y, layer, yaw)) == target:
+            try:
+                return layout.add(key, x, y, layer, yaw, colour).brick_id
+            except CollisionError:
+                return None
+    return None
+
+
+# ---------------------------------------------------------------- joint pattern
+def stacked_joints(layout: Layout) -> tuple[int, int]:
+    """(stacked, total): vertical joints at brick interfaces that continue up.
+
+    A joint between two bricks ends at the interface to the layer above; it
+    is *stacked* if the layer above has a joint at the same place (no brick
+    bridges it), the weak pattern of a wall without bond.
+    """
+    occ = layout.occupancy
+    total = stacked = 0
+    for (x, y, z), brick in occ.items():
+        below = (x, y, z - 1)
+        if below not in occ or occ[below] == brick:
+            continue
+        for dx, dy in ((1, 0), (0, 1)):
+            beside_below = (x + dx, y + dy, z - 1)
+            if beside_below in occ and occ[beside_below] != occ[below]:
+                total += 1
+                beside = (x + dx, y + dy, z)
+                if beside in occ and occ[beside] != brick:
+                    stacked += 1
+    return stacked, total
+
+
 @contextmanager
 def _placement_catalog(catalog: Catalog) -> Iterator[None]:
     """Let legolization's ``run()`` place from ``catalog`` (local patch).
@@ -324,6 +593,19 @@ class LegolizationBackend:
         if grid.filled_count == 0:
             msg = "the voxel grid is empty; nothing to place"
             raise BackendError(msg)
+        availability = settings.parts.availability
+        early: list[str] = []
+        if availability == "exclude":
+            gone = unavailable_parts(grid.colors_used, settings)
+            if gone:
+                parts = settings.parts.model_copy(
+                    update={"exclude": tuple(sorted({*settings.parts.exclude, *gone}))}
+                )
+                settings = settings.model_copy(update={"parts": parts})
+                early.append(
+                    f"left out {len(gone)} part(s) LEGO does not make in all colours "
+                    f"of this model: {', '.join(sorted(gone))} (parts.availability)"
+                )
         allowed = whitelist(settings)
         config = self.pipeline_config(
             settings, height_unit=grid.height_unit, allowed=allowed
@@ -334,8 +616,25 @@ class LegolizationBackend:
                 result = run(lego_grid, config)
         except ValueError as error:
             raise BackendError(f"legolization rejected the input: {error}") from error
+        stability = _report_from_result(result)
+        if availability == "split":
+            report = split_unavailable(result.layout)
+            if report.replaced:
+                stability = _report(
+                    result.layout, analyze(result.layout, config.solver)
+                )
+                early.append(
+                    f"replaced {report.replaced} part(s) LEGO does not make in their "
+                    f"colour by {report.added} shorter one(s) "
+                    "(parts.availability=split)"
+                )
+            if report.unresolved:
+                early.append(
+                    f"{len(report.unresolved)} part(s) could not be replaced by "
+                    "existing shorter parts; see the parts list"
+                )
         plan, notes = self._plan(result.layout, config, settings, deadline)
-        notes = [*allowed.notes, *notes]
+        notes = [*allowed.notes, *early, *notes]
         native = _Native(layout=result.layout, plan=plan)
         return Placement(
             model=to_brick_model(
@@ -346,7 +645,7 @@ class LegolizationBackend:
                     f"{NAME} {VERSION}, strategy {config.strategy}, seed {config.seed}"
                 ),
             ),
-            stability=_report_from_result(result),
+            stability=stability,
             backend=NAME,
             native=native,
             notes=tuple(notes),

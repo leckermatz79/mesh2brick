@@ -16,7 +16,7 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 4 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
+> **Status: pre-alpha (Phase 5 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
 > and STEP files into an LDraw model, three parts lists and a PDF building instruction,
 > in the model's own colours. See [docs/STATUS.md](docs/STATUS.md).
 
@@ -69,6 +69,14 @@ uv run mesh2brick render out/heart.bricks.json --step 3
 ```
 
 All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.yaml).
+
+## Opening the results in other programs
+
+- **BrickLink Studio:** open the `.ldr`/`.mpd` with **File → Open**. On macOS, Studio's
+  **Import** hung for every file in our test (even for files Studio exported itself);
+  File → Open loads the same file at once. A Duo test file showed no overlaps, no
+  duplicates and no stability issues in Studio.
+- LDraw viewers (LDView, LeoCAD) open the files directly.
 
 ## Development
 

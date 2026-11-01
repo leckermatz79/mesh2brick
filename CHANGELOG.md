@@ -6,6 +6,21 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-01 - Phase 5: strategy benchmark and colour availability
+
+### Added
+- `parts.availability` (`exclude` default, `split`, `report`) for parts LEGO does not make in
+  a colour (ADR 0010). `exclude` leaves them out of placement for the whole model; `split`
+  replaces them afterwards by existing shorter parts of the same colour with staggered joints
+  (`mesh2brick.place.split`), rolls back failed replacements and re-checks stability.
+- Strategy benchmark of all 7 legolization strategies on the fixtures at 16 and 32 studs
+  (docs/benchmarks.md, gallery chart); decision "no own strategy" (ADR 0010).
+- `scripts/benchmark_placement.py` reports parts not made in their colour, the share of
+  stacked vertical joints (`stacked_joints`) and the notes.
+- Studio check of the product owner compared with legolization's stability analysis (ADR 0010
+  addendum): no minimum wall thickness, no own offset pass; README notes how to open files in
+  Studio (File → Open; Import hangs on macOS).
+
 ## [0.4.0] - 2026-11-01 - Phase 4: catalogue and whitelist
 
 ### Added
