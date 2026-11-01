@@ -71,9 +71,9 @@ Drei Messrunden mit je 8–10 Varianten parallel, Details in [benchmarks.md](ben
 
 | Was | Einschätzung |
 |---|---|
-| Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. Bei Überhängen muss man evtl. mit der Hand stützen; das PDF sagt es. | Phase 5/6 bzw. Upstream (Zeitbudget für Sequenzierung) |
+| Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. Bei Überhängen muss man evtl. mit der Hand stützen; das PDF sagt es. | von dir akzeptiert; Verbesserung in Phase 5/6 bzw. Upstream |
 | Die letzte Optimierung in legolization („remerge", 40–170 s) lässt sich nicht begrenzen. Die 5 Minuten sind daher Zielmarke, keine harte Garantie; Überschreitungen werden gemeldet. | Upstream-Kandidat #5 |
-| LeoCAD lässt sich per Homebrew nicht mehr installieren (seit 09/2026 gesperrt, Gatekeeper). LDView gibt es dort gar nicht. Die Schrittbilder kommen daher von unserem eigenen Renderer. | akzeptieren oder manuell installieren (Frage 2) |
+| LeoCAD lässt sich per Homebrew nicht mehr installieren (seit 09/2026 gesperrt, Gatekeeper). LDView gibt es dort gar nicht. Die Schrittbilder kommen daher von unserem eigenen Renderer. | entschieden: eigener Renderer |
 | Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an |
 | PDF-Text englisch. | Phase 6 |
 | `color.mode` vertex/texture/cad (Phase 3), Whitelists (Phase 4), `llm.*` (Phase 7) noch ohne Wirkung. | geplant |
@@ -93,14 +93,13 @@ Drei Messrunden mit je 8–10 Varianten parallel, Details in [benchmarks.md](ben
 | 2026-11-01 | LeoCAD für PDF-Schrittbilder installieren? | **Ja**, per Homebrew zu Beginn von Phase 2. Leider nicht möglich (s. o.). |
 | 2026-11-01 | Fehlerbericht #2 bei legolization einreichen? | **Ja**, plus PR-Entwurf für das Zeitlimit; mit Hinweis, dass das Problem in einem Vibe-Coding-Projekt aufgefallen ist. Erledigt: Issue #88, Draft-PR #89. |
 | 2026-11-01 | Wie lange darf eine Umwandlung dauern? | **5 Minuten.** Phase 2: Duo unter 5 Minuten als Zielmarke, Hebel per Benchmark wählen. Erreicht: 110 s. |
+| 2026-11-01 | Manuelle Prüfung der `.ldr` in BrickLink Studio? | **Ja, Screenshot kommt später.** Bis dahin gilt der strenge Wieder-Einlese-Test als Prüfung. |
+| 2026-11-01 | LeoCAD manuell installieren und nutzen? | **Nein.** Schrittbilder kommen vom eigenen Renderer. |
+| 2026-11-01 | Schichtschritte für große Modelle (> 500 Teile)? | **Ja**, in Ordnung. |
 
 ## Fragen an dich
 
-Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
-
-1. **Kannst du eine erzeugte `.ldr` einmal in BrickLink Studio öffnen und mir einen Screenshot geben?** Die SPEC verlangt das als manuelle Abnahme; ich habe weder Studio noch LDView. *Annahme: Der strenge Wieder-Einlese-Test ersetzt die manuelle Prüfung, bis du einen Screenshot hast.*
-2. **Soll ich LeoCAD trotzdem nutzen, wenn du es selbst installierst (Download von leocad.org, beim ersten Start „Trotzdem öffnen")?** *Annahme: nein, wir bleiben bei unserem eigenen Renderer.*
-3. **Sind Schichtschritte für große Modelle für dich in Ordnung?** Alternative: Ich lasse die Prüfung bis zur 5-Minuten-Grenze laufen. Das kostet dann fast immer die vollen 5 Minuten und endet bei Duo trotzdem bei Schichten. *Annahme: ja, Schichten.*
+Keine offenen Fragen. Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio (manuelle Abnahme laut SPEC). Bis dahin gilt der strenge Wieder-Einlese-Test.
 
 ## Offene Kleinigkeit
 
