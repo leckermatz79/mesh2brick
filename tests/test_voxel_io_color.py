@@ -132,10 +132,10 @@ def test_more_bands_than_layers() -> None:
     assert color[0, 0].tolist() == [1, 14]
 
 
-def test_unimplemented_colour_modes() -> None:
-    with pytest.raises(ValueError, match="arrives in Phase 3"):
-        apply_colors(np.ones((1, 1, 1), bool), ColorConfig(mode="vertex"))
-    assert colors_needed(ColorConfig(mode="vertex")) == ()
+def test_model_modes_without_model_use_single_colour() -> None:
+    color = apply_colors(np.ones((1, 1, 1), bool), ColorConfig(mode="vertex"))
+    assert color[0, 0, 0] == 4
+    assert colors_needed(ColorConfig(mode="vertex")) == (4,)
 
 
 def test_colors_needed_and_validation() -> None:

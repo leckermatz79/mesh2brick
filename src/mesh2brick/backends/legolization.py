@@ -39,7 +39,7 @@ import highspy
 import numpy as np
 from legolization import MeshOptions, PipelineConfig, PipelineResult, run
 from legolization import VoxelGrid as LegoGrid
-from legolization.color import default_palette
+from legolization.color import Palette, default_palette
 from legolization.graph import ConnectionGraph
 from legolization.instructions.bom import bill_of_materials
 from legolization.instructions.booklet import BookletConfig, ModelStats, write_booklet
@@ -72,8 +72,10 @@ if TYPE_CHECKING:
 
     import trimesh
     from legolization.layout import Layout
+    from numpy.typing import NDArray
 
     from mesh2brick.config import Settings
+    from mesh2brick.voxel.color import ColorQuantizer
     from mesh2brick.voxel.grid import HeightUnit
 
 NAME: Final = "legolization"
@@ -562,6 +564,44 @@ def color_info(codes: Iterable[int]) -> dict[int, ColorInfo]:
             name=palette.name_of(code), rgb_hex=f"#{r:02x}{g:02x}{b:02x}"
         )
     return result
+
+
+QUANTIZE_CHUNK: Final = 8192
+"""Colours matched per batch (legolization builds an n x palette matrix)."""
+
+
+def color_quantizer(codes: Iterable[int] | None = None) -> ColorQuantizer:
+    """Nearest-colour matcher onto ``codes`` (default: the whole solid palette).
+
+    Uses legolization's palette metric (Oklab with over-weighted chroma, so
+    greys stay grey and black stays black).
+
+    Raises:
+        BackendError: if ``codes`` contains no solid palette colour.
+    """
+    palette = default_palette()
+    if codes is not None:
+        wanted = np.asarray(sorted(set(codes) & solid_color_codes()), dtype=np.int64)
+        if not len(wanted):
+            msg = "the colour palette is empty (no solid LDraw colour allowed)"
+            raise BackendError(msg)
+        index = np.searchsorted(np.asarray(palette.codes, dtype=np.int64), wanted)
+        palette = Palette(
+            codes=palette.codes[index],
+            rgbs=palette.rgbs[index],
+            names=tuple(palette.names[int(i)] for i in index),
+            oklabs=palette.oklabs[index],
+        )
+
+    def quantize(rgb: NDArray[np.uint8], /) -> NDArray[np.int32]:
+        values = np.asarray(rgb, dtype=np.float64).reshape(-1, 3)
+        result = np.empty(len(values), dtype=np.int32)
+        for start in range(0, len(values), QUANTIZE_CHUNK):
+            chunk = values[start : start + QUANTIZE_CHUNK]
+            result[start : start + len(chunk)] = palette.quantize(chunk)
+        return result
+
+    return quantize
 
 
 def color_rgb(codes: Iterable[int]) -> dict[int, tuple[int, int, int]]:

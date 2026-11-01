@@ -103,6 +103,52 @@ def load_id_maps() -> IdMaps:
     )
 
 
+COMMON_MIN_PARTS: Final = 1000
+"""A common colour exists in at least this many different parts (Rebrickable)."""
+COMMON_RECENT_YEARS: Final = 2
+"""... and was still produced this many years before the table was made."""
+
+
+_FINISH_WORDS: Final = ("silver", "gold", "copper", "bronze")
+"""Metallic/pearl finishes (BrickLink files Flat Silver under "Pearl"); SPEC §2
+allows them only on opt-in (``color.palette: all``)."""
+
+
+def catalogue_colors(maps: IdMaps | None = None) -> frozenset[int]:
+    """Solid LDraw colours with confirmed BrickLink *and* Rebrickable numbers.
+
+    Every part in these colours appears in all three parts lists
+    (``color.palette: solid``). Metallic-looking finishes are left out.
+    """
+    maps = maps or load_id_maps()
+    return frozenset(
+        code
+        for code, row in maps.colors.items()
+        if row.get("bricklink") is not None
+        and row.get("rebrickable") is not None
+        and not any(word in str(row.get("name", "")).lower() for word in _FINISH_WORDS)
+    )
+
+
+def common_colors(maps: IdMaps | None = None) -> frozenset[int]:
+    """Catalogue colours LEGO currently makes in many parts (default palette).
+
+    Based on Rebrickable's statistics in the ID table: at least
+    ``COMMON_MIN_PARTS`` parts and produced within ``COMMON_RECENT_YEARS`` of
+    the table's date. That is today's palette (Black ... Coral, about 40
+    colours) without rare or discontinued colours that are hard to buy.
+    """
+    maps = maps or load_id_maps()
+    recent = int(maps.generated[:4]) - COMMON_RECENT_YEARS
+    common = set()
+    for code in catalogue_colors(maps):
+        usage = maps.colors[code].get("usage") or {}
+        parts, last = usage.get("parts") or 0, usage.get("last_year") or 0
+        if parts >= COMMON_MIN_PARTS and last >= recent:
+            common.add(code)
+    return frozenset(common)
+
+
 def build_bom(model: BrickModel, maps: IdMaps | None = None) -> Bom:
     """Count parts per (part, colour) and attach catalogue numbers."""
     maps = maps or load_id_maps()

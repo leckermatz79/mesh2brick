@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --extra step
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src
@@ -44,6 +44,8 @@ jobs:
     env:
       # A missing LDraw library must fail the run, never skip the smoke test.
       MESH2BRICK_REQUIRE_LDRAW: "1"
+      # Same for the optional STEP reader (extra "step").
+      MESH2BRICK_REQUIRE_STEP: "1"
       LEGOLIZATION_RENDERER: none
       MPLBACKEND: Agg
     steps:
@@ -52,7 +54,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --extra step
       - name: Cache generated LDraw modules
         id: ldraw-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

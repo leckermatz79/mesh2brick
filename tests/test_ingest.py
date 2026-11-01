@@ -50,8 +50,8 @@ def test_other_mesh_formats(tmp_path: Path, fixtures_dir: Path, suffix: str) -> 
 
 
 def test_unsupported_and_missing_files(tmp_path: Path) -> None:
-    with pytest.raises(IngestError, match=r"unsupported input format '\.step'"):
-        loader_for(Path("model.step"))
+    with pytest.raises(IngestError, match=r"unsupported input format '\.fbx'"):
+        loader_for(Path("model.fbx"))
     with pytest.raises(IngestError, match="not found"):
         load_model(tmp_path / "nothing.stl", InputConfig())
 

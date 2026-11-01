@@ -106,6 +106,7 @@ def _worker(job: dict[str, Any]) -> None:
     from mesh2brick.backends.legolization import LegolizationBackend  # noqa: PLC0415
     from mesh2brick.config import load_settings  # noqa: PLC0415
     from mesh2brick.ingest import load_model  # noqa: PLC0415
+    from mesh2brick.pipeline import palette_for  # noqa: PLC0415
     from mesh2brick.voxel.io import load_npz  # noqa: PLC0415
     from mesh2brick.voxel.voxelize import voxelize  # noqa: PLC0415
 
@@ -126,7 +127,9 @@ def _worker(job: dict[str, Any]) -> None:
     if path.suffix == ".npz":
         grid = load_npz(path)
     else:
-        grid = voxelize(load_model(path, settings.input), settings).grid
+        grid = voxelize(
+            load_model(path, settings.input), settings, quantize=palette_for(settings)
+        ).grid
     with telemetry.record(span_sink=sink):
         placement = LegolizationBackend().place(grid, settings, name=path.stem)
     model, stability = placement.model, placement.stability

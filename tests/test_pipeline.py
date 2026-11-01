@@ -15,7 +15,8 @@ import trimesh
 from mesh2brick.backends import BackendError
 from mesh2brick.backends.legolization import LegolizationBackend
 from mesh2brick.config import load_settings
-from mesh2brick.pipeline import convert
+from mesh2brick.export.bom import catalogue_colors
+from mesh2brick.pipeline import convert, palette_for
 from mesh2brick.voxel.voxelize import remove_islands
 
 pytestmark = pytest.mark.ldraw
@@ -79,8 +80,8 @@ def test_convert_from_grid_file(bunny, tmp_path: Path) -> None:  # type: ignore[
 
 
 def test_convert_rejects_bad_input(tmp_path: Path) -> None:
-    path = tmp_path / "model.step"
-    path.write_text("ISO-10303-21;")
+    path = tmp_path / "model.fbx"
+    path.write_text("Kaydara FBX Binary")
     with pytest.raises(ValueError, match="unsupported input format"):
         convert(path, load_settings(None, [f"output.dir={tmp_path}"]))
 
@@ -141,3 +142,43 @@ def test_voxelize_removes_a_loose_speck(tmp_path: Path) -> None:
     settings = load_settings(None, ["input.scale_mode=mm", "input.mm_per_stud=2"])
     result = voxelize(load_model(path, settings.input), settings)
     assert any("removed 1 loose voxel island" in w for w in result.warnings)
+
+
+# ------------------------------------------------------------------ colours
+def test_acceptance_coloured_obj_gives_multicolour_model(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """SPEC Phase 3: a coloured OBJ fixture yields a multi-coloured model."""
+    settings = load_settings(
+        None,
+        [
+            "input.target_studs=12",
+            f"output.dir={tmp_path}",
+            "output.formats=[ldr, bom_csv]",
+        ],
+    )
+    result = convert(fixtures_dir / "toadstool.obj", settings)
+    names = {info.name for info in result.model.colors.values()}
+    assert {"Red", "White"} <= names
+    with (tmp_path / "toadstool.bom.csv").open() as handle:
+        colours = {row["color_name"] for row in csv.DictReader(handle)}
+    assert {"Red", "White"} <= colours
+    assert LegolizationBackend().verify_ldraw(tmp_path / "toadstool.ldr") == (
+        result.model.part_count
+    )
+
+
+def test_palette_follows_the_setting() -> None:
+    from mesh2brick.export.bom import common_colors  # noqa: PLC0415
+
+    salmon = np.array([[249, 153, 99]], dtype=np.uint8)  # Duo's "Mandarin Orange"
+    common = palette_for(load_settings(None, []))
+    solid = palette_for(load_settings(None, ["color.palette=solid"]))
+    every = palette_for(load_settings(None, ["color.palette=all"]))
+    assert int(common(salmon)[0]) in common_colors()
+    assert int(solid(salmon)[0]) in catalogue_colors()
+    assert every(salmon)[0] >= 0
+    assert len(common_colors()) == 41  # today's palette, no Flat Silver
+    assert {0, 4, 15, 71, 72, 353, 330} <= common_colors()  # incl. Coral, Olive
+    assert not {7, 8, 6, 225, 315} & common_colors()  # old/rare, Flat Silver
+    assert 315 not in catalogue_colors()

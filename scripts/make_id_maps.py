@@ -9,7 +9,11 @@ mapping is only recorded when the source data confirms it (ADR 0005):
 
 * colours -> BrickLink: exact (normalised) name match against BrickLink's
   colour guide; -> Rebrickable: same numeric ID *and* same name in
-  Rebrickable's ``colors.csv``.
+  Rebrickable's ``colors.csv``, or else the one Rebrickable colour with exactly
+  that (normalised) name (newer colours have their own numbers there, e.g.
+  LDraw Coral 353 = Rebrickable 1050). Rebrickable's usage statistics
+  (parts, sets, first and last year) are stored with the colour; they decide
+  the default "common" palette.
 * parts: candidate numbers are the LDraw number and the number without a
   trailing variant letter (``3070b`` -> ``3070``). A candidate is accepted when
   the catalogue entry exists and its name has the same part type and
@@ -110,6 +114,35 @@ def rebrickable_csv(name: str) -> list[dict[str, str]]:
     return list(csv.DictReader(io.StringIO(data)))
 
 
+def rebrickable_color(
+    code: int, name: str, rows: dict[int, dict[str, str]]
+) -> int | None:
+    """Rebrickable colour ID for an LDraw colour (``None`` if not confirmed).
+
+    Same ID and same name first; otherwise the single Rebrickable colour whose
+    normalised name is identical (ambiguous names stay unmapped).
+    """
+    if code in rows and norm_color(rows[code]["name"]) == name:
+        return code
+    same_name = [rid for rid, row in rows.items() if norm_color(row["name"]) == name]
+    return same_name[0] if len(same_name) == 1 else None
+
+
+def color_usage(row: dict[str, str]) -> dict[str, int | None]:
+    """Rebrickable's statistics for one colour: parts, sets, first/last year."""
+
+    def number(key: str) -> int | None:
+        value = row.get(key, "").strip()
+        return int(value) if value.isdigit() else None
+
+    return {
+        "parts": number("num_parts"),
+        "sets": number("num_sets"),
+        "first_year": number("y1"),
+        "last_year": number("y2"),
+    }
+
+
 def bricklink_part_name(number: str) -> str | None:
     """BrickLink catalogue name of a part number, or None if unknown."""
     page = fetch(BL_PART.format(number)).decode("utf-8", errors="replace")
@@ -151,20 +184,20 @@ def main() -> None:
         }
     else:
         bl_colors = bricklink_colors()
-    rb_colors = {int(r["id"]): r["name"] for r in rebrickable_csv("colors")}
+    rb_rows = {int(r["id"]): r for r in rebrickable_csv("colors")}
     rb_parts = {r["part_num"]: r["name"] for r in rebrickable_csv("parts")}
 
     colors: dict[str, dict[str, object]] = {}
     infos = color_info(solid_color_codes())
     for code, info in sorted(infos.items()):
         name = norm_color(info.name)
-        rebrickable = (
-            code if code in rb_colors and norm_color(rb_colors[code]) == name else None
-        )
+        rebrickable = rebrickable_color(code, name, rb_rows)
+        row = rb_rows.get(rebrickable) if rebrickable is not None else None
         colors[str(code)] = {
             "name": info.name.replace("_", " "),
             "bricklink": bl_colors.get(name),
             "rebrickable": rebrickable,
+            "usage": None if row is None else color_usage(row),
         }
 
     part_rows: dict[str, dict[str, object]] = {}
@@ -207,7 +240,7 @@ def main() -> None:
     OUT.write_text(
         json.dumps(
             {
-                "schema": 1,
+                "schema": 2,
                 "generated": dt.datetime.now(dt.UTC).date().isoformat(),
                 "sources": {
                     "ldraw": "local LDraw library (part descriptions, colour names)",

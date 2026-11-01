@@ -18,6 +18,7 @@ from pathlib import Path
 from mesh2brick.backends.legolization import reference_voxelize
 from mesh2brick.config import load_settings
 from mesh2brick.ingest import load_model
+from mesh2brick.pipeline import palette_for
 from mesh2brick.voxel.voxelize import voxelize
 
 FIXTURES = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
@@ -41,7 +42,7 @@ def main() -> None:
     print("|---|---:|---|---:|---:|---:|---:|---:|---:|")
     for path in paths:
         model = load_model(path, settings.input)
-        ours = voxelize(model, settings)
+        ours = voxelize(model, settings, quantize=palette_for(settings))
         started = time.perf_counter()
         theirs = reference_voxelize(model.mesh, pitch_mm=ours.report.pitch_mm)
         their_seconds = time.perf_counter() - started

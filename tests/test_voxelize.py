@@ -14,10 +14,11 @@ from mesh2brick.config import InputConfig, Settings, load_settings
 from mesh2brick.ingest import load_model
 from mesh2brick.ingest.base import RawModel
 from mesh2brick.ingest.normalize import normalize
-from mesh2brick.voxel import voxelize as voxelize_module
+from mesh2brick.voxel import rays as rays_module
 from mesh2brick.voxel.grid import VoxelGrid
 from mesh2brick.voxel.voxelize import (
     Lattice,
+    VoxelizeResult,
     fill_fractions,
     hollow,
     model_pitch,
@@ -27,7 +28,7 @@ from mesh2brick.voxel.voxelize import (
 )
 
 
-def run(mesh: trimesh.Trimesh, *overrides: str) -> voxelize_module.VoxelizeResult:
+def run(mesh: trimesh.Trimesh, *overrides: str) -> VoxelizeResult:
     settings = load_settings(None, list(overrides))
     model = normalize(
         RawModel(parts=(mesh,), names=("m",)), settings.input, source=Path("m.stl")
@@ -151,7 +152,7 @@ def test_chunking_does_not_change_the_result(monkeypatch: pytest.MonkeyPatch) ->
     sphere.apply_translation((5, 5, 5))
     tris = np.asarray(sphere.triangles)
     reference = fill_fractions(tris, lattice((10, 10, 10)))
-    monkeypatch.setattr(voxelize_module, "_PAIR_CHUNK", 37)
+    monkeypatch.setattr(rays_module, "PAIR_CHUNK", 37)
     np.testing.assert_allclose(fill_fractions(tris, lattice((10, 10, 10))), reference)
 
 

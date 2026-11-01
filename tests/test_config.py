@@ -155,3 +155,14 @@ def test_numeric_part_numbers_become_strings() -> None:
     s = load_settings(None, ["parts.include=[3001, 3004]", "parts.exclude=[3622b]"])
     assert s.parts.include == ("3001", "3004")
     assert s.parts.exclude == ("3622b",)
+
+
+def test_phase3_defaults_and_validation() -> None:
+    settings = load_settings(None, [])
+    assert settings.color.mode == "auto"
+    assert settings.input.multi_body == "union"
+    assert settings.input.step_tolerance_mm == 0.05
+    with pytest.raises(ConfigError, match="step_tolerance_mm"):
+        load_settings(None, ["input.step_tolerance_mm=0"])
+    with pytest.raises(ConfigError, match="multi_body"):
+        load_settings(None, ["input.multi_body=merge"])

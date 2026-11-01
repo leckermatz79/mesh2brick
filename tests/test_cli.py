@@ -197,7 +197,7 @@ def test_voxelize_then_place_npz(fixtures_dir: Path, tmp_path: Path) -> None:
     ("args", "message"),
     [
         (["-s", "color.single_color=9999"], "not solid colours"),
-        (["-s", "color.mode=texture"], "arrives in Phase 3"),
+        (["-s", "color.mode=rainbow"], "color.mode"),
     ],
 )
 def test_voxelize_reports_errors(
@@ -213,8 +213,8 @@ def test_voxelize_reports_errors(
 
 @pytest.mark.ldraw
 def test_voxelize_rejects_unsupported_files(tmp_path: Path) -> None:
-    path = tmp_path / "model.step"
-    path.write_text("ISO-10303-21;")
+    path = tmp_path / "model.fbx"
+    path.write_text("Kaydara FBX Binary")
     result = runner.invoke(app, ["voxelize", str(path), "-o", str(tmp_path)])
     assert result.exit_code == 1
     assert "unsupported input format" in result.output
@@ -276,8 +276,8 @@ def test_convert_end_to_end(fixtures_dir: Path, tmp_path: Path) -> None:
 
 @pytest.mark.ldraw
 def test_convert_reports_errors(tmp_path: Path) -> None:
-    path = tmp_path / "model.step"
-    path.write_text("ISO-10303-21;")
+    path = tmp_path / "model.fbx"
+    path.write_text("Kaydara FBX Binary")
     result = runner.invoke(app, ["convert", str(path), "-o", str(tmp_path)])
     assert result.exit_code == 1
     assert "unsupported input format" in result.output

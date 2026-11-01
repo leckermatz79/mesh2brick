@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 Axis = Literal["x", "y", "z", "-x", "-y", "-z"]
 PartCategory = Literal["brick", "plate", "slope", "tile"]
+ColorMode = Literal["single", "height_bands", "cad", "vertex", "texture", "auto"]
 OutputFormat = Literal[
     "ldr", "mpd", "bom_csv", "bom_bricklink", "bom_rebrickable", "pdf", "png"
 ]
@@ -62,6 +63,11 @@ class InputConfig(_Section):
     """
     mm_per_stud: Annotated[float, Field(gt=0)] = 8.0
     """Model millimetres per stud (``scale_mode: mm``); a real stud pitch is 8 mm."""
+    multi_body: Literal["union", "error"] = "union"
+    """Files with several bodies/parts: ``union`` merges them into one solid
+    (overlaps are unioned), ``error`` rejects such files."""
+    step_tolerance_mm: Annotated[float, Field(gt=0)] = 0.05
+    """Largest distance between a STEP surface and its triangles (mm)."""
 
 
 class VoxelConfig(_Section):
@@ -81,9 +87,27 @@ class VoxelConfig(_Section):
 class ColorConfig(_Section):
     """How voxel colours are chosen (codes are LDraw colour codes)."""
 
-    mode: Literal["single", "vertex", "texture", "cad", "height_bands"] = "single"
+    mode: ColorMode = "auto"
+    """Where colours come from.
+
+    * ``single``: every cell is ``single_color``.
+    * ``height_bands``: horizontal bands in ``bands``, bottom to top.
+    * ``cad``: part and material colours of the file (STEP colours, 3MF
+      materials and slicer filaments, OBJ/glTF material colours).
+    * ``vertex``: per-vertex or per-face colours, else as ``cad``.
+    * ``texture``: image textures, else as ``vertex``.
+    * ``auto``: the most detailed colours the file has (like ``texture``).
+
+    Surfaces without colour information get ``single_color``.
+    """
     single_color: Annotated[int, Field(ge=0)] = 4
-    palette: Literal["solid", "all"] = "solid"
+    palette: Literal["common", "solid", "all"] = "common"
+    """Colours that model colours are matched to (ADR 0008).
+
+    * ``common``: colours LEGO currently makes in many parts (about 40; easy to buy).
+    * ``solid``: every opaque colour with BrickLink and Rebrickable numbers.
+    * ``all``: every opaque LDraw colour of the library, including rare ones.
+    """
     bands: tuple[Annotated[int, Field(ge=0)], ...] = (1, 2, 14, 25, 4)
     """Colours for ``mode: height_bands``, bottom to top (default: Blue, Green,
     Yellow, Orange, Red)."""
