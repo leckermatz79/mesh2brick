@@ -8,24 +8,27 @@ stages together and does the file I/O; every stage stays usable on its own.
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
+
+import platformdirs
 
 from mesh2brick.backends.legolization import (
     LegolizationBackend,
     color_info,
     color_quantizer,
     load_voxel_file,
+    placeable_parts,
+    whitelist,
 )
-from mesh2brick.export.bom import (
-    Bom,
-    bom_warnings,
-    build_bom,
-    catalogue_colors,
-    common_colors,
-    write_boms,
-)
+from mesh2brick.backends.pyldraw import library_release, part_geometry
+from mesh2brick.catalog.parts import PartSpec, part_specs, spec_cache_path
+from mesh2brick.catalog.rebrickable import catalogue_colors, common_colors
+from mesh2brick.catalog.whitelist import WhitelistError
+from mesh2brick.export.bom import Bom, bom_warnings, build_bom, write_boms
 from mesh2brick.ingest import load_model, supported_suffixes
 from mesh2brick.render.preview import PreviewOptions, render_preview, render_step_images
 from mesh2brick.voxel.color import colors_needed
@@ -34,7 +37,6 @@ from mesh2brick.voxel.voxelize import voxelize
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
     from mesh2brick.backends.protocols import StabilityReport
     from mesh2brick.config import Settings
@@ -179,6 +181,64 @@ def _grid(
         msg = "voxelization produced no cells; increase input.target_studs"
         raise ValueError(msg)
     return result.grid
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogOverview:
+    """What ``mesh2brick catalog`` shows: placeable parts and their specs."""
+
+    placeable: tuple[str, ...]
+    specs: dict[str, PartSpec]
+    allowed: frozenset[str] | None
+    """Parts the current ``parts.*`` settings allow (``None`` if they are invalid)."""
+    problem: str | None = None
+
+
+def cache_dir() -> Path:
+    """mesh2brick's cache directory (``MESH2BRICK_CACHE_DIR`` overrides it)."""
+    override = os.environ.get("MESH2BRICK_CACHE_DIR")
+    return (
+        Path(override) if override else Path(platformdirs.user_cache_dir("mesh2brick"))
+    )
+
+
+def catalog_overview(settings: Settings) -> CatalogOverview:
+    """Placeable parts with geometry-derived specs (cached) and the whitelist.
+
+    Raises:
+        mesh2brick.backends.BackendError: if the LDraw library is missing.
+    """
+    release = library_release()
+    placeable = tuple(p.part for p in placeable_parts())
+    specs = part_specs(
+        placeable,
+        part_geometry,
+        cache=spec_cache_path(cache_dir(), release),
+        release=release,
+    )
+    try:
+        allowed: frozenset[str] | None = whitelist(settings).parts
+        problem = None
+    except WhitelistError as error:
+        allowed, problem = None, str(error)
+    return CatalogOverview(
+        placeable=placeable, specs=specs, allowed=allowed, problem=problem
+    )
+
+
+def part_spec(part: str) -> PartSpec:
+    """Spec of any LDraw part, derived from its geometry (cached).
+
+    Raises:
+        mesh2brick.backends.BackendError: for unknown parts.
+    """
+    release = library_release()
+    return part_specs(
+        [part],
+        part_geometry,
+        cache=spec_cache_path(cache_dir(), release),
+        release=release,
+    )[part]
 
 
 def palette_for(settings: Settings) -> ColorQuantizer:

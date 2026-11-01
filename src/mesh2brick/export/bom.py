@@ -4,23 +4,23 @@
 
 Part and colour numbers in the model are LDraw numbers. BrickLink and
 Rebrickable use partly different numbers (LDraw red ``4`` is BrickLink ``5``,
-LDraw ``3070b`` is BrickLink ``3070``). The translation comes from
-``id_maps.json``, built by ``scripts/make_id_maps.py`` from the catalogues
-themselves; only confirmed mappings are used (ADR 0005). Lines without a
-confirmed mapping stay in the mesh2brick CSV and are listed as a comment in
-the other formats, so nothing is silently dropped or guessed.
+LDraw ``3070b`` is BrickLink ``3070``). The translation, Rebrickable's part
+names and the colours each part is produced in come from the offline
+catalogue (:mod:`mesh2brick.catalog.rebrickable`); only confirmed mappings are
+used (ADR 0005). Lines without a confirmed mapping stay in the mesh2brick CSV
+and are listed as a comment in the other formats, so nothing is silently
+dropped or guessed. Part/colour pairs LEGO has never produced are flagged.
 """
 
 from __future__ import annotations
 
 import csv
 import io
-import json
 from dataclasses import dataclass
-from functools import lru_cache
-from importlib import resources
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 from xml.sax.saxutils import escape
+
+from mesh2brick.catalog.rebrickable import IdMaps, load_id_maps
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -48,6 +48,11 @@ class BomLine:
     bricklink_color: int | None = None
     rebrickable_part: str | None = None
     rebrickable_color: int | None = None
+    name: str | None = None
+    """Rebrickable's part name (``None`` if not confirmed)."""
+    produced: bool | None = None
+    """Whether LEGO makes this part in this colour (Rebrickable elements);
+    ``None`` if unknown."""
 
     @property
     def on_bricklink(self) -> bool:
@@ -72,81 +77,14 @@ class Bom:
         """Total number of parts."""
         return sum(line.quantity for line in self.lines)
 
+    def not_produced(self) -> tuple[BomLine, ...]:
+        """Lines whose part LEGO does not make in that colour."""
+        return tuple(line for line in self.lines if line.produced is False)
+
     def missing(self, catalogue: str) -> tuple[BomLine, ...]:
         """Lines without a confirmed number in ``bricklink`` or ``rebrickable``."""
         attribute = "on_bricklink" if catalogue == "bricklink" else "on_rebrickable"
         return tuple(line for line in self.lines if not getattr(line, attribute))
-
-
-@dataclass(frozen=True, slots=True)
-class IdMaps:
-    """The parsed ``id_maps.json``."""
-
-    parts: dict[str, dict[str, Any]]
-    colors: dict[int, dict[str, Any]]
-    generated: str
-
-
-@lru_cache(maxsize=1)
-def load_id_maps() -> IdMaps:
-    """Load the bundled LDraw -> BrickLink/Rebrickable table."""
-    text = (
-        resources.files("mesh2brick.export")
-        .joinpath("id_maps.json")
-        .read_text(encoding="utf-8")
-    )
-    data = json.loads(text)
-    return IdMaps(
-        parts=dict(data["parts"]),
-        colors={int(code): row for code, row in data["colors"].items()},
-        generated=str(data["generated"]),
-    )
-
-
-COMMON_MIN_PARTS: Final = 1000
-"""A common colour exists in at least this many different parts (Rebrickable)."""
-COMMON_RECENT_YEARS: Final = 2
-"""... and was still produced this many years before the table was made."""
-
-
-_FINISH_WORDS: Final = ("silver", "gold", "copper", "bronze")
-"""Metallic/pearl finishes (BrickLink files Flat Silver under "Pearl"); SPEC §2
-allows them only on opt-in (``color.palette: all``)."""
-
-
-def catalogue_colors(maps: IdMaps | None = None) -> frozenset[int]:
-    """Solid LDraw colours with confirmed BrickLink *and* Rebrickable numbers.
-
-    Every part in these colours appears in all three parts lists
-    (``color.palette: solid``). Metallic-looking finishes are left out.
-    """
-    maps = maps or load_id_maps()
-    return frozenset(
-        code
-        for code, row in maps.colors.items()
-        if row.get("bricklink") is not None
-        and row.get("rebrickable") is not None
-        and not any(word in str(row.get("name", "")).lower() for word in _FINISH_WORDS)
-    )
-
-
-def common_colors(maps: IdMaps | None = None) -> frozenset[int]:
-    """Catalogue colours LEGO currently makes in many parts (default palette).
-
-    Based on Rebrickable's statistics in the ID table: at least
-    ``COMMON_MIN_PARTS`` parts and produced within ``COMMON_RECENT_YEARS`` of
-    the table's date. That is today's palette (Black ... Coral, about 40
-    colours) without rare or discontinued colours that are hard to buy.
-    """
-    maps = maps or load_id_maps()
-    recent = int(maps.generated[:4]) - COMMON_RECENT_YEARS
-    common = set()
-    for code in catalogue_colors(maps):
-        usage = maps.colors[code].get("usage") or {}
-        parts, last = usage.get("parts") or 0, usage.get("last_year") or 0
-        if parts >= COMMON_MIN_PARTS and last >= recent:
-            common.add(code)
-    return frozenset(common)
 
 
 def build_bom(model: BrickModel, maps: IdMaps | None = None) -> Bom:
@@ -157,6 +95,7 @@ def build_bom(model: BrickModel, maps: IdMaps | None = None) -> Bom:
         part_row = maps.parts.get(part, {})
         color_row = maps.colors.get(color, {})
         info = model.colors.get(color)
+        produced_in = part_row.get("colors")
         lines.append(
             BomLine(
                 part=part,
@@ -170,6 +109,8 @@ def build_bom(model: BrickModel, maps: IdMaps | None = None) -> Bom:
                 bricklink_color=color_row.get("bricklink"),
                 rebrickable_part=part_row.get("rebrickable"),
                 rebrickable_color=color_row.get("rebrickable"),
+                name=part_row.get("rebrickable_name"),
+                produced=None if produced_in is None else color in produced_in,
             )
         )
     return Bom(model=model.name, lines=tuple(lines))
@@ -191,6 +132,8 @@ def bom_csv(bom: Bom) -> str:
             "bricklink_color",
             "rebrickable_part",
             "rebrickable_color",
+            "rebrickable_name",
+            "produced_in_color",
         ]
     )
     for line in bom.lines:
@@ -205,6 +148,8 @@ def bom_csv(bom: Bom) -> str:
                 _blank(line.bricklink_color),
                 _blank(line.rebrickable_part),
                 _blank(line.rebrickable_color),
+                _blank(line.name),
+                "" if line.produced is None else ("yes" if line.produced else "no"),
             ]
         )
     return out.getvalue()
@@ -265,8 +210,18 @@ def write_boms(
 
 
 def bom_warnings(bom: Bom, formats: Iterable[str]) -> list[str]:
-    """Human-readable notes about lines a requested format cannot contain."""
+    """Human-readable notes about the parts list.
+
+    Parts LEGO does not make in their colour, and lines a requested format
+    cannot contain.
+    """
     notes = []
+    if absent := bom.not_produced():
+        listed = ", ".join(f"{m.quantity}x {m.part} {m.color_name}" for m in absent)
+        notes.append(
+            f"{sum(m.quantity for m in absent)} part(s) in colours LEGO does not "
+            f"make them in (Rebrickable); substitute by hand: {listed}"
+        )
     for name, catalogue in (
         ("bom_bricklink", "bricklink"),
         ("bom_rebrickable", "rebrickable"),

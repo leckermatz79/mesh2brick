@@ -367,3 +367,79 @@ def test_color_quantizer_matches_and_restricts() -> None:
     assert color_quantizer()(many).tolist() == [4, 0, 15] * 10_000
     with pytest.raises(BackendError, match="palette is empty"):
         color_quantizer({999_999})
+
+
+# ------------------------------------------------------------------ whitelist
+def test_whitelist_reaches_placement(
+    backend: LegolizationBackend, heart: VoxelGrid, heart_placement: Placement
+) -> None:
+    import legolization.pipeline as lego_pipeline  # noqa: PLC0415
+
+    original = lego_pipeline.default_catalog
+    used = {p.part for p in heart_placement.model.parts}
+    banned = sorted(used - {"3005", "3024"})[:2]
+    settings = load_settings(None, [f"parts.exclude=[{', '.join(banned)}]"])
+    placement = backend.place(heart, settings, name="heart")
+    assert not {p.part for p in placement.model.parts} & set(banned)
+    assert lego_pipeline.default_catalog is original  # patch undone
+    only = load_settings(None, ["parts.include=[3003]"])
+    narrow = backend.place(heart, only, name="heart")
+    assert {p.part for p in narrow.model.parts} <= {"3003", "3005", "3024"}
+    assert any("added 3005, 3024" in note for note in narrow.notes)
+
+
+def test_whitelist_errors_and_patch_cleanup(
+    backend: LegolizationBackend, heart: VoxelGrid, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import legolization.pipeline as lego_pipeline  # noqa: PLC0415
+
+    from mesh2brick.catalog.whitelist import WhitelistError  # noqa: PLC0415
+
+    with pytest.raises(WhitelistError, match="cannot remove 3024"):
+        backend.place(heart, load_settings(None, ["parts.exclude=[3024]"]))
+    original = lego_pipeline.default_catalog
+
+    def broken(*_args: object, **_kwargs: object) -> None:
+        msg = "boom"
+        raise ValueError(msg)
+
+    monkeypatch.setattr("mesh2brick.backends.legolization.run", broken)
+    with pytest.raises(BackendError, match="boom"):
+        backend.place(heart, Settings())
+    assert lego_pipeline.default_catalog is original
+
+
+def test_restricted_catalog_keeps_import_parts() -> None:
+    from mesh2brick.backends.legolization import (  # noqa: PLC0415
+        placeable_parts,
+        restricted_catalog,
+    )
+
+    catalog = restricted_catalog(frozenset({"3005", "3024"}))
+    placeable = {
+        p.ldraw_part
+        for p in catalog.parts.values()
+        if p.category.value in {"brick", "plate", "tile", "slope"}
+    }
+    assert placeable == {"3005", "3024"}
+    assert "plate_2x16" in catalog.parts  # import-only parts stay
+    assert len(placeable_parts()) == 29
+
+
+def test_ldraw_specs_match_legolization_cells() -> None:
+    """Phase 4: specs derived from LDraw geometry agree with legolization."""
+    from mesh2brick.backends.legolization import (  # noqa: PLC0415
+        placeable_parts,
+        placement_footprint,
+    )
+    from mesh2brick.backends.pyldraw import part_geometry  # noqa: PLC0415
+    from mesh2brick.catalog.parts import derive_spec  # noqa: PLC0415
+
+    for placeable in placeable_parts():
+        spec = derive_spec(part_geometry(placeable.part))
+        assert (spec.width, spec.length, spec.height_plates) == placement_footprint(
+            placeable.part
+        ), placeable.part
+        assert spec.category == placeable.category, placeable.part
+    with pytest.raises(BackendError, match="not placeable"):
+        placement_footprint("3062b")

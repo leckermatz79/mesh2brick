@@ -26,6 +26,12 @@ def fixtures_dir() -> Path:
     return FIXTURES
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _private_cache(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Keep the part-spec cache out of the user's real cache directory."""
+    os.environ["MESH2BRICK_CACHE_DIR"] = str(tmp_path_factory.mktemp("cache"))
+
+
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:

@@ -26,8 +26,8 @@ color:
   bands: [1, 2, 14, 25, 4]   # height_bands: colours bottom to top (Blue..Red)
 parts:
   categories: [brick, plate]   # also: slope (slow with legolization 0.5.0), tile
-  include: []           # LDraw part numbers to allow explicitly (Phase 4)
-  exclude: []           # LDraw part numbers to forbid (Phase 4)
+  include: []           # whitelist of LDraw numbers, e.g. [3001, 3003]; see `mesh2brick catalog list`
+  exclude: []           # blacklist, e.g. [3008, 3007]; 3005 and 3024 are always needed
   max_parts: 5000
 placement:
   backend: legolization

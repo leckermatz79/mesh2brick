@@ -13,13 +13,13 @@ from legolization.catalog import default_catalog
 from rebrickable.bom import Bom as RebrickableBom
 from tests.helpers import make_brick
 
+from mesh2brick.catalog.rebrickable import load_id_maps
 from mesh2brick.export.bom import (
     BOM_FORMATS,
     bom_csv,
     bom_warnings,
     bricklink_xml,
     build_bom,
-    load_id_maps,
     rebrickable_csv,
     write_boms,
 )
@@ -128,3 +128,26 @@ def test_write_boms(sample_model: BrickModel, tmp_path: Path) -> None:
         "tower.bricklink.xml",
         "tower.rebrickable.csv",
     ]
+
+
+# ------------------------------------------------------------------ Phase 4
+def test_acceptance_bom_shows_rebrickable_names(sample_model: BrickModel) -> None:
+    """SPEC Phase 4: the parts list shows Rebrickable names."""
+    bom = build_bom(sample_model)
+    assert {line.name for line in bom.lines} >= {"Brick 2 x 4"}
+    rows = list(csv.DictReader(io.StringIO(bom_csv(bom))))
+    assert rows[0]["rebrickable_name"] == "Brick 2 x 4"
+    assert rows[0]["produced_in_color"] == "yes"
+
+
+def test_parts_lego_does_not_make_are_flagged(sample_model: BrickModel) -> None:
+    maps = load_id_maps()
+    made = set(maps.parts["3001"]["colors"])
+    absent = min(c for c in maps.colors if c not in made)
+    bom = build_bom(with_colour(sample_model, absent, "Odd"))
+    flagged = bom.not_produced()
+    assert [(line.part, line.color) for line in flagged] == [("3001", absent)]
+    rows = list(csv.DictReader(io.StringIO(bom_csv(bom))))
+    assert any(r["produced_in_color"] == "no" for r in rows)
+    notes = bom_warnings(bom, ["bom_csv"])
+    assert any("colours LEGO does not make" in n and "1x 3001 Odd" in n for n in notes)
