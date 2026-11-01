@@ -6,6 +6,37 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-01 - Phase 2: end-to-end MVP
+
+### Added
+- `mesh2brick convert`: mesh or voxel grid -> LDraw (`.ldr`/`.mpd`), brick model JSON,
+  parts lists, PDF instructions and preview, with per-stage timings (`mesh2brick.pipeline`).
+- Bills of materials (`mesh2brick.export.bom`): mesh2brick CSV, BrickLink wanted-list XML,
+  Rebrickable CSV; LDraw -> BrickLink/Rebrickable numbers from a generated, source-confirmed
+  table (`export/id_maps.json`, `scripts/make_id_maps.py`, ADR 0005); unconfirmed lines are
+  reported, never guessed.
+- PDF instructions via legolization's booklet with mesh2brick step images (new parts
+  highlighted, earlier ones faded, subassembly steps framed separately), A4/letter.
+- Strict LDraw self-check after export (`verify_ldraw`, legolization's strict importer).
+- Time-bounded conversion (ADR 0006): `placement.time_limit_s` (300 s), `steps.sequencing`
+  (`auto`/`thorough`/`fast`/`layers`), stability-checked step planning in a child process
+  with layer-order fallback, legolization `time_budget_s` defaulting to 25 % of the budget.
+- `voxel.min_island_fraction`: loose voxel islands below 5 % are removed (a 2-cell island
+  made a real model unbuildable and slow).
+- `scripts/benchmark_placement.py` (isolated, time-limited runs with phase logs);
+  benchmark rounds 1–3 in `docs/benchmarks.md`.
+
+### Changed
+- Default strategy `kollsker` (was `luo`), chosen by benchmark.
+- Default output formats include `bom_rebrickable` (Phase 2 needs three BOM formats).
+- Preview renderer vectorised with numpy (~8x faster); step images palette-compressed.
+- CLI progress thins legolization's per-layer lines to quarters.
+- Dependencies: pillow (palette PNGs).
+
+### Upstream
+- Filed hbmartin/legolization#88 and draft PR #89 (LP attempt time limit).
+
+
 ## [0.1.0] - 2026-11-01 - Phase 1: ingest and voxelization
 
 ### Added

@@ -9,6 +9,7 @@ the commands, which keeps ``mesh2brick --help`` fast.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Final, NoReturn
 
@@ -18,9 +19,12 @@ from mesh2brick import __version__
 from mesh2brick.config import ConfigError, Settings, load_settings
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from mesh2brick.model import BrickModel
     from mesh2brick.voxel.voxelize import VoxelizeReport
 
+_LAYER_PROGRESS: Final = re.compile(r"layer (\d+)/(\d+)\b")
 EXIT_ERROR: Final = 1
 EXIT_NOT_YET: Final = 3
 """Exit code of commands that are planned but not implemented yet."""
@@ -132,7 +136,7 @@ def place(
             f"{input_file.name}: {grid.filled_count} voxels, grid {grid.shape} "
             f"({grid.height_unit} cells)"
         )
-        backend = LegolizationBackend(progress=lambda line: typer.echo(f"  {line}"))
+        backend = LegolizationBackend(progress=progress_printer())
         placement = backend.place(grid, settings, name=stem)
         suffix = ".mpd" if "mpd" in settings.output.formats else ".ldr"
         ldraw_path = backend.write_ldraw(placement, out_dir / f"{stem}{suffix}")
@@ -185,14 +189,44 @@ def render(
 
 @app.command()
 def convert(
-    input_file: Annotated[Path, typer.Argument(metavar="INPUT")],
+    input_file: Annotated[
+        Path,
+        typer.Argument(
+            metavar="INPUT",
+            help="3D model (STL, OBJ, PLY, 3MF) or voxel grid (.grid.npz, .vox, .npy).",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ],
     config: ConfigOption = None,
     overrides: SetOption = None,
     output_dir: OutputDirOption = None,
 ) -> None:
-    """Full pipeline: 3D model -> LDraw, parts lists and PDF (Phase 2)."""
-    del input_file, config, overrides, output_dir
-    _not_yet("convert", phase=2, hint="for voxel files use `mesh2brick place` today")
+    """Full pipeline: 3D model -> LDraw, parts lists, PDF instructions."""
+    settings = _settings(config, overrides, output_dir)
+    from mesh2brick.backends import BackendError  # noqa: PLC0415 - keep --help fast
+    from mesh2brick.ingest import IngestError  # noqa: PLC0415
+    from mesh2brick.pipeline import convert as run_convert  # noqa: PLC0415
+
+    _require_ldraw_library()
+    try:
+        result = run_convert(
+            input_file,
+            settings,
+            name=model_name(input_file),
+            progress=progress_printer(),
+        )
+    except (IngestError, BackendError, ValueError) as error:
+        _fail(str(error))
+    for warning in result.warnings:
+        typer.secho(f"  note: {warning}", fg=typer.colors.YELLOW)
+    for path in result.files:
+        typer.echo(f"wrote {path}")
+    timing = ", ".join(f"{k} {v:.0f} s" for k, v in result.seconds.items())
+    typer.echo(f"  time: {sum(result.seconds.values()):.0f} s ({timing})")
+    typer.echo(f"  parts list total: {result.bom.total} = parts placed")
+    _echo_summary(result.model, result.stability.buildable)
 
 
 @app.command()
@@ -304,6 +338,23 @@ def feedback() -> None:
 def main() -> None:
     """Console-script entry point."""
     app()
+
+
+def progress_printer() -> Callable[[str], None]:
+    """Echo backend progress, thinning legolization's per-layer lines to quarters."""
+    last_quarter = -1
+
+    def show(line: str) -> None:
+        nonlocal last_quarter
+        if match := _LAYER_PROGRESS.match(line):
+            done, total = int(match.group(1)), int(match.group(2))
+            quarter = 4 * done // max(total, 1)
+            if quarter == last_quarter:
+                return
+            last_quarter = quarter
+        typer.echo(f"  {line}")
+
+    return show
 
 
 def model_name(path: Path) -> str:

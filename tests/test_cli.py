@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from mesh2brick import __version__
-from mesh2brick.cli import EXIT_NOT_YET, app, model_name
+from mesh2brick.cli import EXIT_NOT_YET, app, model_name, progress_printer
 from mesh2brick.model import BrickModel
 
 runner = CliRunner()
@@ -46,7 +46,6 @@ def test_version() -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        ["convert", "x.stl"],
         ["catalog"],
         ["inspect"],
         ["feedback"],
@@ -252,3 +251,43 @@ def test_voxelize_warns_about_tiny_models(fixtures_dir: Path, tmp_path: Path) ->
 )
 def test_model_name(name: str, expected: str) -> None:
     assert model_name(Path(name)) == expected
+
+
+# ------------------------------------------------------------------ phase 2: convert
+@pytest.mark.ldraw
+def test_convert_end_to_end(fixtures_dir: Path, tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "convert",
+            str(fixtures_dir / "l_bracket.stl"),
+            "-o",
+            str(tmp_path),
+            "-s",
+            "input.target_studs=8",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    for suffix in (".ldr", ".bom.csv", ".bricklink.xml", ".rebrickable.csv", ".pdf"):
+        assert (tmp_path / f"l_bracket{suffix}").is_file(), suffix
+    assert "parts list total" in result.output
+    assert "time:" in result.output
+
+
+@pytest.mark.ldraw
+def test_convert_reports_errors(tmp_path: Path) -> None:
+    path = tmp_path / "model.step"
+    path.write_text("ISO-10303-21;")
+    result = runner.invoke(app, ["convert", str(path), "-o", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "unsupported input format" in result.output
+
+
+def test_progress_printer_thins_layer_lines(capsys: pytest.CaptureFixture[str]) -> None:
+    show = progress_printer()
+    for done in range(1, 41):
+        show(f"layer {done}/40 ({done * 2}% of cells)")
+    show("planning steps")
+    lines = capsys.readouterr().out.splitlines()
+    assert len([line for line in lines if "layer" in line]) == 5  # 0, 25, 50, 75, 100 %
+    assert lines[-1] == "  planning steps"

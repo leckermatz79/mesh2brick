@@ -29,9 +29,11 @@ from __future__ import annotations
 import dataclasses
 import importlib.metadata
 import math
+import multiprocessing
+import time
 import types
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 import highspy
 import numpy as np
@@ -39,7 +41,19 @@ from legolization import MeshOptions, PipelineConfig, PipelineResult, run
 from legolization import VoxelGrid as LegoGrid
 from legolization.color import default_palette
 from legolization.graph import ConnectionGraph
-from legolization.instructions.sequencer import InstructionsConfig, plan_instructions
+from legolization.instructions.bom import bill_of_materials
+from legolization.instructions.booklet import BookletConfig, ModelStats, write_booklet
+from legolization.instructions.chunking import chunk_bands, mirror_pairs
+from legolization.instructions.render import StepImages
+from legolization.instructions.sequencer import (
+    BuildStep as LegoStep,
+)
+from legolization.instructions.sequencer import (
+    InstructionPlan,
+    InstructionsConfig,
+    plan_instructions,
+)
+from legolization.ldraw_in import LdrawImportError, layout_from_ldraw
 from legolization.ldraw_out import write_model
 from legolization.mesh import grid_from_mesh
 from legolization.placement.registry import strategy_names
@@ -52,11 +66,11 @@ from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.voxel.grid import EMPTY, VoxelGrid
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
+    from multiprocessing.connection import Connection
     from pathlib import Path
 
     import trimesh
-    from legolization.instructions.sequencer import InstructionPlan
     from legolization.layout import Layout
 
     from mesh2brick.config import Settings
@@ -84,6 +98,20 @@ _MANAGED_FIELDS: Final = frozenset(
     }
 )
 _DEFAULT_STEP_SPREAD: Final = 3
+AUTO_THOROUGH_MAX_PARTS: Final = 500
+"""``steps.sequencing: auto`` uses stability-checked steps up to this size."""
+PLACE_BUDGET_SHARE: Final = 0.25
+"""Default share of ``placement.time_limit_s`` for legolization's placement
+and repair (``time_budget_s``), unless set in ``placement.backend_options``."""
+MIN_SEQUENCING_S: Final = 5.0
+_TIME_FALLBACK_NOTE: Final = (
+    "time limit reached during step planning; steps follow layer order "
+    "(raise placement.time_limit_s for stability-checked steps)"
+)
+_LAYER_PLAN_WARNING: Final = (
+    "steps follow layer order without stability checks "
+    "(steps.sequencing=layers); support overhangs by hand"
+)
 LP_ATTEMPT_TIME_LIMIT_S: Final = 5.0
 """Wall-clock limit for every LP attempt except the last (local patch)."""
 
@@ -168,9 +196,18 @@ class LegolizationBackend:
         return tuple(strategy_names())
 
     def place(
-        self, grid: VoxelGrid, settings: Settings, *, name: str = "model"
+        self,
+        grid: VoxelGrid,
+        settings: Settings,
+        *,
+        name: str = "model",
+        deadline: float | None = None,
     ) -> Placement:
-        """Run legolization's full pipeline (place, repair, sequence) on ``grid``.
+        """Place, repair and sequence ``grid`` with legolization.
+
+        legolization's own pipeline runs without its sequencer; steps are
+        planned afterwards (:meth:`_plan`) so their cost can be bounded by
+        ``deadline`` (a :func:`time.monotonic` timestamp).
 
         Raises:
             BackendError: on invalid settings or if the grid is empty.
@@ -184,11 +221,12 @@ class LegolizationBackend:
             result = run(lego_grid, config)
         except ValueError as error:
             raise BackendError(f"legolization rejected the input: {error}") from error
-        native = _Native(layout=result.layout, plan=result.plan)
+        plan, notes = self._plan(result.layout, config, settings, deadline)
+        native = _Native(layout=result.layout, plan=plan)
         return Placement(
             model=to_brick_model(
                 result.layout,
-                result.plan,
+                plan,
                 name=name,
                 source=(
                     f"{NAME} {VERSION}, strategy {config.strategy}, seed {config.seed}"
@@ -197,7 +235,47 @@ class LegolizationBackend:
             stability=_report_from_result(result),
             backend=NAME,
             native=native,
+            notes=tuple(notes),
         )
+
+    def _plan(
+        self,
+        layout: Layout,
+        config: PipelineConfig,
+        settings: Settings,
+        deadline: float | None,
+    ) -> tuple[InstructionPlan, list[str]]:
+        """Choose and run the step planner within the remaining time."""
+        mode = settings.steps.sequencing
+        notes: list[str] = []
+        if mode == "auto":
+            mode = "thorough" if len(layout) <= AUTO_THOROUGH_MAX_PARTS else "layers"
+            if mode == "layers":
+                notes.append(
+                    f"{len(layout)} parts: steps follow layer order (stability-checked "
+                    f"steps are used up to {AUTO_THOROUGH_MAX_PARTS} parts; "
+                    "steps.sequencing=thorough forces them)"
+                )
+        if mode == "layers":
+            return layer_plan(layout, config.instructions), notes
+        smart = dataclasses.replace(
+            config.instructions, mode="smart", solver=config.solver
+        )
+        budget = None
+        if deadline is not None:
+            budget = deadline - time.monotonic() - export_reserve_s(len(layout))
+            if budget < MIN_SEQUENCING_S:
+                notes.append(_TIME_FALLBACK_NOTE)
+                return layer_plan(layout, config.instructions), notes
+        self._say(
+            "planning stability-checked steps"
+            + (f" (up to {budget:.0f} s)" if budget is not None else "")
+        )
+        plan = plan_with_timeout(layout, smart, budget)
+        if plan is None:
+            notes.append(_TIME_FALLBACK_NOTE)
+            return layer_plan(layout, config.instructions), notes
+        return plan, notes
 
     # ------------------------------------------------------------ StabilityChecker
     def check(self, placement: Placement, settings: Settings) -> StabilityReport:
@@ -227,6 +305,77 @@ class LegolizationBackend:
         )
 
     # ------------------------------------------------------------ Exporter
+    def write_instructions(
+        self,
+        placement: Placement,
+        path: Path,
+        images: Sequence[bytes | None],
+        *,
+        page_size: Literal["A4", "letter"] = "A4",
+        steps_per_page: int = 2,
+    ) -> Path:
+        """Write legolization's instruction booklet (PDF or HTML by suffix).
+
+        ``images`` holds one PNG per build step (``placement.model.steps``);
+        ``None`` entries become placeholder boxes.
+
+        Raises:
+            BackendError: without a step plan or with a wrong image count.
+        """
+        native = _native_of(placement)
+        if native.plan is None:
+            msg = "instructions need a step plan (smart sequencing)"
+            raise BackendError(msg)
+        if len(images) != len(native.plan.steps):
+            msg = f"{len(images)} step images for {len(native.plan.steps)} steps"
+            raise BackendError(msg)
+        model, stability = placement.model, placement.stability
+        stats = ModelStats(
+            name=model.name,
+            brick_count=model.part_count,
+            mass_g=float(native.layout.total_mass_g()),
+            step_count=model.step_count,
+            stable=stability.stable,
+            buildable=stability.buildable,
+            component_count=stability.component_count,
+            floating_count=stability.floating_count,
+        )
+        config = BookletConfig(
+            steps_per_page=steps_per_page,
+            page_size="a4" if page_size == "A4" else "letter",
+            title=model.name,
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            write_booklet(
+                native.plan,
+                stats,
+                StepImages(images=tuple(images), renderer=None, warnings=()),
+                path,
+                config=config,
+            )
+        except ValueError as error:
+            raise BackendError(str(error)) from error
+        return path
+
+    def verify_ldraw(self, path: Path) -> int:
+        """Re-read an LDraw file strictly and return its part count.
+
+        Uses legolization's strict importer: every part must be a known
+        catalogue part, axis-aligned, on the stud/plate grid, in a solid
+        colour and collision-free. A stand-in for opening the file in an LDraw
+        viewer.
+
+        Raises:
+            BackendError: listing every problem found.
+        """
+        try:
+            return len(layout_from_ldraw(path))
+        except LdrawImportError as error:
+            raise BackendError(
+                f"{path.name} failed the LDraw check: {error}"
+            ) from error
+
     def write_ldraw(self, placement: Placement, path: Path) -> Path:
         """Write ``.ldr`` or ``.mpd`` (chosen by suffix) with ``0 STEP`` markers.
 
@@ -270,10 +419,15 @@ class LegolizationBackend:
             raise BackendError(msg)
         steps = settings.steps
         instructions = InstructionsConfig(
+            # legolization's pipeline never sequences; place() plans the steps
+            # itself so their cost can be bounded (see _plan).
+            mode="layer",
             target_step_size=steps.parts_per_step,
             max_step_size=steps.parts_per_step + _DEFAULT_STEP_SPREAD,
             min_step_size=min(_DEFAULT_STEP_SPREAD, steps.parts_per_step),
-            subassemblies=steps.submodels,
+            subassemblies=steps.submodels and steps.sequencing != "layers",
+            beam_width=1 if steps.sequencing == "fast" else 4,
+            fallback="band" if steps.sequencing == "fast" else "disassembly",
         )
         if not steps.keep_symmetry:
             self._say(
@@ -295,11 +449,91 @@ class LegolizationBackend:
             "instructions": instructions,
             "progress": self._progress,
         }
-        return PipelineConfig(**managed, **_backend_options(placement.backend_options))
+        options = _backend_options(placement.backend_options)
+        options.setdefault(
+            "time_budget_s", round(PLACE_BUDGET_SHARE * placement.time_limit_s)
+        )
+        return PipelineConfig(**managed, **options)
 
     def _say(self, message: str) -> None:
         if self._progress is not None:
             self._progress(message)
+
+
+def export_reserve_s(parts: int) -> float:
+    """Seconds to keep free after sequencing for LDraw, BOMs and the PDF."""
+    return 20.0 + 0.03 * parts
+
+
+def plan_with_timeout(
+    layout: Layout, config: InstructionsConfig, seconds: float | None
+) -> InstructionPlan | None:
+    """Run legolization's step planner, stopped after ``seconds`` (None = no limit).
+
+    The planner cannot be interrupted in-process, so a limited run happens in
+    a child process that is terminated on timeout. Returns ``None`` then.
+    """
+    if seconds is None:
+        return plan_instructions(layout, config=config)
+    context = multiprocessing.get_context("spawn")
+    receiver, sender = context.Pipe(duplex=False)
+    worker = context.Process(
+        target=_plan_worker, args=(layout, config, sender), daemon=True
+    )
+    worker.start()
+    sender.close()
+    try:
+        if receiver.poll(max(seconds, 0.0)):
+            plan = receiver.recv()
+            if isinstance(plan, BaseException):
+                raise BackendError(f"step planning failed: {plan}") from plan
+            return cast("InstructionPlan", plan)
+        return None
+    except EOFError as error:
+        msg = "step planning process ended without a result"
+        raise BackendError(msg) from error
+    finally:
+        receiver.close()
+        if worker.is_alive():
+            worker.terminate()
+        worker.join(timeout=10)
+
+
+def _plan_worker(
+    layout: Layout, config: InstructionsConfig, sender: Connection
+) -> None:
+    """Child-process entry point: plan and send the result (or the error)."""
+    try:
+        sender.send(plan_instructions(layout, config=config))
+    except Exception as error:
+        sender.send(error)
+    finally:
+        sender.close()
+
+
+def layer_plan(layout: Layout, config: InstructionsConfig) -> InstructionPlan:
+    """Bottom-up layer chunks as build steps, without stability checks.
+
+    Uses legolization's own chunking (spatially coherent groups of about
+    ``target_step_size`` parts per layer). Layer order is always insertable
+    from above; overhangs may need a supporting hand, which the plan says.
+    """
+    chunks = chunk_bands(layout, config=config, pairs=mirror_pairs(layout))
+    steps = tuple(
+        LegoStep(
+            index=index,
+            brick_ids=tuple(brick_ids),
+            prefix_stable=True,
+            prefix_max_score=0.0,
+        )
+        for index, (_band, brick_ids) in enumerate(chunks, start=1)
+    )
+    plan = InstructionPlan(
+        steps=steps,
+        warnings=(_LAYER_PLAN_WARNING,),
+        bom=bill_of_materials(layout),
+    )
+    return dataclasses.replace(plan, bom=bill_of_materials(layout, plan=plan))
 
 
 # ---------------------------------------------------------------- palette

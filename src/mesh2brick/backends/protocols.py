@@ -62,6 +62,8 @@ class Placement:
     stability: StabilityReport
     backend: str
     native: object | None = field(default=None, compare=False, repr=False)
+    notes: tuple[str, ...] = ()
+    """Things the user should know (e.g. a cheaper step plan was used)."""
 
 
 @runtime_checkable
@@ -75,9 +77,18 @@ class Placer(Protocol):
         ...
 
     def place(
-        self, grid: VoxelGrid, settings: Settings, *, name: str = "model"
+        self,
+        grid: VoxelGrid,
+        settings: Settings,
+        *,
+        name: str = "model",
+        deadline: float | None = None,
     ) -> Placement:
-        """Place parts on ``grid`` (including stability repair and steps)."""
+        """Place parts on ``grid`` (including repair and steps) by ``deadline``.
+
+        ``deadline`` is a :func:`time.monotonic` timestamp; backends use cheaper
+        methods as it approaches and report that in ``Placement.notes``.
+        """
         ...
 
 

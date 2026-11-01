@@ -73,6 +73,9 @@ class VoxelConfig(_Section):
     """Shell thickness in voxels when ``fill: hollow``."""
     threshold: Annotated[float, Field(gt=0, le=1)] = 0.5
     """Minimum filled volume fraction for a voxel to become occupied."""
+    min_island_fraction: Annotated[float, Field(ge=0, le=1)] = 0.05
+    """Disconnected voxel islands smaller than this share of all cells are
+    removed (a LEGO model must be one piece); 0 keeps every island."""
 
 
 class ColorConfig(_Section):
@@ -134,9 +137,14 @@ class PlacementConfig(_Section):
     """Brick placement backend and strategy."""
 
     backend: Literal["legolization"] = "legolization"
-    strategy: str = "luo"
-    """Passed through to the backend; valid names come from the backend itself."""
+    strategy: str = "kollsker"
+    """Passed through to the backend; valid names come from the backend itself.
+    ``kollsker`` was clearly fastest on a real 1,000-part model at similar part
+    counts (docs/benchmarks.md); SPEC §4 had ``luo``."""
     seed: Annotated[int, Field(ge=0)] = 0
+    time_limit_s: Annotated[float, Field(gt=0)] = 300.0
+    """Wall-clock budget for a whole conversion. When it runs short, cheaper
+    steps are chosen (layer-order instructions) and the result says so."""
     backend_options: dict[str, Any] = Field(default_factory=dict)
     """Backend-specific options, validated by the backend (not duplicated here)."""
 
@@ -154,6 +162,15 @@ class StepsConfig(_Section):
     parts_per_step: Annotated[int, Field(ge=1, le=50)] = 7
     keep_symmetry: bool = True
     submodels: bool = True
+    sequencing: Literal["auto", "thorough", "fast", "layers"] = "auto"
+    """How build steps are ordered. ``thorough``: every intermediate state is
+    checked for stability, with a search when the order gets stuck (best
+    instructions, slow for big models). ``fast``: one candidate per step and a
+    cheap layer-order escape instead of the search. ``layers``: bottom-up layer
+    chunks without stability checks (seconds, may need a supporting hand).
+    ``auto``: ``thorough`` for models up to 500 parts, ``layers`` above. The
+    checked modes fall back to ``layers`` when ``placement.time_limit_s`` runs
+    out."""
 
 
 class LlmConfig(_Section):
@@ -168,7 +185,13 @@ class OutputConfig(_Section):
     """What gets written where."""
 
     dir: Path = Path("./out")
-    formats: tuple[OutputFormat, ...] = ("ldr", "bom_csv", "bom_bricklink", "pdf")
+    formats: tuple[OutputFormat, ...] = (
+        "ldr",
+        "bom_csv",
+        "bom_bricklink",
+        "bom_rebrickable",
+        "pdf",
+    )
     language: Literal["de", "en"] = "de"
     page_size: Literal["A4", "letter"] = "A4"
 

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -19,9 +20,11 @@ from mesh2brick.backends import (
     StepSequencer,
 )
 from mesh2brick.backends.legolization import (
+    AUTO_THOROUGH_MAX_PARTS,
     LegolizationBackend,
     from_lego_grid,
     load_voxel_file,
+    plan_with_timeout,
     to_lego_grid,
 )
 from mesh2brick.config import Settings, load_settings
@@ -155,8 +158,10 @@ def test_check_and_sequence(
     resequenced = backend.sequence(
         heart_placement, load_settings(None, ["steps.parts_per_step=2"])
     )
-    assert resequenced.model.part_count == heart_placement.model.part_count
-    assert resequenced.model.step_count > heart_placement.model.step_count
+    model = resequenced.model
+    assert model.part_count == heart_placement.model.part_count
+    # target 2 parts per step, at most target + 3 (legolization's max_step_size)
+    assert max(len(model.parts_in_step(s)) for s in range(model.step_count)) <= 5
 
 
 def test_settings_translation(backend: LegolizationBackend) -> None:
@@ -243,3 +248,108 @@ def test_mpd_keeps_subassemblies_as_submodels(
     assert model.submodels, "heart is expected to contain a subassembly"
     assert text.count("0 FILE ") == 1 + len(model.submodels)
     assert len(_type1_lines(text)) == model.part_count + len(model.submodels)
+
+
+# ------------------------------------------------------------ sequencing modes
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("thorough", ("layer", 4, "disassembly", True)),
+        ("fast", ("layer", 1, "band", True)),
+        ("layers", ("layer", 4, "disassembly", False)),
+    ],
+)
+def test_sequencing_modes_translate(
+    backend: LegolizationBackend, mode: str, expected: tuple[object, ...]
+) -> None:
+    config = backend.pipeline_config(load_settings(None, [f"steps.sequencing={mode}"]))
+    instructions = config.instructions
+    assert (
+        instructions.mode,
+        instructions.beam_width,
+        instructions.fallback,
+        instructions.subassemblies,
+    ) == expected
+
+
+@pytest.mark.parametrize("mode", ["auto", "thorough", "fast", "layers"])
+def test_every_sequencing_mode_covers_every_part(
+    backend: LegolizationBackend, heart: VoxelGrid, mode: str, tmp_path: Path
+) -> None:
+    placement = backend.place(
+        heart, load_settings(None, [f"steps.sequencing={mode}"]), name="heart"
+    )
+    model = placement.model
+    attach = {i for i, s in enumerate(model.steps) if s.attaches is not None}
+    assert {p.step for p in model.parts} == set(range(model.step_count)) - attach
+    text = backend.write_ldraw(placement, tmp_path / "h.ldr").read_text()
+    assert len(_type1_lines(text)) == model.part_count
+    assert text.count("0 STEP") == model.main_step_count
+
+
+def test_layer_plan_is_bottom_up(
+    backend: LegolizationBackend, heart: VoxelGrid
+) -> None:
+    placement = backend.place(
+        heart, load_settings(None, ["steps.sequencing=layers"]), name="heart"
+    )
+    lowest_layer_per_step = [
+        min(p.layer for p in placement.model.parts_in_step(step))
+        for step in range(placement.model.step_count)
+    ]
+    assert lowest_layer_per_step == sorted(lowest_layer_per_step)
+
+
+# ------------------------------------------------------------ time limit
+def test_plan_with_timeout(heart_placement: Placement) -> None:
+    from legolization.instructions.sequencer import InstructionsConfig  # noqa: PLC0415
+
+    layout = heart_placement.native.layout  # type: ignore[union-attr]
+    config = InstructionsConfig()
+    direct = plan_with_timeout(layout, config, None)
+    assert direct is not None
+    assert len(direct.steps) > 1
+    in_child = plan_with_timeout(layout, config, 120.0)
+    assert in_child is not None
+    assert [s.brick_ids for s in in_child.steps] == [s.brick_ids for s in direct.steps]
+    assert plan_with_timeout(layout, config, 0.0) is None
+
+
+def test_expired_deadline_falls_back_to_layers(
+    backend: LegolizationBackend, heart: VoxelGrid
+) -> None:
+    settings = load_settings(None, ["steps.sequencing=thorough"])
+    placement = backend.place(heart, settings, name="h", deadline=time.monotonic())
+    assert any("time limit reached" in note for note in placement.notes)
+    assert placement.model.part_count > 0
+
+
+def test_auto_uses_layers_for_big_models(
+    backend: LegolizationBackend, heart: VoxelGrid, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mesh2brick.backends import legolization as module  # noqa: PLC0415
+
+    assert AUTO_THOROUGH_MAX_PARTS == 500
+    monkeypatch.setattr(module, "AUTO_THOROUGH_MAX_PARTS", 3)
+    placement = backend.place(heart, Settings(), name="h")
+    assert any("steps follow layer order" in note for note in placement.notes)
+
+
+def test_default_placement_budget(backend: LegolizationBackend) -> None:
+    config = backend.pipeline_config(
+        load_settings(None, ["placement.time_limit_s=200"])
+    )
+    assert config.time_budget_s == 50
+    explicit = backend.pipeline_config(
+        load_settings(None, ["placement.backend_options={time_budget_s: 7}"])
+    )
+    assert explicit.time_budget_s == 7
+
+
+def test_verify_ldraw_rejects_broken_files(
+    backend: LegolizationBackend, tmp_path: Path
+) -> None:
+    broken = tmp_path / "broken.ldr"
+    broken.write_text("0 broken\n1 4 3 -24 7 1 0 0 0 1 0 0 0 1 3001.dat\n")  # off-grid
+    with pytest.raises(BackendError, match="failed the LDraw check"):
+        backend.verify_ldraw(broken)

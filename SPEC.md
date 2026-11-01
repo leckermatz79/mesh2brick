@@ -136,7 +136,7 @@ parts:
   max_parts: 5000
 placement:
   backend: legolization
-  strategy: luo         # wird 1:1 an legolization durchgereicht; gültige Werte aus dem Backend abfragen
+  strategy: kollsker    # wird 1:1 an legolization durchgereicht; Standard per Benchmark (2026-11-01, docs/benchmarks.md), vorher luo
   seed: 0
 stability:
   enabled: true
@@ -151,7 +151,7 @@ llm:
   tasks: [group_steps, write_step_text]
 output:
   dir: ./out
-  formats: [ldr, bom_csv, bom_bricklink, pdf]
+  formats: [ldr, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # bom_rebrickable ergänzt (2026-11-01), damit convert die drei BOM-Formate aus Phase 2 liefert
   language: de
   page_size: A4
 ```

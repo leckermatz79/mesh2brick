@@ -16,9 +16,9 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 1 of 8).** Mesh import (STL, OBJ, PLY, 3MF) and
-> voxelization work; the one-command pipeline with parts lists and PDF arrives in
-> Phase 2. See [docs/STATUS.md](docs/STATUS.md).
+> **Status: pre-alpha (Phase 2 of 8).** `mesh2brick convert` turns STL, OBJ, PLY and
+> 3MF files into an LDraw model, three parts lists and a PDF building instruction.
+> See [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (development)
 
@@ -34,6 +34,10 @@ uv run mesh2brick --help
 ## Usage
 
 ```sh
+# Everything in one go: LDraw, parts lists (CSV, BrickLink XML, Rebrickable CSV), PDF
+uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+
+# Or stage by stage:
 # 1. Voxelize a mesh onto the stud grid (longest axis = 32 studs by default)
 uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
 

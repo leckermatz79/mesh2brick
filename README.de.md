@@ -17,9 +17,9 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 1 von 8).** Mesh-Import (STL, OBJ, PLY, 3MF) und
-> Voxelisierung funktionieren. Der Ein-Befehl-Ablauf mit Teilelisten und PDF kommt in
-> Phase 2. Details stehen in [docs/STATUS.md](docs/STATUS.md).
+> **Stand: Vorab-Version (Phase 2 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY
+> und 3MF ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung. Details stehen in
+> [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (Entwicklung)
 
@@ -35,6 +35,10 @@ uv run mesh2brick --help
 ## Benutzung
 
 ```sh
+# Alles in einem Schritt: LDraw, Teilelisten (CSV, BrickLink-XML, Rebrickable-CSV), PDF
+uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+
+# Oder Schritt für Schritt:
 # 1. Mesh auf das Noppenraster voxelisieren (längste Achse standardmäßig 32 Noppen)
 uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
 

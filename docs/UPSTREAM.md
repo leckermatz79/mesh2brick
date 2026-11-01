@@ -17,10 +17,13 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | # | Project | Topic | Why | Status | Link |
 |---|---|---|---|---|---|
 | 1 | legolization | Ship a `py.typed` marker (PEP 561) | The package is fully annotated, but type checkers ignore it without the marker. We currently work around it with a mypy override (`follow_untyped_imports`). It's a one-line change in the package data. | idea | – |
-| 2 | legolization | **Stability LPs can hang forever: HiGHS presolve stalls, and no attempt has a time limit** | See the draft below. Makes the pipeline hang indefinitely on some models with slopes enabled. | draft ready | below |
+| 2 | legolization | **Stability LPs can hang forever: HiGHS presolve stalls, and no attempt has a time limit** | Makes the pipeline hang indefinitely on some models with slopes enabled. Filed after approval (2026-11-01), with a note that it surfaced in a vibe-coding project; draft PR adds `SolverConfig.lp_attempt_time_limit_s` (default 5 s) in both LP paths, 5 tests. | opened | [issue #88](https://github.com/hbmartin/legolization/issues/88), [draft PR #89](https://github.com/hbmartin/legolization/pull/89) (branch `leckermatz79:fix/lp-attempt-time-limit`) |
 | 3 | legolization | Volume-fraction voxelization for `legolization.mesh` | Its surface-plus-fill voxelizer adds +8 % to +27 % volume on our fixtures. mesh2brick's column rasterization (ADR 0003) is exact to ~0.1 % and faster. We could offer it as an option. | idea | – |
+| 4 | legolization | Solid palette contains non-brick colours ("Conductive Black", "Fluorescent * Ink", "Cool Silver") | RGB quantization can pick colours no brick exists in. Found while building the BrickLink colour table (ADR 0005). | idea | – |
+| 5 | legolization | Time budget for `final_remerge` and step sequencing | Both ignore `time_budget_s` in 0.5.0 and dominate large models (remerge 40–170 s, sequencing 4–7 min at ~1,000 parts, docs/benchmarks.md). mesh2brick works around sequencing with a child process and a layer-order fallback (ADR 0006). | idea | – |
+| 6 | legolization | `plan_instructions` ignores `InstructionsConfig.mode="layer"`; booklet only English, fonts not embedded | A cheap layer plan helper (mesh2brick's `layer_plan`) and i18n/embedded fonts would help every user. | idea | – |
 
-## Draft #2 (issue for hbmartin/legolization)
+## Draft #2 (as filed in issue #88)
 
 **Title:** Stability LP can hang indefinitely: HiGHS presolve stalls and `_LP_ATTEMPTS` / `_solve_lp_highspy` have no time limit
 
