@@ -170,3 +170,18 @@ def test_failed_replacement_is_rolled_back(monkeypatch: pytest.MonkeyPatch) -> N
     report = split_unavailable(layout, _missing(("3008", GREEN)))
     assert report.unresolved == (("3008", GREEN),)
     assert {(b.part_key, b.x, b.y, b.layer, b.yaw) for b in layout} == before
+
+
+def test_stacked_joints_measures_the_bond() -> None:
+    from mesh2brick.backends.legolization import stacked_joints  # noqa: PLC0415
+
+    stacked = _layout_with(
+        ("brick_1x4", 0, 0, 0, 0, 4), ("brick_1x4", 4, 0, 0, 0, 4),
+        ("brick_1x4", 0, 0, 3, 0, 4), ("brick_1x4", 4, 0, 3, 0, 4),
+    )  # fmt: skip
+    assert stacked_joints(stacked) == (1, 1)  # joint at x = 4 runs straight up
+    bonded = _layout_with(
+        ("brick_1x4", 0, 0, 0, 0, 4), ("brick_1x4", 4, 0, 0, 0, 4),
+        ("brick_1x2", 0, 0, 3, 0, 4), ("brick_1x4", 2, 0, 3, 0, 4), ("brick_1x2", 6, 0, 3, 0, 4),
+    )  # fmt: skip
+    assert stacked_joints(bonded) == (0, 1)

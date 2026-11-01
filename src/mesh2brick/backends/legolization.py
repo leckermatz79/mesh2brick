@@ -510,6 +510,30 @@ def _place_exact(
     return None
 
 
+# ---------------------------------------------------------------- joint pattern
+def stacked_joints(layout: Layout) -> tuple[int, int]:
+    """(stacked, total): vertical joints at brick interfaces that continue up.
+
+    A joint between two bricks ends at the interface to the layer above; it
+    is *stacked* if the layer above has a joint at the same place (no brick
+    bridges it), the weak pattern of a wall without bond.
+    """
+    occ = layout.occupancy
+    total = stacked = 0
+    for (x, y, z), brick in occ.items():
+        below = (x, y, z - 1)
+        if below not in occ or occ[below] == brick:
+            continue
+        for dx, dy in ((1, 0), (0, 1)):
+            beside_below = (x + dx, y + dy, z - 1)
+            if beside_below in occ and occ[beside_below] != occ[below]:
+                total += 1
+                beside = (x + dx, y + dy, z)
+                if beside in occ and occ[beside] != brick:
+                    stacked += 1
+    return stacked, total
+
+
 @contextmanager
 def _placement_catalog(catalog: Catalog) -> Iterator[None]:
     """Let legolization's ``run()`` place from ``catalog`` (local patch).

@@ -103,7 +103,10 @@ def _run(job: dict[str, Any], timeout: float) -> dict[str, Any]:
 def _worker(job: dict[str, Any]) -> None:
     from legolization import telemetry  # noqa: PLC0415 - heavy, worker only
 
-    from mesh2brick.backends.legolization import LegolizationBackend  # noqa: PLC0415
+    from mesh2brick.backends.legolization import (  # noqa: PLC0415
+        LegolizationBackend,
+        stacked_joints,
+    )
     from mesh2brick.config import load_settings  # noqa: PLC0415
     from mesh2brick.export.bom import build_bom  # noqa: PLC0415
     from mesh2brick.ingest import load_model  # noqa: PLC0415
@@ -135,6 +138,7 @@ def _worker(job: dict[str, Any]) -> None:
         placement = LegolizationBackend().place(grid, settings, name=path.stem)
     model, stability = placement.model, placement.stability
     absent = build_bom(model).not_produced()
+    stacked, joints = stacked_joints(placement.native.layout)  # type: ignore[union-attr]
     emit(
         "result",
         data={
@@ -145,6 +149,7 @@ def _worker(job: dict[str, Any]) -> None:
             "buildable": stability.buildable,
             "components": stability.component_count,
             "not_produced": sum(line.quantity for line in absent),
+            "stacked_joints": round(stacked / joints, 3) if joints else 0.0,
             "notes": list(placement.notes),
         },
     )
