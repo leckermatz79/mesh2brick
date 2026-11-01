@@ -17,7 +17,7 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 3 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
+> **Stand: Vorab-Version (Phase 4 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
 > 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
 > des Modells. Details stehen in [docs/STATUS.md](docs/STATUS.md).
 
@@ -53,6 +53,14 @@ uv run mesh2brick place tests/fixtures/heart.vox -o out/
 # STEP-Farben, OBJ/glTF-Materialien und -Texturen, PLY-Vertexfarben). Sie werden auf
 # ~40 aktuelle LEGO-Farben abgebildet. Stattdessen alles in einer Farbe:
 uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set color.mode=single
+
+# Teile ansehen (offline): Größen, BrickLink-/Rebrickable-Nummern, Farben
+uv run mesh2brick catalog list --category slope
+uv run mesh2brick catalog show 3001
+
+# Nur bestimmte Teile verwenden (Whitelist) oder Teile verbieten (Blacklist)
+uv run mesh2brick convert modell.stl -o out/ --set "parts.include=[3001, 3003, 3004]"
+uv run mesh2brick convert modell.stl -o out/ --set "parts.exclude=[3008, 3007]"
 
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
 uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placement.seed=3

@@ -46,7 +46,6 @@ def test_version() -> None:
 @pytest.mark.parametrize(
     "args",
     [
-        ["catalog"],
         ["inspect"],
         ["feedback"],
     ],
@@ -291,3 +290,73 @@ def test_progress_printer_thins_layer_lines(capsys: pytest.CaptureFixture[str]) 
     lines = capsys.readouterr().out.splitlines()
     assert len([line for line in lines if "layer" in line]) == 5  # 0, 25, 50, 75, 100 %
     assert lines[-1] == "  planning steps"
+
+
+# ------------------------------------------------------------------ catalog
+@pytest.mark.ldraw
+def test_acceptance_catalog_list_slopes_offline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SPEC Phase 4: `catalog list --category slope` works offline."""
+
+    def no_network(*_args: object, **_kwargs: object) -> None:
+        msg = "network access during catalog list"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr("socket.socket.connect", no_network)
+    result = runner.invoke(app, ["catalog", "list", "--category", "slope"])
+    assert result.exit_code == 0, result.output
+    lines = result.output.splitlines()
+    assert lines[0].split()[:3] == ["PART", "NAME", "SIZE"]
+    parts = {line.split()[0] for line in lines[1:4]}
+    assert parts == {"3039", "3040b", "4286"}
+    assert "Brick Sloped 45° 2 x 2" in result.output  # Rebrickable name
+    assert "3 part(s), 3 placeable" in result.output
+
+
+@pytest.mark.ldraw
+def test_catalog_list_shows_settings_and_json() -> None:
+    result = runner.invoke(
+        app, ["catalog", "list", "--json", "-s", "parts.exclude=[3001]"]
+    )
+    assert result.exit_code == 0, result.output
+    import json  # noqa: PLC0415
+
+    rows = {row["part"]: row for row in json.loads(result.output)}
+    assert rows["3001"]["enabled"] is False
+    assert rows["3003"]["enabled"] is True
+    assert rows["3039"]["enabled"] is False  # slopes are opt-in
+    assert rows["3001"]["size"] == "2 x 4 x 1 brick"
+    assert rows["3001"]["bricklink"] == "3001"
+    assert 4 in rows["3001"]["colors"]  # Red
+    broken = runner.invoke(app, ["catalog", "list", "-s", "parts.exclude=[3005]"])
+    assert broken.exit_code == 0
+    assert "cannot remove 3005" in broken.output
+    assert "?" in broken.output
+
+
+@pytest.mark.ldraw
+def test_catalog_list_all_and_errors() -> None:
+    result = runner.invoke(app, ["catalog", "list", "--category", "tile", "--all"])
+    assert result.exit_code == 0, result.output
+    assert "not placeable" not in result.output
+    assert int(result.output.split(" part(s)")[0].split()[-1]) > 4
+    bad = runner.invoke(app, ["catalog", "list", "--category", "wheel"])
+    assert bad.exit_code == 1
+    assert "unknown category" in bad.output
+
+
+@pytest.mark.ldraw
+def test_catalog_show() -> None:
+    result = runner.invoke(app, ["catalog", "show", "3001"])
+    assert result.exit_code == 0, result.output
+    assert "2 x 4 x 1 brick, 8 stud(s) on top" in result.output
+    assert 'Rebrickable: 3001 "Brick 2 x 4"' in result.output
+    assert "Coral" in result.output
+    other = runner.invoke(app, ["catalog", "show", "3062b"])
+    assert other.exit_code == 0
+    assert "placeable: no" in other.output
+    assert "colours: unknown" in other.output
+    missing = runner.invoke(app, ["catalog", "show", "nope"])
+    assert missing.exit_code == 1
+    assert "nope" in missing.output

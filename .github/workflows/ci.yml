@@ -55,16 +55,20 @@ jobs:
           python-version: ${{ matrix.python }}
           enable-cache: true
       - run: uv sync --locked --extra step
-      - name: Cache generated LDraw modules
+      - name: Cache LDraw library and generated modules
         id: ldraw-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          # platformdirs data/config dirs of pyldraw3 on Linux and macOS
+          # platformdirs dirs of pyldraw3 on Linux and macOS: generated modules
+          # (data), configuration, and the downloaded library itself (cache),
+          # whose part files the catalogue reads since Phase 4.
           path: |
             ~/.local/share/pyldraw3
             ~/.config/pyldraw3
+            ~/.cache/pyldraw3
             ~/Library/Application Support/pyldraw3
-          key: pyldraw3-1.7.0-${{ runner.os }}-v1
+            ~/Library/Caches/pyldraw3
+          key: pyldraw3-1.7.0-${{ runner.os }}-v2
       - name: Download LDraw library and generate modules
         if: steps.ldraw-cache.outputs.cache-hit != 'true'
         run: |

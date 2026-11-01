@@ -11,9 +11,16 @@ mapping is only recorded when the source data confirms it (ADR 0005):
   colour guide; -> Rebrickable: same numeric ID *and* same name in
   Rebrickable's ``colors.csv``, or else the one Rebrickable colour with exactly
   that (normalised) name (newer colours have their own numbers there, e.g.
-  LDraw Coral 353 = Rebrickable 1050). Rebrickable's usage statistics
-  (parts, sets, first and last year) are stored with the colour; they decide
-  the default "common" palette.
+  LDraw Coral 353 = Rebrickable 1050), or else the same numeric ID with a
+  near-identical RGB value (LDraw renamed some colours to LEGO's official
+  names: LDraw 85 "Medium Lilac" is Rebrickable 85 "Dark Purple"). A colour
+  without a BrickLink name match takes BrickLink's colour of the same name as
+  its confirmed Rebrickable colour. Every mapping records how it was found
+  (``match``). Rebrickable's usage statistics (parts, sets, first and last
+  year) are stored with the colour; they decide the default "common" palette.
+* parts additionally get Rebrickable's name and the LDraw colours they are
+  produced in (Rebrickable ``elements.csv``), so parts lists can show names
+  and flag part/colour combinations LEGO does not make.
 * parts: candidate numbers are the LDraw number and the number without a
   trailing variant letter (``3070b`` -> ``3070``). A candidate is accepted when
   the catalogue entry exists and its name has the same part type and
@@ -42,7 +49,7 @@ from legolization.catalog import default_catalog
 from mesh2brick.backends.legolization import color_info, solid_color_codes
 from mesh2brick.backends.pyldraw import library_status
 
-OUT = Path(__file__).resolve().parents[1] / "src/mesh2brick/export/id_maps.json"
+OUT = Path(__file__).resolve().parents[1] / "src/mesh2brick/catalog/id_maps.json"
 BL_COLORS = "https://www.bricklink.com/catalogColors.asp"
 BL_PART = "https://www.bricklink.com/v2/catalog/catalogitem.page?P={}"
 RB_BASE = "https://cdn.rebrickable.com/media/downloads/"
@@ -114,18 +121,33 @@ def rebrickable_csv(name: str) -> list[dict[str, str]]:
     return list(csv.DictReader(io.StringIO(data)))
 
 
-def rebrickable_color(
-    code: int, name: str, rows: dict[int, dict[str, str]]
-) -> int | None:
-    """Rebrickable colour ID for an LDraw colour (``None`` if not confirmed).
+RGB_MATCH_DISTANCE = 32.0
+"""Max sRGB distance for "same ID, renamed colour" (Medium Lilac: 28)."""
 
-    Same ID and same name first; otherwise the single Rebrickable colour whose
-    normalised name is identical (ambiguous names stay unmapped).
+
+def rgb_distance(a: str, b: str) -> float:
+    """Euclidean distance of two ``RRGGBB`` hex colours (0..441)."""
+    va = [int(a.removeprefix("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    vb = [int(b.removeprefix("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    return sum((x - y) ** 2 for x, y in zip(va, vb, strict=True)) ** 0.5
+
+
+def rebrickable_color(
+    code: int, name: str, rgb: str, rows: dict[int, dict[str, str]]
+) -> tuple[int | None, str | None]:
+    """Rebrickable colour ID for an LDraw colour and how it was confirmed.
+
+    Same ID and same name; else the single Rebrickable colour with the same
+    normalised name; else the same ID with a near-identical RGB value.
     """
     if code in rows and norm_color(rows[code]["name"]) == name:
-        return code
+        return code, "id+name"
     same_name = [rid for rid, row in rows.items() if norm_color(row["name"]) == name]
-    return same_name[0] if len(same_name) == 1 else None
+    if len(same_name) == 1:
+        return same_name[0], "name"
+    if code in rows and rgb_distance(rgb, rows[code]["rgb"]) <= RGB_MATCH_DISTANCE:
+        return code, "id+rgb"
+    return None, None
 
 
 def color_usage(row: dict[str, str]) -> dict[str, int | None]:
@@ -159,6 +181,37 @@ def candidates(part: str) -> list[str]:
     return [part] if stripped == part else [part, stripped]
 
 
+def map_colors(
+    bl_colors: dict[str, int], rb_rows: dict[int, dict[str, str]]
+) -> dict[str, dict[str, object]]:
+    """BrickLink/Rebrickable numbers and usage for every solid LDraw colour."""
+    colors: dict[str, dict[str, object]] = {}
+    for code, info in sorted(color_info(solid_color_codes()).items()):
+        name = norm_color(info.name)
+        rebrickable, rb_match = rebrickable_color(code, name, info.rgb_hex, rb_rows)
+        row = rb_rows.get(rebrickable) if rebrickable is not None else None
+        bricklink, bl_match = bl_colors.get(name), "name"
+        if bricklink is None and row is not None:
+            bricklink = bl_colors.get(norm_color(row["name"]))
+            bl_match = "rebrickable name"
+        colors[str(code)] = {
+            "name": info.name.replace("_", " "),
+            "bricklink": bricklink,
+            "rebrickable": rebrickable,
+            "match": {
+                "bricklink": bl_match if bricklink is not None else None,
+                "rebrickable": rb_match,
+            },
+            "usage": None if row is None else color_usage(row),
+        }
+        if rb_match == "id+rgb" or (bricklink is not None and bl_match != "name"):
+            print(
+                f"  colour {code} {info.name}: RB {rebrickable} ({rb_match}), "
+                f"BL {bricklink} ({bl_match})"
+            )
+    return colors
+
+
 def main() -> None:
     """Fetch the sources and write the JSON table."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -176,29 +229,27 @@ def main() -> None:
         raise SystemExit(msg)
     parts = sorted({p.ldraw_part for p in default_catalog().parts.values()})
     print(f"{len(parts)} parts, fetching sources ...")
-    if args.reuse_bricklink:
+    try:  # one page; only the part pages are throttled
+        bl_colors = bricklink_colors()
+    except (OSError, RuntimeError) as error:
+        print(f"BrickLink colour guide unavailable ({error}); reusing stored IDs")
         bl_colors = {
             norm_color(str(row["name"])): int(row["bricklink"])
             for row in previous.get("colors", {}).values()
             if row.get("bricklink") is not None
         }
-    else:
-        bl_colors = bricklink_colors()
     rb_rows = {int(r["id"]): r for r in rebrickable_csv("colors")}
     rb_parts = {r["part_num"]: r["name"] for r in rebrickable_csv("parts")}
+    rb_elements: dict[str, set[int]] = {}
+    for row in rebrickable_csv("elements"):
+        rb_elements.setdefault(row["part_num"], set()).add(int(row["color_id"]))
 
-    colors: dict[str, dict[str, object]] = {}
-    infos = color_info(solid_color_codes())
-    for code, info in sorted(infos.items()):
-        name = norm_color(info.name)
-        rebrickable = rebrickable_color(code, name, rb_rows)
-        row = rb_rows.get(rebrickable) if rebrickable is not None else None
-        colors[str(code)] = {
-            "name": info.name.replace("_", " "),
-            "bricklink": bl_colors.get(name),
-            "rebrickable": rebrickable,
-            "usage": None if row is None else color_usage(row),
-        }
+    colors = map_colors(bl_colors, rb_rows)
+    ldraw_of_rb = {
+        int(row["rebrickable"]): int(code)
+        for code, row in colors.items()
+        if row["rebrickable"] is not None
+    }
 
     part_rows: dict[str, dict[str, object]] = {}
     for part in parts:
@@ -230,23 +281,32 @@ def main() -> None:
                 if name is not None and part_signature(name) == signature:
                     bricklink = candidate
                     break
+        available = sorted(
+            ldraw_of_rb[c]
+            for c in rb_elements.get(rebrickable or "", ())
+            if c in ldraw_of_rb
+        )
         part_rows[part] = {
             "description": description,
             "bricklink": bricklink,
             "rebrickable": rebrickable,
+            "rebrickable_name": rb_parts.get(rebrickable) if rebrickable else None,
+            # No elements at all means "no data" (older parts predate element
+            # numbers), not "made in no colour".
+            "colors": available or None,
         }
         print(f"  {part:8s} {description[:40]:40s} BL={bricklink} RB={rebrickable}")
 
     OUT.write_text(
         json.dumps(
             {
-                "schema": 2,
+                "schema": 3,
                 "generated": dt.datetime.now(dt.UTC).date().isoformat(),
                 "sources": {
                     "ldraw": "local LDraw library (part descriptions, colour names)",
                     "bricklink_colors": BL_COLORS,
                     "bricklink_parts": BL_PART,
-                    "rebrickable": RB_BASE + "{colors,parts}.csv.gz",
+                    "rebrickable": RB_BASE + "{colors,parts,elements}.csv.gz",
                 },
                 "method": "see scripts/make_id_maps.py and docs/adr/0005",
                 "colors": colors,

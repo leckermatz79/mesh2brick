@@ -1416,7 +1416,7 @@ wheels = [
 
 [[package]]
 name = "mesh2brick"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "legolization" },
@@ -1424,6 +1424,7 @@ dependencies = [
     { name = "networkx" },
     { name = "numpy" },
     { name = "pillow" },
+    { name = "platformdirs" },
     { name = "pydantic" },
     { name = "pyldraw3" },
     { name = "pyyaml" },
@@ -1461,6 +1462,7 @@ requires-dist = [
     { name = "networkx", specifier = ">=3.5" },
     { name = "numpy", specifier = ">=2.5" },
     { name = "pillow", specifier = ">=11" },
+    { name = "platformdirs", specifier = ">=4.14" },
     { name = "pydantic", specifier = ">=2.14" },
     { name = "pyldraw3", specifier = "==1.7.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },

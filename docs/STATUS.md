@@ -1,64 +1,54 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **3 – STEP + Farben: fertig, wartet auf Merge** · Nächste: **Phase 4 – Katalog und Whitelist**
+Stand: 2026-11-01 · Aktuelle Phase: **4 – Katalog und Whitelist: fertig, wartet auf Merge** · Nächste: **Phase 5 – eigene Platzierungs-/Stabilitätserweiterungen (nur bei Bedarf)**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
 
-Modelle kommen jetzt **in ihren eigenen Farben** heraus:
-- aus Slicer-Projekten (Bambu Studio, Orca, PrusaSlicer),
-- aus CAD-Dateien,
-- aus OBJ, glTF und PLY mit Materialien, Vertexfarben oder Texturen.
+mesh2brick hat jetzt einen **Teilekatalog**, der offline funktioniert.
+- `mesh2brick catalog list` und `catalog show` zeigen zu jedem Teil:
+  - Größe und Noppen (aus der LDraw-Geometrie),
+  - BrickLink- und Rebrickable-Nummer, Namen,
+  - die Farben, in denen LEGO das Teil herstellt.
+- Mit `parts.include` und `parts.exclude` legst du fest, welche Teile verwendet werden dürfen.
 
-Zusätzlich liest mesh2brick **STEP-Dateien**. Duo wird in 137 Sekunden in Weiß, Grün, Hellgrün, Orange und Schwarz gebaut: 1.013 Teile, stabil, alle Teile in allen drei Teilelisten.
+Die Teileliste zeigt jetzt Rebrickable-Namen und warnt, wenn ein Teil in einer Farbe gar nicht produziert wird.
 
-| Galerie: Fliegenpilz (OBJ mit Materialien, 32 Noppen, 1.240 Teile) |
+| Galerie: derselbe Hase mit allen Teilen (links) und nur mit 2×4, 2×2, 1×2 (rechts) |
 |---|
-| ![Fliegenpilz](gallery/phase3-toadstool.png) |
+| ![Whitelist](gallery/phase4-whitelist.png) |
 
-## Erledigt (Phase 3)
+## Erledigt (Phase 4)
 
-- **STEP-Import** (`.step`, `.stp`):
-  - Über ein optionales Zusatzpaket: `uv sync --extra step`.
-  - Liest Baugruppen, Körper und Farben. Die Genauigkeit ist in Millimetern einstellbar, egal in welcher Einheit die Datei ist.
-  - Ein STEP-Würfel ergibt exakt dasselbe Gitter wie der gleiche Würfel als STL. Das war die Abnahme der SPEC.
-- **Mehrere Körper in einer Datei:** Sie werden vereinigt (Standard) oder auf Wunsch abgelehnt (`input.multi_body: error`).
-- **Farben aus dem Modell:** neuer Standard `color.mode: auto`.
-  - **3MF:** Materialfarben und die Filamentzuordnung aus Slicer-Projekten. Die Filamente gewinnen, weil sie zeigen, was wirklich gedruckt wird.
-  - **STEP:** Körper- und Flächenfarben.
-  - **OBJ, glTF und PLY:** Materialfarben, Vertexfarben und Bildtexturen.
-- **Nur sichtbare Flächen zählen:**
-  - Bei Duo stecken Teile ineinander, etwa Pupillen halb im Auge oder das Gesicht auf dem Körper. Verdeckte Flächen bestimmen deshalb keine Farbe.
-  - Dünne Beschichtungen, die keinen eigenen Stein füllen, färben den Stein dahinter.
-- **Gängige LEGO-Farben:**
-  - Modellfarben werden auf die rund 40 Farben abgebildet, die LEGO heute in vielen Teilen herstellt. Die Zahlen dazu kommen aus der Statistik von Rebrickable.
-  - Ohne diese Grenze wurde Duos Orange zu „Warm Yellowish Orange“. Diese Farbe gab es 2004 in 19 Teilen, man bekäme sie kaum.
-  - Metallic-Töne gibt es nur auf Wunsch (`color.palette: all`).
-- **Slicer-Hilfskörper** (Modifier, Negativ-Körper, Stützblocker) wurden bisher als Geometrie mitgelesen. Jetzt werden sie übersprungen.
-- **Teilelisten:** Rebrickable-Farbnummern werden jetzt auch über den exakten Namen gefunden, für 90 statt 69 Farben. Eine falsche Zahl in ADR 0005 ist korrigiert.
-- **Testdateien:** STEP-Würfel, zwei farbige STEP-Körper, Fliegenpilz, Kugel mit Vertexfarben und Würfel mit Textur. Alle sind selbst erzeugt und gemeinfrei.
-- 381 automatische Tests, 96 % Abdeckung.
+- **Teilekatalog** (`mesh2brick catalog list --category slope`, `catalog show 3001`):
+  - Er läuft offline; ein Test sperrt dabei jeden Netzwerkzugriff.
+  - Größe, Höhe, Noppen und Kategorie werden aus der LDraw-Geometrie berechnet und pro LDraw-Version zwischengespeichert.
+  - Abgleich mit legolizations eigenem Modell: Alle 29 platzierbaren Teile stimmen überein.
+  - `--all` zeigt zusätzlich Teile aus der LDraw-Bibliothek, die legolization (noch) nicht setzen kann. Das sind z. B. 218 Slopes ohne bedruckte Varianten.
+- **Whitelist und Blacklist** wirken jetzt bei der Platzierung.
+  - Unmögliches wird mit klarer Meldung abgelehnt: ein Tippfehler in der Teilenummer, ein Teil, das legolization nicht setzen kann, oder das Entfernen der unverzichtbaren 1×1-Teile.
+  - Grund für Letzteres: legolization braucht 1×1-Stein und 1×1-Platte, um beliebige Formen zu füllen. Das habe ich gemessen, indem ich jedes Teil einzeln entfernt habe.
+- **Teileliste:** Spalten für den Rebrickable-Namen und „in dieser Farbe produziert“, dazu eine Warnung bei Kombinationen, die es nicht gibt.
+- **Farbabgleich verbessert:** LDraw hat einige Farben auf LEGOs offizielle Namen umbenannt. Sie werden jetzt über Nummer und Farbwert sicher zugeordnet.
+  - Dunkellila („Medium Lilac“ = „Dark Purple“) ist dadurch in der Standardpalette. Lila wird nicht mehr zu Blau.
+  - Hellorange („Spud Orange“ = „Light Orange“) ist ebenfalls zugeordnet, ist aber eine alte Farbe und daher nicht in der Standardpalette.
+- **Daten:** Rebrickable-Namen und die Verfügbarkeit (welches Teil gibt es in welcher Farbe) stecken in der mitgelieferten Tabelle. Es braucht keinen Download, kein Konto und keine große Datenbank (ADR 0009).
+- 424 automatische Tests, 96 % Abdeckung.
 
-## So sieht Duo jetzt aus (lokal, nicht im Repo)
+## Ein echter Fund bei Duo
 
-| Filament (Bambu) | wird zu LEGO-Farbe | Teile |
-|---|---|---:|
-| Weiß (Augen, Sockel) | White | 209 |
-| Grasgrün (Körper, Flügel) | Bright Green | 603 |
-| Apfelgrün (Gesicht, Federn) | Lime | 114 |
-| Mandarin-Orange (Schnabel, Füße) | Orange | 81 |
-| Schwarz (Pupillen) | Black | 6 |
+Duo wird mit **20 Steinen 2×8 und 16 Steinen 1×8 in Bright Green** gebaut. Diese Kombination stellt LEGO laut Rebrickable gar nicht her. Die Teileliste sagt das jetzt.
 
-137 s gesamt (Import 13 s, Steine 104 s, PDF 20 s), 158 Schritte, stabil, ein Stück. Die Farbübertragung selbst kostet bei 2,1 Mio. Dreiecken etwa 0,6 s.
+- **Abhilfe heute:** `--set "parts.exclude=[3007, 3008]"`. Dann nimmt legolization kürzere Steine, allerdings in allen Farben.
+- **Besser wäre**, solche Steine automatisch durch kürzere gleicher Farbe zu ersetzen (siehe Frage 2).
 
-## Was ich entschieden habe (Details in den ADRs)
+## Was ich entschieden habe (Details in ADR 0009)
 
-| Entscheidung | Warum | ADR |
-|---|---|---|
-| STEP über **cascadio** statt cadquery | Gleiche Technik (OpenCASCADE). Der Download ist 22 statt 63 MB, und es braucht keine Zusatzpakete (siehe Frage 1). | 0007 |
-| Standard `color.mode: auto` statt `single` | Wer ein farbiges Modell lädt, erwartet seine Farben. Modelle ohne Farben sehen aus wie bisher (siehe Frage 2). | 0008 |
-| Standard `color.palette: common` (~40 heutige LEGO-Farben) | Kaufbare Steine statt exakter, aber seltener Farbtöne (siehe Frage 3). | 0008 |
-| Farbabstand von legolization übernommen | Er ist erprobt und darauf abgestimmt, dass Grau grau und Schwarz schwarz bleibt. Keine eigene Farbformel. | 0008 |
+| Entscheidung | Warum |
+|---|---|
+| Katalogdaten in der mitgelieferten Tabelle statt in der Datenbank des `rebrickable`-Pakets | Die Datenbank wäre ein großer Download (alle Rebrickable-Tabellen inkl. Set-Inventare). BrickLink-Nummern bekäme man dort nur mit API-Schlüssel. So funktioniert alles offline und ohne Konto. |
+| Whitelist über einen eng begrenzten lokalen Patch | legolization nimmt im Hauptablauf immer den vollen Katalog. Der Patch gilt nur während der Platzierung und wird danach (auch bei Fehlern) zurückgenommen. Ein Upstream-Vorschlag liegt bereit (Frage 1). |
+| Fehlende 1×1-Teile in einer Whitelist werden ergänzt (mit Hinweis), statt einen Fehler zu melden | Wer „nur 2×4 und 2×2“ schreibt, meint die großen Steine. Ohne 1×1 ginge es gar nicht. |
 
 ## Lückenliste: legolizations PDF gegen SPEC §1 (unverändert, wird in Phase 6 geschlossen)
 
@@ -77,29 +67,29 @@ Zusätzlich liest mesh2brick **STEP-Dateien**. Duo wird in 137 Sekunden in Weiß
 
 ## Als Nächstes
 
-1. **Phase 4 (Issue #5): Katalog und Whitelist.**
-   - Teile und Farben offline aus Rebrickable.
-   - Welche Teile gibt es in welcher Farbe wirklich?
-   - Ein vollständiger Farbabgleich LDraw ↔ BrickLink ↔ Rebrickable. Dann kommt zum Beispiel Dunkellila dazu: LDraw nennt es inzwischen „Medium Lilac“, die Kataloge „Dark Purple“.
+1. **Phase 5 (Issue #6): Benchmark aller legolization-Strategien, eigene Erweiterungen nur bei messbaren Lücken.**
+   - Kandidat aus Phase 4: Teile, die es in einer Farbe nicht gibt, automatisch ersetzen (Frage 2).
 
 ## Bekannte Einschränkungen
 
 | Was | Einschätzung |
 |---|---|
-| Ob ein Teil in einer Farbe wirklich existiert (z. B. Platte 1×2 in Coral), wird noch nicht geprüft. | Phase 4 |
-| Reine Computer-Grundfarben landen teils auf Nachbarfarben, etwa #FF0000 auf „Reddish Orange“. LEGOs Rot ist deutlich dunkler. Echte Filament- und CAD-Rottöne werden zu Red. | akzeptiert (Frage 3) |
-| Lila wird zu Blau, weil Dunkellila wegen der Umbenennung noch nicht in der Palette ist. | Phase 4 |
-| Bemalte Farben aus dem Slicer (Multi-Material-Painting) und Texturen in 3MF werden noch nicht gelesen. Das Programm sagt es. | bei Bedarf |
+| Teile, die es in einer Farbe nicht gibt, werden nur gemeldet, nicht vermieden (Duo: 2×8 und 1×8 in Bright Green). | Frage 2 / Phase 5 |
+| Sehr schmale Whitelists kosten Teile und Zeit: Hase mit nur 2×4/2×2/1×2 hat 356 statt 177 Teile und braucht 85 statt 5 s. | in Ordnung, ist dokumentiert |
+| legolization setzt nur 29 Teile (Platten bis 2×8, keine großen Platten, keine Ecken). `catalog list --all` zeigt mehr, die lassen sich aber nicht verwenden. | Phase 5 bzw. Upstream |
+| Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert; optional eine kleine Ausnahmetabelle für reine Primärfarben (niedrige Priorität) |
+| Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
 | Große Modelle (> 500 Teile) bekommen Schritte in Schicht-Reihenfolge ohne Stabilitätsprüfung. | von dir akzeptiert; Verbesserung in Phase 5/6 bzw. Upstream |
-| Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. Die 5 Minuten sind eine Zielmarke; Überschreitungen werden gemeldet. | Upstream-Kandidat #5 |
+| Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. | Upstream-Kandidat #5 |
 | Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an |
 | PDF-Text englisch. | Phase 6 |
-| Whitelists (Phase 4) und `llm.*` (Phase 7) sind noch ohne Wirkung. | geplant |
+| `llm.*` (Phase 7) ist noch ohne Wirkung. | geplant |
 
 ## Umgebung (gut zu wissen)
 
 - Die Python-Umgebung liegt außerhalb von Nextcloud (`.venv` ist ein Symlink nach `~/.local/share/venvs/mesh2brick`).
 - Die LDraw-Teilebibliothek liegt in `~/Library/Caches/pyldraw3`. `samples/` (Duo) ist von Git ausgeschlossen.
+- Neu: mesh2brick legt einen kleinen Zwischenspeicher für Teilebeschreibungen in `~/Library/Caches/mesh2brick` an. Er lässt sich gefahrlos löschen.
 - STEP braucht einmalig `uv sync --extra step`.
 
 ## Deine Entscheidungen
@@ -114,18 +104,20 @@ Zusätzlich liest mesh2brick **STEP-Dateien**. Duo wird in 137 Sekunden in Weiß
 | 2026-11-01 | Manuelle Prüfung der `.ldr` in BrickLink Studio? | **Ja, Screenshot kommt später.** Bis dahin gilt der strenge Wieder-Einlese-Test als Prüfung. |
 | 2026-11-01 | LeoCAD manuell installieren und nutzen? | **Nein.** Schrittbilder kommen vom eigenen Renderer. |
 | 2026-11-01 | Schichtschritte für große Modelle (> 500 Teile)? | **Ja**, in Ordnung. |
+| 2026-11-01 | STEP-Zusatzpaket mit 70 MB (über der 50-MB-Regel)? | **In Ordnung.** Ein vollständiger CAD-Kern rechtfertigt die Größe, er wird nur bei Bedarf installiert. Die Rückfrage war richtig: So soll die 50-MB-Regel funktionieren. |
+| 2026-11-01 | Farben aus dem Modell automatisch übernehmen? | **Ja.** Einfarbig bleibt per Config erreichbar (`color.mode: single`). |
+| 2026-11-01 | Gängige LEGO-Farben statt exakter Farbtöne? | **Ja.** Eine Anleitung, deren Steine man nicht kaufen kann, ist wertlos. Für Spezialfälle gibt es `color.palette: all`. |
+| 2026-11-01 | Reines #FF0000 wird „Reddish Orange“ | **Kein Bug, sondern Farbmetrik.** Optional in Phase 4: kleine Ausnahmetabelle für reine Primärfarben. Erwähnen, nicht priorisieren. |
 
 ## Fragen an dich
 
 Wenn keine Antwort kommt, gilt jeweils die Standardannahme.
 
-1. **Ist das STEP-Zusatzpaket mit 70 MB auf der Platte in Ordnung?**
-   - Der Download ist 22 MB, entpackt sind es 70 MB, weil OpenCASCADE darin steckt.
-   - CLAUDE.md verlangt ab 50 MB eine Rückfrage. Es wird aber nur installiert, wer STEP braucht.
-   - Die in der SPEC genannte Alternative (cadquery) ist schon als Download 63 MB groß.
-   - *Annahme: ja.*
-2. **Sollen Farben aus dem Modell automatisch übernommen werden?** Bisher war alles einfarbig rot, außer man hat es umgestellt. *Annahme: ja, automatisch (`color.mode: auto`).*
-3. **Lieber gängige LEGO-Farben als exakte Farbtöne?** Das heißt: nur die rund 40 Farben, die LEGO heute in vielen Teilen herstellt. Ein Farbton passt dann manchmal weniger genau, die Steine sind aber kaufbar. *Annahme: ja, gängige Farben.*
+1. **Darf ich bei legolization vorschlagen, dass man die erlaubten Teile direkt angeben kann (Issue plus PR-Entwurf, mit dem Vibe-Coding-Hinweis wie bei #88)?**
+   - Dann könnten wir unseren lokalen Patch irgendwann streichen.
+   - Der Text liegt in `docs/UPSTREAM.md` (#8).
+   - *Annahme: nein, er bleibt Entwurf, bis du zustimmst.*
+2. **Sollen Steine, die es in einer Farbe nicht gibt, automatisch durch kürzere gleicher Farbe ersetzt werden?** Beispiel: 1×8 in Bright Green wird zu 1×4 + 1×4. Das Modell hat dann etwas mehr Teile, und die Stabilität wird neu geprüft. *Annahme: ja, als Teil von Phase 5.*
 
 Noch ausstehend von dir: ein Screenshot einer erzeugten `.ldr` aus BrickLink Studio. Bis dahin gilt der strenge Wieder-Einlese-Test.
 

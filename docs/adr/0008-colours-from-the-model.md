@@ -1,6 +1,6 @@
 # 8. Colours from the model: visible surface, majority vote, common palette
 
-- Status: accepted
+- Status: accepted (defaults `auto` and `common` confirmed by the product owner, 2026-11-01)
 - Date: 2026-11-01
 
 ## Context
@@ -68,7 +68,9 @@ copper tones) are excluded from `common` and `solid` (SPEC §2: metallics only o
 - Without the `common` palette, its orange matched "Warm Yellowish Orange", a colour made in
   19 parts in 2004 that could hardly be bought.
 - Pure sRGB primaries can land on neighbouring colours (#FF0000 → Reddish Orange), because
-  LDraw's Red (#B40000) is much darker. Real filament and CAD reds land on Red.
+  LDraw's Red (#B40000) is much darker. Real filament and CAD reds land on Red. The product
+  owner accepted this as colour metrics, not a bug (2026-11-01). A small exception table for
+  pure primaries is an optional, low-priority follow-up.
 - Renamed colours are missing from `common` until Phase 4 builds a full cross-reference via
   Rebrickable. Example: LDraw "Medium Lilac" is BrickLink/Rebrickable "Dark Purple".
 - Not yet read: 3MF textures and multi-material painting (both reported as notes).

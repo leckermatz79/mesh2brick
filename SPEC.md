@@ -88,7 +88,7 @@ src/mesh2brick/
 │   └─ pyldraw.py       # Bibliothekszugriff, Teile-Geometrie, Farbtabellen
 ├─ catalog/
 │   ├─ parts.py         # PartSpec: id, footprint, height_plates, stud_mask, category – aus pyldraw3 abgeleitet
-│   ├─ rebrickable.py   # Metadaten, Verfügbarkeit, Namen (offline-Katalog)
+│   ├─ rebrickable.py   # Metadaten, Verfügbarkeit, Namen (offline-Katalog; 2026-11-01: aus mitgelieferter, generierter Tabelle statt rebrickable-Datenbank, ADR 0009)
 │   └─ whitelist.py     # Teile-Whitelist aus Config → an Backend durchgereicht
 ├─ place/               # eigene Strategien, die das Placer-Protocol erfüllen (erst ab Phase 5)
 ├─ steps/               # eigene Schrittlogik, falls legolization nicht reicht (Phase 6)

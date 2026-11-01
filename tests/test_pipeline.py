@@ -14,8 +14,8 @@ import trimesh
 
 from mesh2brick.backends import BackendError
 from mesh2brick.backends.legolization import LegolizationBackend
+from mesh2brick.catalog.rebrickable import catalogue_colors
 from mesh2brick.config import load_settings
-from mesh2brick.export.bom import catalogue_colors
 from mesh2brick.pipeline import convert, palette_for
 from mesh2brick.voxel.voxelize import remove_islands
 
@@ -169,7 +169,7 @@ def test_acceptance_coloured_obj_gives_multicolour_model(
 
 
 def test_palette_follows_the_setting() -> None:
-    from mesh2brick.export.bom import common_colors  # noqa: PLC0415
+    from mesh2brick.catalog.rebrickable import common_colors  # noqa: PLC0415
 
     salmon = np.array([[249, 153, 99]], dtype=np.uint8)  # Duo's "Mandarin Orange"
     common = palette_for(load_settings(None, []))
@@ -178,7 +178,8 @@ def test_palette_follows_the_setting() -> None:
     assert int(common(salmon)[0]) in common_colors()
     assert int(solid(salmon)[0]) in catalogue_colors()
     assert every(salmon)[0] >= 0
-    assert len(common_colors()) == 41  # today's palette, no Flat Silver
-    assert {0, 4, 15, 71, 72, 353, 330} <= common_colors()  # incl. Coral, Olive
+    assert len(common_colors()) == 42  # today's palette, no Flat Silver
+    # incl. Coral, Olive Green and Dark Purple (LDraw: Medium Lilac, renamed)
+    assert {0, 4, 15, 71, 72, 353, 330, 85} <= common_colors()
     assert not {7, 8, 6, 225, 315} & common_colors()  # old/rare, Flat Silver
     assert 315 not in catalogue_colors()

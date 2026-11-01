@@ -21,6 +21,7 @@ from mesh2brick.config import ConfigError, Settings, load_settings
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from mesh2brick.catalog.listing import CatalogRow
     from mesh2brick.model import BrickModel
     from mesh2brick.voxel.voxelize import VoxelizeReport
 
@@ -318,10 +319,168 @@ def voxelize(
     )
 
 
-@app.command()
-def catalog() -> None:
-    """Browse the offline part catalogue (Phase 4)."""
-    _not_yet("catalog", phase=4)
+catalog_app = typer.Typer(
+    help="Browse the offline part catalogue (placeable parts, sizes, IDs, colours).",
+    no_args_is_help=True,
+)
+app.add_typer(catalog_app, name="catalog")
+CATEGORIES: Final = ("brick", "plate", "tile", "slope", "other")
+
+
+@catalog_app.command("list")
+def catalog_list(
+    category: Annotated[
+        str | None,
+        typer.Option("--category", help=f"Only one family: {', '.join(CATEGORIES)}."),
+    ] = None,
+    every: Annotated[
+        bool,
+        typer.Option(
+            "--all", help="Also list LDraw library parts the backend cannot place."
+        ),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Machine-readable.")] = False,
+    config: ConfigOption = None,
+    overrides: SetOption = None,
+) -> None:
+    """List parts with size, catalogue numbers, colours and whether settings allow them.
+
+    Works offline: sizes come from the local LDraw library, names and
+    colours from the bundled Rebrickable/BrickLink table.
+    """
+    if category is not None and category not in CATEGORIES:
+        _fail(f"unknown category {category!r}; choose from {', '.join(CATEGORIES)}")
+    settings = _settings(config, overrides, None)
+    _require_ldraw_library()
+    from mesh2brick.backends import BackendError  # noqa: PLC0415
+    from mesh2brick.catalog.listing import catalog_rows, library_rows  # noqa: PLC0415
+    from mesh2brick.pipeline import catalog_overview  # noqa: PLC0415
+
+    try:
+        overview = catalog_overview(settings)
+        rows = catalog_rows(
+            overview.specs,
+            placeable=overview.placeable,
+            allowed=overview.allowed,
+            category=category,
+        )
+        if every:
+            from mesh2brick.backends.pyldraw import library_parts  # noqa: PLC0415
+
+            rows += library_rows(
+                library_parts(), skip=overview.placeable, category=category
+            )
+    except BackendError as error:
+        _fail(str(error))
+    if as_json:
+        import json  # noqa: PLC0415
+
+        typer.echo(json.dumps([row.as_json() for row in rows], indent=1))
+        return
+    typer.echo(catalog_table(rows))
+    if overview.problem:
+        typer.secho(f"  note: {overview.problem}", fg=typer.colors.YELLOW)
+    placeable = sum(row.placeable for row in rows)
+    typer.echo(
+        f"{len(rows)} part(s), {placeable} placeable. "
+        "USE: allowed by the current parts.* settings."
+    )
+
+
+@catalog_app.command("show")
+def catalog_show(
+    part: Annotated[str, typer.Argument(help="LDraw part number, e.g. 3001.")],
+    config: ConfigOption = None,
+    overrides: SetOption = None,
+) -> None:
+    """Show one part: size, studs, catalogue numbers and the colours it exists in."""
+    settings = _settings(config, overrides, None)
+    _require_ldraw_library()
+    from mesh2brick.backends import BackendError  # noqa: PLC0415
+    from mesh2brick.catalog.listing import spec_row  # noqa: PLC0415
+    from mesh2brick.pipeline import catalog_overview, part_spec  # noqa: PLC0415
+
+    try:
+        overview = catalog_overview(settings)
+        spec = overview.specs.get(part) or part_spec(part)
+    except BackendError as error:
+        _fail(str(error))
+    placeable = part in overview.placeable
+    allowed = overview.allowed
+    row = spec_row(
+        spec,
+        placeable=placeable,
+        enabled=None if allowed is None else part in allowed,
+    )
+    typer.echo(part_details(row))
+
+
+def catalog_table(rows: list[CatalogRow]) -> str:
+    """Fixed-width table of catalogue rows."""
+    header = (
+        "PART",
+        "NAME",
+        "SIZE",
+        "STUDS",
+        "BRICKLINK",
+        "REBRICKABLE",
+        "COLOURS",
+        "USE",
+    )
+    body = [
+        (
+            row.part,
+            (row.rebrickable_name or row.name)[:38],
+            row.size,
+            "-" if row.top_studs is None else str(row.top_studs),
+            row.bricklink or "-",
+            row.rebrickable or "-",
+            "-" if row.colors is None else str(len(row.colors)),
+            "-" if not row.placeable else _yes_no(row.enabled),
+        )
+        for row in rows
+    ]
+    widths = [max(len(r[i]) for r in [header, *body]) for i in range(len(header))]
+    return "\n".join(
+        "  ".join(
+            cell.ljust(width) for cell, width in zip(r, widths, strict=True)
+        ).rstrip()
+        for r in [header, *body]
+    )
+
+
+def part_details(row: CatalogRow) -> str:
+    """Multi-line description of one catalogue row (``catalog show``)."""
+    from mesh2brick.catalog.rebrickable import color_name, common_colors  # noqa: PLC0415
+
+    studs = "?" if row.top_studs is None else str(row.top_studs)
+    lines = [
+        f"{row.part}  {row.name}",
+        f"  {row.category}, {row.size}, {studs} stud(s) on top",
+        f"  placeable: {_yes_no(row.placeable)}"
+        + (
+            ""
+            if not row.placeable
+            else f", allowed by settings: {_yes_no(row.enabled)}"
+        ),
+        f"  BrickLink: {row.bricklink or '-'}   Rebrickable: {row.rebrickable or '-'}"
+        + (f' "{row.rebrickable_name}"' if row.rebrickable_name else ""),
+    ]
+    if row.colors is None:
+        lines.append(
+            "  colours: unknown (only placeable parts are in the offline table)"
+        )
+    else:
+        common = [c for c in row.colors if c in common_colors()]
+        lines.append(
+            f"  produced in {len(row.colors)} colour(s), {len(common)} of them common: "
+            + ", ".join(color_name(c) for c in common)
+        )
+    return "\n".join(lines)
+
+
+def _yes_no(value: bool | None) -> str:
+    return "?" if value is None else ("yes" if value else "no")
 
 
 @app.command()

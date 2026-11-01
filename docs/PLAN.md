@@ -1,4 +1,4 @@
-# Umsetzungsplan Phase 0–3
+# Umsetzungsplan Phase 0–4
 
 Stand: 2026-11-01 · Grundlage: `SPEC.md` · Fortschritt: `docs/STATUS.md`
 
@@ -87,6 +87,16 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Fixtures: STEP-Würfel und zwei farbige STEP-Körper (eigener AP214-Schreiber), Fliegenpilz (OBJ, Materialien), Vertexfarben-Kugel (PLY), Texturwürfel (OBJ).
 - [x] Duo lokal in echten Farben: unter 5 Minuten, stabil.
 - **Abnahme:** STEP-Würfel und STL-Würfel ergeben identische Gitter (Test für 3 Größen × Brick/Plate); ein farbiges OBJ-Fixture liefert ein mehrfarbiges Modell (Fliegenpilz: Rot und Weiß in Modell und Teileliste).
+
+## Phase 4 – Katalog und Whitelist
+
+- [x] Untersucht: legolization platziert 29 Teile. `run()` nimmt immer den vollen Katalog, und 1×1-Stein, 1×1-Platte und die drei Slopes werden per Namen gebraucht (Experiment: jedes Teil einzeln entfernt, dazu Zufallsteilmengen).
+- [x] `catalog/parts.py`: Teilebeschreibung aus der LDraw-Geometrie (Grundfläche, Höhe, Noppen, Kategorie), JSON-Cache pro LDraw-Version. Abgleich mit legolizations Zellmodell: alle 29 Teile stimmen.
+- [x] `catalog/rebrickable.py`: Namen, Verfügbarkeit (Teil × Farbe aus Rebrickables `elements.csv`) und Farbabgleich (umbenannte Farben über Nummer + Farbwert) in der mitgelieferten Tabelle. Offline, ohne API-Schlüssel und ohne große Datenbank.
+- [x] `catalog/whitelist.py`: Kategorien, `include`, `exclude`; unmögliche Kombinationen mit klarer Meldung. Weitergabe an legolization über einen eng begrenzten lokalen Patch, Upstream-Entwurf #8 (öffnen erst nach OK).
+- [x] CLI `catalog list/show`.
+- [x] Teileliste: Rebrickable-Namen, Spalte „in dieser Farbe produziert“, Warnung bei Kombinationen, die es nicht gibt.
+- **Abnahme:** `mesh2brick catalog list --category slope` läuft offline (Test sperrt Netzwerkzugriffe); die BOM zeigt Rebrickable-Namen.
 
 ## Risiken und wie ich damit umgehe
 

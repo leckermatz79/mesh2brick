@@ -11,6 +11,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | # | Where | What | Remove when |
 |---|---|---|---|
 | 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`) | Adds a 5 s time limit to every stability-LP attempt except the last, in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`). | legolization ships per-attempt time limits (candidate #2) |
+| 8 | `src/mesh2brick/backends/legolization.py` (`_placement_catalog`) | During `run()`, `legolization.pipeline.default_catalog` returns a catalogue reduced to the whitelisted parts; restored afterwards (also on errors). | `PipelineConfig` accepts a catalogue or part filter (candidate #8) |
 
 ## Candidates
 
@@ -23,6 +24,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | 5 | legolization | Time budget for `final_remerge` and step sequencing | Both ignore `time_budget_s` in 0.5.0 and dominate large models (remerge 40–170 s, sequencing 4–7 min at ~1,000 parts, docs/benchmarks.md). mesh2brick works around sequencing with a child process and a layer-order fallback (ADR 0006). | idea | – |
 | 6 | legolization | `plan_instructions` ignores `InstructionsConfig.mode="layer"`; booklet only English, fonts not embedded | A cheap layer plan helper (mesh2brick's `layer_plan`) and i18n/embedded fonts would help every user. | idea | – |
 | 7 | trimesh | glTF `baseColorFactor` is kept as bytes of the *linear* value | Converting back to sRGB loses up to ±3 levels in dark tones (STEP 0.1 grey arrives as 28 instead of 26). Harmless for LEGO colours; storing floats would be exact. | idea | – |
+| 8 | legolization | **Part whitelist: `PipelineConfig.catalog` (or `allowed_parts`) for `run()`** | `run()` always places from `default_catalog()`; users cannot exclude parts they do not own or want. mesh2brick patches `default_catalog` for the duration of `run()`. Also worth documenting: the 1 x 1 brick/plate and the three slopes are looked up by name, so a filtered catalogue must keep them (else `KeyError`). Draft below. | draft ready | – |
 
 ## Draft #2 (as filed in issue #88)
 
@@ -50,3 +52,22 @@ slopes off it takes 8 s.
 optional pipeline deadline already on `main`. A follow-up question worth a look: why
 slope-substituted layouts make the LP so much harder for presolve (degenerate or
 near-duplicate contact rows?).
+
+## Draft #8 (not opened yet, needs the product owner's OK)
+
+**Title:** Allow placing from a custom catalogue: `PipelineConfig.catalog`
+
+**Problem:** `legolization.pipeline.run()` hard-wires `catalog = default_catalog()`. Callers
+that want to restrict the parts (a builder's own collection, no 1 x 8 bricks, ...) have no
+public way to do so, although every strategy already receives the catalogue as a parameter.
+
+**Proposal:** an optional `catalog: Catalog | None = None` field on `PipelineConfig`; `run()`
+uses `config.catalog or default_catalog()`. Validate early that the parts looked up by key
+are present (`brick_1x1`, `plate_1x1`, and the slope keys when `slopes` is enabled) and raise
+a clear `ValueError` instead of a `KeyError` deep inside placement. Optionally, a helper
+`Catalog.restricted(ldraw_parts: Iterable[str])` that keeps import-only categories.
+
+**Evidence:** removing single parts from the catalogue (bunny fixture, brick and plate
+height) works for every part except `3005`, `3024` and, with slopes, `3039`/`3040b`/`4286`;
+ten random subsets per height unit placed correctly and never used excluded parts. The issue
+would mention that it surfaced in a vibe-coding project (like #88).

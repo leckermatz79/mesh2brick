@@ -16,7 +16,7 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 3 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
+> **Status: pre-alpha (Phase 4 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
 > and STEP files into an LDraw model, three parts lists and a PDF building instruction,
 > in the model's own colours. See [docs/STATUS.md](docs/STATUS.md).
 
@@ -52,6 +52,14 @@ uv run mesh2brick place tests/fixtures/heart.vox -o out/
 # STEP colours, OBJ/glTF materials and textures, PLY vertex colours) and are matched
 # to ~40 current LEGO colours. One colour for everything instead:
 uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set color.mode=single
+
+# Browse the parts (offline): sizes, BrickLink/Rebrickable numbers, colours
+uv run mesh2brick catalog list --category slope
+uv run mesh2brick catalog show 3001
+
+# Use only some parts (whitelist) or forbid some (blacklist)
+uv run mesh2brick convert model.stl -o out/ --set "parts.include=[3001, 3003, 3004]"
+uv run mesh2brick convert model.stl -o out/ --set "parts.exclude=[3008, 3007]"
 
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3

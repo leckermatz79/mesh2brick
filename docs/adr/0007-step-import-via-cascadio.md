@@ -45,7 +45,8 @@ B-rep solids with optional colours), so no CAD kernel is needed to make them.
 
 - Size: the cascadio wheel is 22–28 MB, but it unpacks to ~70 MB because OpenCASCADE is
   linked into it. CLAUDE.md's "ask before > 50 MB" does not say whether download or installed
-  size counts, so the product owner gets the decision with the Phase 3 pull request. It is an
+  size counts, so the product owner decided: approved on 2026-11-01, because a full
+  CAD kernel justifies the size and it is installed only on demand. It is an
   optional extra (default installs are unaffected) and smaller than the `cadquery-ocp`
   packaging SPEC §2 names (63 MB as a download alone).
 - We do not get OCP's full B-rep API (no exact volumes, no feature recognition). If a later

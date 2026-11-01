@@ -117,3 +117,15 @@ The colour transfer itself (rays along three axes, vote, fill) adds about 0.6 s 
 part count: the coloured owl came out with 6 % fewer parts than in one colour (the colour
 boundaries change where legolization splits and merges bricks; not investigated further).
 Both models stay well inside the 5-minute budget.
+
+## Whitelists (Phase 4, 2026-11-01)
+
+`bunny_lowpoly.stl` at 20 studs, defaults otherwise (`kollsker`), one run each:
+
+| Parts allowed | Parts | Steps | Time |
+|---|---:|---:|---:|
+| all 22 bricks and plates | 177 | 41 | 5 s |
+| `parts.include=[3001, 3003, 3004]` (+ 3005, 3024 added automatically) | 356 | 58 | 85 s |
+
+Narrow whitelists double the part count here and make placement much slower. The cause was
+not investigated further; the time for single-part exclusions was not measured.

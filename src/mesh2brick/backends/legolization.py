@@ -32,6 +32,7 @@ import math
 import multiprocessing
 import time
 import types
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
@@ -39,6 +40,8 @@ import highspy
 import numpy as np
 from legolization import MeshOptions, PipelineConfig, PipelineResult, run
 from legolization import VoxelGrid as LegoGrid
+from legolization import pipeline as _lego_pipeline
+from legolization.catalog import Catalog, default_catalog
 from legolization.color import Palette, default_palette
 from legolization.graph import ConnectionGraph
 from legolization.instructions.bom import bill_of_materials
@@ -62,11 +65,18 @@ from legolization.stability import solver as _lego_solver
 from legolization.stability.solver import StabilityResult, analyze
 
 from mesh2brick.backends.protocols import BackendError, Placement, StabilityReport
+from mesh2brick.backends.pyldraw import part_exists
+from mesh2brick.catalog.whitelist import (
+    BackendRules,
+    PlaceablePart,
+    Whitelist,
+    allowed_parts,
+)
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.voxel.grid import EMPTY, VoxelGrid
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
     from multiprocessing.connection import Connection
     from pathlib import Path
 
@@ -175,6 +185,103 @@ _HIGHSPY_SHIM: Final = _HighspyShim("highspy")
 _limit_lp_attempts()
 
 
+# ---------------------------------------------------------------- part whitelist
+PLACEABLE_CATEGORIES: Final = ("brick", "plate", "tile", "slope")
+"""legolization categories its strategies place; the others (special, snot)
+only serve LDraw import and stay untouched."""
+FILLER_PARTS: Final = frozenset({"3005", "3024"})
+
+
+def placeable_parts() -> tuple[PlaceablePart, ...]:
+    """Parts legolization can place, one entry per LDraw number."""
+    found: dict[str, PlaceablePart] = {}
+    for part in default_catalog().parts.values():
+        category = part.category.value
+        if category in PLACEABLE_CATEGORIES and part.ldraw_part not in found:
+            found[part.ldraw_part] = PlaceablePart(
+                part=part.ldraw_part,
+                category=cast("Any", category),
+            )
+    return tuple(sorted(found.values(), key=lambda p: (p.category, p.part)))
+
+
+def placement_footprint(part: str) -> tuple[int, int, int]:
+    """Footprint ``(width, length, height_plates)`` in legolization's cell model.
+
+    Used to cross-check the specs derived from the LDraw geometry.
+
+    Raises:
+        BackendError: if ``part`` is not placeable.
+    """
+    for entry in default_catalog().parts.values():
+        if entry.ldraw_part == part and entry.category.value in PLACEABLE_CATEGORIES:
+            cells = entry.occupied_cells
+            sides = sorted(
+                (
+                    max(c[0] for c in cells) - min(c[0] for c in cells) + 1,
+                    max(c[1] for c in cells) - min(c[1] for c in cells) + 1,
+                )
+            )
+            return (sides[0], sides[1], entry.height_plates)
+    msg = f"part {part} is not placeable by legolization"
+    raise BackendError(msg)
+
+
+def backend_rules() -> BackendRules:
+    """What legolization 0.5.0 cannot do without (measured, ADR 0009).
+
+    It looks up the 1 x 1 brick and plate by name to fill any shape, and its
+    slope pass uses all three slopes by name.
+    """
+    slopes = frozenset(p.part for p in placeable_parts() if p.category == "slope")
+    reasons = dict.fromkeys(
+        FILLER_PARTS, "legolization fills arbitrary shapes with 1 x 1 brick and plate"
+    )
+    reasons |= dict.fromkeys(slopes, "legolization's slope pass uses all its slopes")
+    return BackendRules(required=FILLER_PARTS, coupled=(slopes,), reasons=reasons)
+
+
+def whitelist(settings: Settings) -> Whitelist:
+    """The part set ``settings.parts`` allows (see catalog.whitelist).
+
+    Raises:
+        WhitelistError: for impossible part settings.
+    """
+    return allowed_parts(
+        placeable_parts(), settings.parts, backend_rules(), in_library=part_exists
+    )
+
+
+def restricted_catalog(parts: frozenset[str]) -> Catalog:
+    """Legolization's catalogue with only ``parts`` among the placeable ones."""
+    full = default_catalog()
+    return Catalog(
+        parts={
+            key: part
+            for key, part in full.parts.items()
+            if part.category.value not in PLACEABLE_CATEGORIES
+            or part.ldraw_part in parts
+        }
+    )
+
+
+@contextmanager
+def _placement_catalog(catalog: Catalog) -> Iterator[None]:
+    """Let legolization's ``run()`` place from ``catalog`` (local patch).
+
+    ``run()`` always takes ``default_catalog()`` and ``PipelineConfig`` has
+    no catalogue option (docs/UPSTREAM.md #8). Every other legolization API
+    used here receives the catalogue explicitly.
+    """
+    namespace = _lego_pipeline.__dict__
+    original = namespace["default_catalog"]
+    namespace["default_catalog"] = lambda: catalog  # documented local patch
+    try:
+        yield
+    finally:
+        namespace["default_catalog"] = original
+
+
 @dataclass(frozen=True, slots=True)
 class _Native:
     """What we keep of legolization's result to export without a round trip."""
@@ -217,13 +324,18 @@ class LegolizationBackend:
         if grid.filled_count == 0:
             msg = "the voxel grid is empty; nothing to place"
             raise BackendError(msg)
-        config = self.pipeline_config(settings, height_unit=grid.height_unit)
+        allowed = whitelist(settings)
+        config = self.pipeline_config(
+            settings, height_unit=grid.height_unit, allowed=allowed
+        )
         lego_grid = to_lego_grid(grid)
         try:
-            result = run(lego_grid, config)
+            with _placement_catalog(restricted_catalog(allowed.parts)):
+                result = run(lego_grid, config)
         except ValueError as error:
             raise BackendError(f"legolization rejected the input: {error}") from error
         plan, notes = self._plan(result.layout, config, settings, deadline)
+        notes = [*allowed.notes, *notes]
         native = _Native(layout=result.layout, plan=plan)
         return Placement(
             model=to_brick_model(
@@ -398,6 +510,7 @@ class LegolizationBackend:
         settings: Settings,
         *,
         height_unit: HeightUnit | None = None,
+        allowed: Whitelist | None = None,
     ) -> PipelineConfig:
         """Translate mesh2brick settings into a legolization ``PipelineConfig``.
 
@@ -415,10 +528,12 @@ class LegolizationBackend:
         categories = set(settings.parts.categories)
         if not {"brick", "plate"} <= categories:
             msg = (
-                "the legolization backend always needs bricks and plates; "
-                "keep both in parts.categories (custom whitelists: Phase 4)"
+                "the legolization backend always needs bricks and plates; keep "
+                "both in parts.categories (narrow them with parts.include/exclude)"
             )
             raise BackendError(msg)
+        if allowed is not None:
+            categories = set(allowed.categories(placeable_parts()))
         steps = settings.steps
         instructions = InstructionsConfig(
             # legolization's pipeline never sequences; place() plans the steps
