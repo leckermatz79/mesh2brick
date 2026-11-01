@@ -1,6 +1,7 @@
 # Projektstatus
 
-Stand: 2026-11-01 · Aktuelle Phase: **0 – Gerüst (lokal abgeschlossen; CI-Lauf auf GitHub steht noch aus)**
+Stand: 2026-11-01 · Aktuelle Phase: **0 – Gerüst: abgeschlossen ✅** · Nächste: **Phase 1 – Ingest + Voxelisierung**
+Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · CI grün auf Linux + macOS, Python 3.12/3.13
 Plan für Phase 0–2: [PLAN.md](PLAN.md)
 
 ## Fazit in zwei Sätzen
@@ -27,10 +28,12 @@ das Thema von Phase 1.
   - ein Test, dass jede Datei den Lizenz-Header hat.
 - Dokumente: README (de/en), CLAUDE.md, ADR 0001/0002, Lizenzübersicht, Upstream-Liste.
 
+- GitHub: öffentliches Repo, Tag `v0.0.0` mit Release, Issues #1–#9 (eins pro Phase mit Abnahme-Checkliste), `main` geschützt (Änderungen ab jetzt per Pull Request).
+- Commits laufen unter deiner GitHub-noreply-Adresse; die gmx-Adresse taucht im Repo nirgends auf.
+
 ## Als Nächstes
 
-1. GitHub-Repo anlegen und pushen, damit die CI läuft (Abnahme Phase 0: „Smoke-Test grün in CI").
-2. Phase 1: Mesh-Import (STL/OBJ/3MF/PLY) und eigene Voxelisierung, siehe PLAN.md.
+Phase 1 (Issue #2): Mesh-Import (STL/OBJ/3MF/PLY) und eigene Voxelisierung, siehe PLAN.md.
 
 ## Bekannte Einschränkungen
 

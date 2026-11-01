@@ -51,7 +51,7 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] GitHub-Actions-Workflow (Linux + macOS, Python 3.12/3.13, LDraw-Bibliothek gecacht).
 - [x] `CLAUDE.md`, `README.md`, `README.de.md`, `LICENSE`, ADR 0001/0002, `THIRD_PARTY.md`, `UPSTREAM.md`, `STATUS.md`, `CHANGELOG.md`, Galeriebild.
 - [x] Git-Repo, erster Commit (DCO), Tag `v0.0.0`.
-- [ ] GitHub-Repo anlegen und pushen (**nur nach deinem OK**, weil öffentlich), CI grün.
+- [x] GitHub-Repo anlegen und pushen (nach deinem OK, öffentlich, noreply-Adresse), CI grün.
 - **Abnahme:** `uv run mesh2brick --help` läuft, Smoke-Test grün in CI.
 
 ## Phase 1 – Ingest + Voxelisierung
