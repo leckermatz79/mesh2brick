@@ -19,6 +19,7 @@ from mesh2brick.config import ConfigError, Settings, load_settings
 
 if TYPE_CHECKING:
     from mesh2brick.model import BrickModel
+    from mesh2brick.voxel.voxelize import VoxelizeReport
 
 EXIT_ERROR: Final = 1
 EXIT_NOT_YET: Final = 3
@@ -94,7 +95,10 @@ def place(
         Path,
         typer.Argument(
             metavar="INPUT",
-            help="Voxel file: MagicaVoxel .vox or numpy .npy (LDraw codes, -1 empty).",
+            help=(
+                "Voxel grid: .npz from `voxelize`, MagicaVoxel .vox, or numpy .npy "
+                "(LDraw codes, -1 empty)."
+            ),
             exists=True,
             dir_okay=False,
             readable=True,
@@ -114,12 +118,16 @@ def place(
         LegolizationBackend,
         load_voxel_file,
     )
+    from mesh2brick.voxel.io import load_npz  # noqa: PLC0415
 
     _require_ldraw_library()
     out_dir = settings.output.dir
-    stem = input_file.stem
+    stem = model_name(input_file)
     try:
-        grid = load_voxel_file(input_file, height_unit=settings.voxel.height_unit)
+        if input_file.suffix.lower() == ".npz":
+            grid = load_npz(input_file)
+        else:
+            grid = load_voxel_file(input_file, height_unit=settings.voxel.height_unit)
         typer.echo(
             f"{input_file.name}: {grid.filled_count} voxels, grid {grid.shape} "
             f"({grid.height_unit} cells)"
@@ -128,7 +136,7 @@ def place(
         placement = backend.place(grid, settings, name=stem)
         suffix = ".mpd" if "mpd" in settings.output.formats else ".ldr"
         ldraw_path = backend.write_ldraw(placement, out_dir / f"{stem}{suffix}")
-    except BackendError as error:
+    except (BackendError, ValueError, OSError) as error:
         _fail(str(error))
     model_path = placement.model.save(out_dir / f"{stem}.bricks.json")
     typer.echo(f"wrote {ldraw_path}")
@@ -189,14 +197,90 @@ def convert(
 
 @app.command()
 def voxelize(
-    input_file: Annotated[Path, typer.Argument(metavar="INPUT")],
+    input_file: Annotated[
+        Path,
+        typer.Argument(
+            metavar="INPUT",
+            help="3D model: STL, OBJ, PLY or 3MF.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ],
     config: ConfigOption = None,
     overrides: SetOption = None,
     output_dir: OutputDirOption = None,
+    preview: Annotated[
+        bool, typer.Option(help="Also write a PNG preview of the voxels.")
+    ] = True,
+    vox: Annotated[
+        bool, typer.Option("--vox", help="Also write a MagicaVoxel .vox file.")
+    ] = False,
+    npy: Annotated[
+        bool,
+        typer.Option("--npy", help="Also write a .npy code array (legolization)."),
+    ] = False,
 ) -> None:
-    """Voxelize a mesh (STL/OBJ/3MF/PLY) onto the stud grid (Phase 1)."""
-    del input_file, config, overrides, output_dir
-    _not_yet("voxelize", phase=1)
+    """Voxelize a mesh onto the stud grid and write <name>.grid.npz."""
+    settings = _settings(config, overrides, output_dir)
+    from mesh2brick.backends import BackendError  # noqa: PLC0415
+    from mesh2brick.backends.legolization import color_info, color_rgb  # noqa: PLC0415
+    from mesh2brick.ingest import IngestError, load_model  # noqa: PLC0415
+    from mesh2brick.voxel.color import colors_needed  # noqa: PLC0415
+    from mesh2brick.voxel.io import save_npz, write_npy, write_vox  # noqa: PLC0415
+    from mesh2brick.voxel.voxelize import hollow  # noqa: PLC0415
+    from mesh2brick.voxel.voxelize import voxelize as run_voxelize  # noqa: PLC0415
+
+    _require_ldraw_library()
+    try:
+        color_info(colors_needed(settings.color))  # fail fast on bad colours
+        model = load_model(input_file, settings.input)
+        result = run_voxelize(model, settings)
+    except (IngestError, BackendError, ValueError) as error:
+        _fail(str(error))
+    grid, report = result.grid, result.report
+    for warning in (*model.warnings, *result.warnings):
+        typer.secho(f"  note: {warning}", fg=typer.colors.YELLOW)
+    stem = model_name(input_file)
+    out_dir = settings.output.dir
+    written = [save_npz(grid, out_dir / f"{stem}.grid.npz")]
+    if npy:
+        written.append(write_npy(grid, out_dir / f"{stem}.npy"))
+    if vox:
+        try:
+            written.append(
+                write_vox(grid, out_dir / f"{stem}.vox", color_rgb(grid.colors_used))
+            )
+        except ValueError as error:
+            typer.secho(f"  note: no .vox written: {error}", fg=typer.colors.YELLOW)
+    if preview and grid.filled_count:
+        from mesh2brick.render.preview import (  # noqa: PLC0415
+            PreviewOptions,
+            render_grid_preview,
+        )
+
+        written.append(
+            render_grid_preview(
+                grid,
+                out_dir / f"{stem}.voxels.png",
+                PreviewOptions(title=f"{stem} - voxels"),
+                colors=color_info(grid.colors_used),
+            )
+        )
+    for path in written:
+        typer.echo(f"wrote {path}")
+    shell = hollow(grid, settings.voxel.wall_thickness) if grid.filled_count else grid
+    typer.echo(
+        voxel_summary(
+            name=input_file.name,
+            triangles=len(model.mesh.faces),
+            parts=model.part_count,
+            report=report,
+            height_unit=grid.height_unit,
+            shell_cells=shell.filled_count,
+            settings=settings,
+        )
+    )
 
 
 @app.command()
@@ -220,6 +304,53 @@ def feedback() -> None:
 def main() -> None:
     """Console-script entry point."""
     app()
+
+
+def model_name(path: Path) -> str:
+    """Model name from a file name: ``duo.grid.npz`` -> ``duo``."""
+    name = path.name
+    for suffix in (".grid.npz", ".bricks.json"):
+        if name.lower().endswith(suffix):
+            return name[: -len(suffix)]
+    return path.stem
+
+
+def voxel_summary(
+    *,
+    name: str,
+    triangles: int,
+    parts: int,
+    report: VoxelizeReport,
+    height_unit: str,
+    shell_cells: int,
+    settings: Settings,
+) -> str:
+    """Human-readable result of ``voxelize``."""
+    nx, ny, nz = report.shape
+    cell_mm = 9.6 if height_unit == "brick" else 3.2
+    unit = "bricks" if height_unit == "brick" else "plates"
+    lines = [
+        f"{name}: {triangles:,} triangles, {parts} part(s)",
+        f"  scale: {report.pitch_mm:.2f} mm of model per stud"
+        + (
+            f" (longest axis -> {settings.input.target_studs} studs)"
+            if settings.input.scale_mode == "studs"
+            else ""
+        ),
+        (
+            f"  grid: {nx} x {ny} studs x {nz} {unit}, {report.filled_cells:,} "
+            f"filled cells ({report.method} method, {report.seconds:.1f} s)"
+        ),
+        f"  LEGO size: {nx * 0.8:.1f} x {ny * 0.8:.1f} x {nz * cell_mm / 10:.1f} cm",
+    ]
+    if report.volume_error is not None:
+        lines.append(f"  volume vs. mesh: {report.volume_error * 100:+.1f} %")
+    if settings.voxel.fill == "hollow":
+        lines.append(
+            f"  hollow shell (wall {settings.voxel.wall_thickness}): "
+            f"~{shell_cells:,} of {report.filled_cells:,} cells to build"
+        )
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------- helpers

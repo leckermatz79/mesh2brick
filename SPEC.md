@@ -130,7 +130,7 @@ color:
   single_color: 4       # LDraw-Code
   palette: solid        # solid|all
 parts:
-  categories: [brick, plate, slope]
+  categories: [brick, plate]   # slope vorübergehend opt-in (2026-11-01): legolization 0.5.0 wird damit bis zu 50x langsamer, siehe docs/UPSTREAM.md #2
   include: []
   exclude: []
   max_parts: 5000

@@ -8,8 +8,14 @@ import numpy as np
 import pytest
 from matplotlib.image import imread
 
-from mesh2brick.model import BrickModel
-from mesh2brick.render.preview import PreviewOptions, render_preview
+from mesh2brick.model import BrickModel, ColorInfo
+from mesh2brick.render.preview import (
+    PreviewOptions,
+    grid_to_model,
+    render_grid_preview,
+    render_preview,
+)
+from mesh2brick.voxel.grid import VoxelGrid
 
 
 def _pixels(path: Path) -> np.ndarray:
@@ -52,3 +58,20 @@ def test_unknown_colour_uses_fallback(tmp_path: Path, sample_model: BrickModel) 
     model = sample_model
     no_colours = BrickModel(name=model.name, parts=model.parts, steps=model.steps)
     assert render_preview(no_colours, tmp_path / "grey.png").exists()
+
+
+def test_grid_preview(tmp_path: Path) -> None:
+    codes = np.full((3, 2, 2), -1, dtype=np.int16)
+    codes[:, 0, 0] = 4
+    codes[1, 1, 1] = 15
+    grid = VoxelGrid.from_codes(codes)
+    model = grid_to_model(grid)
+    assert model.part_count == 4
+    assert all(len(p.cells) == 3 and p.category == "voxel" for p in model.parts)
+    path = render_grid_preview(
+        grid,
+        tmp_path / "grid.png",
+        PreviewOptions(width_px=300, height_px=200),
+        colors={4: ColorInfo("Red", "#c91a09"), 15: ColorInfo("White", "#ffffff")},
+    )
+    assert _pixels(path).shape[:2] == (200, 300)

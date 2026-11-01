@@ -20,8 +20,9 @@ color:
   mode: single          # single | vertex | texture | cad | height_bands
   single_color: 4       # LDraw colour code (4 = Red)
   palette: solid        # solid | all (metallic/transparent only on opt-in)
+  bands: [1, 2, 14, 25, 4]   # height_bands: colours bottom to top (Blue..Red)
 parts:
-  categories: [brick, plate, slope]   # also: tile
+  categories: [brick, plate]   # also: slope (slow with legolization 0.5.0), tile
   include: []           # LDraw part numbers to allow explicitly (Phase 4)
   exclude: []           # LDraw part numbers to forbid (Phase 4)
   max_parts: 5000

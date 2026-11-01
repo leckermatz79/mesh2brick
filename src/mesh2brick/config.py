@@ -81,6 +81,16 @@ class ColorConfig(_Section):
     mode: Literal["single", "vertex", "texture", "cad", "height_bands"] = "single"
     single_color: Annotated[int, Field(ge=0)] = 4
     palette: Literal["solid", "all"] = "solid"
+    bands: tuple[Annotated[int, Field(ge=0)], ...] = (1, 2, 14, 25, 4)
+    """Colours for ``mode: height_bands``, bottom to top (default: Blue, Green,
+    Yellow, Orange, Red)."""
+
+    @model_validator(mode="after")
+    def _check_bands(self) -> Self:
+        if not self.bands:
+            msg = "color.bands needs at least one colour"
+            raise ValueError(msg)
+        return self
 
 
 def _part_numbers(value: object) -> object:
@@ -96,7 +106,10 @@ PartNumbers = Annotated[tuple[str, ...], BeforeValidator(_part_numbers)]
 class PartsConfig(_Section):
     """Which parts placement may use."""
 
-    categories: tuple[PartCategory, ...] = ("brick", "plate", "slope")
+    categories: tuple[PartCategory, ...] = ("brick", "plate")
+    """Part families placement may use. ``slope`` is opt-in for now: with
+    legolization 0.5.0 it can slow placement down 50x (docs/UPSTREAM.md #2);
+    SPEC §4 lists it as a default."""
     include: PartNumbers = ()
     """LDraw part numbers to allow explicitly (whitelist, Phase 4)."""
     exclude: PartNumbers = ()

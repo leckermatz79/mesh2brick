@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from mesh2brick import __version__
-from mesh2brick.cli import EXIT_NOT_YET, app
+from mesh2brick.cli import EXIT_NOT_YET, app, model_name
 from mesh2brick.model import BrickModel
 
 runner = CliRunner()
@@ -47,7 +47,6 @@ def test_version() -> None:
     "args",
     [
         ["convert", "x.stl"],
-        ["voxelize", "x.stl"],
         ["catalog"],
         ["inspect"],
         ["feedback"],
@@ -138,3 +137,118 @@ def test_place_reports_backend_errors(fixtures_dir: Path, tmp_path: Path) -> Non
     )
     assert result.exit_code == 1
     assert "unknown placement strategy" in result.output
+
+
+# ------------------------------------------------------------------ phase 1: voxelize
+@pytest.mark.ldraw
+def test_voxelize_writes_grid_preview_and_exports(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "voxelize",
+            str(fixtures_dir / "l_bracket.stl"),
+            "-o",
+            str(tmp_path),
+            "-s",
+            "input.target_studs=10",
+            "--vox",
+            "--npy",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    for name in (
+        "l_bracket.grid.npz",
+        "l_bracket.voxels.png",
+        "l_bracket.vox",
+        "l_bracket.npy",
+    ):
+        assert (tmp_path / name).is_file(), name
+    assert "volume method" in result.output
+    assert "LEGO size" in result.output
+    assert "hollow shell (wall 2)" in result.output
+
+
+@pytest.mark.ldraw
+def test_voxelize_then_place_npz(fixtures_dir: Path, tmp_path: Path) -> None:
+    voxelized = runner.invoke(
+        app,
+        [
+            "voxelize",
+            str(fixtures_dir / "cube_10mm.stl"),
+            "-o",
+            str(tmp_path),
+            "-s",
+            "input.target_studs=4",
+            "--no-preview",
+        ],
+    )
+    assert voxelized.exit_code == 0, voxelized.output
+    placed = runner.invoke(
+        app, ["place", str(tmp_path / "cube_10mm.grid.npz"), "-o", str(tmp_path)]
+    )
+    assert placed.exit_code == 0, placed.output
+    assert (tmp_path / "cube_10mm.ldr").is_file()
+    assert BrickModel.load(tmp_path / "cube_10mm.bricks.json").name == "cube_10mm"
+
+
+@pytest.mark.ldraw
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["-s", "color.single_color=9999"], "not solid colours"),
+        (["-s", "color.mode=texture"], "arrives in Phase 3"),
+    ],
+)
+def test_voxelize_reports_errors(
+    fixtures_dir: Path, tmp_path: Path, args: list[str], message: str
+) -> None:
+    result = runner.invoke(
+        app,
+        ["voxelize", str(fixtures_dir / "cube_10mm.stl"), "-o", str(tmp_path), *args],
+    )
+    assert result.exit_code == 1
+    assert message in result.output
+
+
+@pytest.mark.ldraw
+def test_voxelize_rejects_unsupported_files(tmp_path: Path) -> None:
+    path = tmp_path / "model.step"
+    path.write_text("ISO-10303-21;")
+    result = runner.invoke(app, ["voxelize", str(path), "-o", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "unsupported input format" in result.output
+
+
+@pytest.mark.ldraw
+def test_voxelize_warns_about_tiny_models(fixtures_dir: Path, tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "voxelize",
+            str(fixtures_dir / "cube_10mm.stl"),
+            "-o",
+            str(tmp_path),
+            "-s",
+            "input.scale_mode=mm",
+            "-s",
+            "input.mm_per_stud=40",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "no voxel reached the fill threshold" in result.output
+    assert not (tmp_path / "cube_10mm.voxels.png").exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("duo.grid.npz", "duo"),
+        ("duo.bricks.json", "duo"),
+        ("duo.stl", "duo"),
+        ("a.b.vox", "a.b"),
+    ],
+)
+def test_model_name(name: str, expected: str) -> None:
+    assert model_name(Path(name)) == expected
