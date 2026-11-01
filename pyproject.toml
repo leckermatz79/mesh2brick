@@ -1,0 +1,146 @@
+[project]
+name = "mesh2brick"
+version = "0.0.0"
+description = "Turn 3D models (STL, OBJ, 3MF, PLY, STEP) into buildable LEGO-compatible models with LDraw files, parts lists and PDF instructions."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Benjamin Bruno" }]
+requires-python = ">=3.12"
+keywords = ["lego", "ldraw", "voxel", "mesh", "stl", "3mf", "step", "instructions"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Typing :: Typed",
+]
+dependencies = [
+    # LEGO pipeline backends: pinned exactly, upgraded deliberately (SPEC §2).
+    "legolization==0.5.0",
+    "pyldraw3==1.7.0",
+    "rebrickable==1.1.0",
+    # Core
+    "matplotlib>=3.11",
+    "numpy>=2.5",
+    "pydantic>=2.14",
+    "pyyaml>=6.0.3",
+    "scipy>=1.18",
+    "trimesh>=5.2",
+    "typer>=0.27",
+]
+
+[project.optional-dependencies]
+# STEP/CAD import via OpenCascade (large, Phase 3).
+step = ["cadquery>=2.8"]
+# .blend import runs an external, headless Blender binary; no Python packages needed.
+blender = []
+# Optional LLM layer (Phase 7).
+llm = ["anthropic>=2.3"]
+
+[project.scripts]
+mesh2brick = "mesh2brick.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/leckermatz79/mesh2brick"
+Repository = "https://github.com/leckermatz79/mesh2brick"
+Changelog = "https://github.com/leckermatz79/mesh2brick/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4",
+    "pre-commit>=4.7",
+    "pytest>=9.2",
+    "pytest-cov>=7.1",
+    "ruff>=0.17",
+    "scipy-stubs>=1.18.1.1",
+    "types-pyyaml>=6.0.12.20261030",
+]
+
+# --------------------------------------------------------------------------- ruff
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+extend-exclude = ["samples", "out"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "D", "UP", "B", "A", "C4", "SIM", "RUF", "PTH",
+    "PIE", "PT", "RET", "ARG", "PL", "TC", "ISC", "PERF", "FBT",
+]
+ignore = [
+    "D105",    # magic-method docstrings
+    "D107",    # __init__ docstrings (documented on the class)
+    "PLR0913", # config-heavy APIs legitimately take many keyword arguments
+    "ISC001",  # conflicts with the formatter
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "PLR2004", "ARG", "FBT", "S101", "TC"]
+"scripts/**" = ["D", "T201"]
+"src/mesh2brick/cli.py" = ["FBT001", "FBT002"]  # typer options are boolean parameters
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# --------------------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[[tool.mypy.overrides]]
+# legolization ships inline annotations but no py.typed marker (upstream
+# candidate, see docs/UPSTREAM.md); analyse it anyway instead of treating it
+# as Any.
+module = ["legolization", "legolization.*"]
+follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# Generated at runtime by `ldraw generate`; not importable at type-check time.
+module = ["ldraw.library", "ldraw.library.*"]
+ignore_missing_imports = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+# --------------------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+markers = [
+    "ldraw: needs the local LDraw parts library (`uv run ldraw download --yes && uv run ldraw generate --yes`)",
+    "slow: takes more than a few seconds",
+]
+filterwarnings = ["error::DeprecationWarning:mesh2brick.*"]
+
+[tool.coverage.run]
+source = ["mesh2brick"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "@overload"]

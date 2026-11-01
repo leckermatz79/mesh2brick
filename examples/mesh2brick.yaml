@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 mesh2brick contributors
+#
+# mesh2brick configuration - every value shown is the default.
+# Any key can be overridden on the command line: --set section.key=value
+# (e.g. --set placement.seed=3 or --set parts.categories=[brick,plate]).
+
+input:
+  up_axis: z            # x|y|z, optionally negative, e.g. -y
+  auto_orient: false
+  scale_mode: studs     # studs: longest axis = target_studs | mm: use mm_per_stud
+  target_studs: 48      # longest model axis in studs
+  mm_per_stud: 8.0      # model millimetres per stud (a real stud pitch is 8 mm)
+voxel:
+  height_unit: brick    # brick (9.6 mm) | plate (3.2 mm) per voxel layer
+  fill: hollow          # solid | hollow
+  wall_thickness: 2     # shell thickness in voxels when hollow
+  threshold: 0.5        # min. filled volume fraction for a voxel to count
+color:
+  mode: single          # single | vertex | texture | cad | height_bands
+  single_color: 4       # LDraw colour code (4 = Red)
+  palette: solid        # solid | all (metallic/transparent only on opt-in)
+parts:
+  categories: [brick, plate, slope]   # also: tile
+  include: []           # LDraw part numbers to allow explicitly (Phase 4)
+  exclude: []           # LDraw part numbers to forbid (Phase 4)
+  max_parts: 5000
+placement:
+  backend: legolization
+  strategy: luo         # passed to the backend; see `legolization --help` for names
+  seed: 0
+  backend_options: {}   # extra legolization PipelineConfig fields, validated
+stability:
+  enabled: true
+  max_repair_iterations: 20
+steps:
+  parts_per_step: 7
+  keep_symmetry: true
+  submodels: true
+llm:
+  enabled: false
+  model: claude-sonnet-5-5
+  tasks: [group_steps, write_step_text]
+output:
+  dir: ./out
+  formats: [ldr, bom_csv, bom_bricklink, pdf]   # also: mpd, bom_rebrickable, png
+  language: de          # de | en
+  page_size: A4         # A4 | letter

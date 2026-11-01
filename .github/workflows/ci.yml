@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 mesh2brick contributors
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src
+
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.12", "3.13"]
+    env:
+      # A missing LDraw library must fail the run, never skip the smoke test.
+      MESH2BRICK_REQUIRE_LDRAW: "1"
+      LEGOLIZATION_RENDERER: none
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Cache generated LDraw modules
+        id: ldraw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # platformdirs data/config dirs of pyldraw3 on Linux and macOS
+          path: |
+            ~/.local/share/pyldraw3
+            ~/.config/pyldraw3
+            ~/Library/Application Support/pyldraw3
+          key: pyldraw3-1.7.0-${{ runner.os }}-v1
+      - name: Download LDraw library and generate modules
+        if: steps.ldraw-cache.outputs.cache-hit != 'true'
+        run: |
+          uv run ldraw download --yes
+          uv run ldraw generate --yes
+      - name: Acceptance - CLI help
+        run: uv run mesh2brick --help
+      - name: Tests (incl. legolization smoke test)
+        run: uv run pytest --cov --cov-report=term --cov-report=xml
+      - name: Smoke - place heart.vox via CLI
+        run: uv run mesh2brick place tests/fixtures/heart.vox -o out/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        with:
+          name: smoke-output
+          path: out/
+          retention-days: 14

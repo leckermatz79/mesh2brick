@@ -1,0 +1,27 @@
+# Python / tooling
+__pycache__/
+*.py[cod]
+.venv
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# mesh2brick outputs
+/out/
+
+# User sample models: large and not redistributable - never commit
+/samples/
+
+# OS / sync clients
+.DS_Store
+.sync-exclude.lst
+.nextcloudsync.log
+._sync_*.db*
+.owncloudsync.log

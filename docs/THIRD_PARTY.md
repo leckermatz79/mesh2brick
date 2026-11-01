@@ -1,0 +1,50 @@
+# Third-party software and data
+
+mesh2brick is GPL-3.0-or-later. Every dependency below has a GPL-compatible licence.
+Versions are the ones locked in `uv.lock` at the time of the last update. Run
+`uv tree` for the full graph.
+
+## Direct runtime dependencies
+
+| Package | Version | Licence | Purpose |
+|---|---|---|---|
+| legolization | 0.5.0 (pinned) | GPL-3.0-or-later | Placement, stability, repair, steps, LDraw export, booklet |
+| pyldraw3 | 1.7.0 (pinned) | GPL-3.0-or-later | LDraw library access, part/colour modules, `.ldr`/`.mpd` writing |
+| rebrickable | 1.1.0 (pinned) | GPL-3.0-or-later | Offline catalogue, part metadata, LDraw bridge |
+| numpy | ≥ 2.5 | BSD-3-Clause (+ bundled 0BSD/MIT/Zlib/CC0) | Arrays |
+| scipy | ≥ 1.18 | BSD-3-Clause | Morphology, optimisation (HiGHS) |
+| trimesh | ≥ 5.2 | MIT | Mesh loading (STL/OBJ/3MF/PLY), voxelization helpers |
+| matplotlib | ≥ 3.11 | PSF-based (matplotlib licence) | PNG previews |
+| pydantic | ≥ 2.14 | MIT | Configuration schema |
+| PyYAML | ≥ 6.0.3 | MIT | Configuration files |
+| typer | ≥ 0.27 | MIT | CLI |
+
+## Notable transitive dependencies
+
+Pulled in mainly by legolization: cvxpy (Apache-2.0), highspy (MIT), clarabel (Apache-2.0),
+osqp (Apache-2.0), scs (MIT), reportlab (BSD), pillow (MIT-CMU), requests (Apache-2.0),
+certifi (MPL-2.0), httpx2/httpcore2 (BSD-3-Clause), aiosqlite (MIT), defusedxml (PSF).
+All are GPL-3.0-compatible.
+
+## Optional extras
+
+| Extra | Package | Licence | Purpose |
+|---|---|---|---|
+| `step` | cadquery ≥ 2.8 (+ cadquery-ocp / OpenCascade) | Apache-2.0 (OCCT: LGPL-2.1 with exception) | STEP import (Phase 3) |
+| `llm` | anthropic ≥ 2.3 | MIT | Optional LLM layer (Phase 7) |
+| `blender` | – (external Blender binary, GPL-2.0-or-later, run as a separate process) | – | `.blend` import (Phase 8) |
+
+## Development tools (dependency group `dev`)
+
+ruff (MIT), mypy (MIT), pytest (MIT), pytest-cov (MIT), pre-commit (MIT),
+scipy-stubs (BSD-3-Clause), types-PyYAML (Apache-2.0).
+
+## Data
+
+| Data | Licence | How it is used |
+|---|---|---|
+| LDraw parts library (ldraw.org, release 2610 at time of writing) | CC BY 4.0 (official parts) | Downloaded at runtime by `ldraw download` into the user's cache; **not** redistributed in this repository |
+| `tests/fixtures/heart.vox` | GPL-3.0-or-later | Copied unchanged from legolization `data/examples/heart.vox` at commit `893414297d4f088106c8416b4110c85a438c8bd8` (tag v0.5.0 = `3d2572ae699daf3640eaffd8c11c73835e381e6c`) |
+
+LEGO® is a trademark of the LEGO Group, which does not sponsor, authorise or endorse this
+project. BrickLink and Rebrickable are trademarks of their respective owners.
