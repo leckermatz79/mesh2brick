@@ -130,6 +130,8 @@ def step_lines(model: BrickModel) -> str:
             step.stable
         ]
         text = f"Step {index + 1} | {where} | {verdict}"
+        if step.section is not None:
+            text = f"[section: {step.section}]\n{text}"
         if parts:
             text += f" | {_position(parts, (x0, x1), (y0, y1))} | {_contents(parts)}"
         text += f" | {_support(model, structure, index, labels)}"

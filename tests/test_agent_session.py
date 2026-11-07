@@ -118,6 +118,8 @@ def test_session_runs_both_tasks_and_records_the_run(tmp_path: Path) -> None:
     prompts = claude.prompts()
     assert "example for group_steps" in prompts[0]
     assert "kürzere Texte bitte" in prompts[2]
+    assert "[section: Links]\nStep 1 |" in prompts[2]  # texts know the sections
+    assert "[section:" not in prompts[0]
     assert "# The model" in prompts[0]
     model_block = claude.requests[0]["messages"][0]["content"][0]
     assert model_block["cache_control"] == {"type": "ephemeral"}

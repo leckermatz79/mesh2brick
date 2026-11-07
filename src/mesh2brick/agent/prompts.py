@@ -64,8 +64,9 @@ German "Sockel", "Körper", "Kopf", "Linker Flügel"). Name what the steps build
 judged from the picture and from where the steps place their parts (layers and \
 position). The first section starts at step 1; every section starts at a step \
 that begins a merged or unmerged step. Use 2 to {max_sections} sections; a \
-sub-assembly's steps form a section of their own. A title differs from the \
-title before it.
+sub-assembly's steps form a section of their own, named after what it is \
+("Lid", "Left ear"), not its letter: the booklet labels sub-assemblies itself. \
+A title differs from the title before it.
 
 Answer in the JSON format: "merges" (first_step, last_step, a short reason) and \
 "sections" (first_step, title), with the step numbers of the step list."""
@@ -83,6 +84,9 @@ step achieves and where the new parts go, using the part of the model they sit \
 on: "Close the ring around the stem.", "Now the brim of the cap grows towards \
 the back.", "Put the white dots on top of the cap." Name a part only when that \
 helps to find its place ("the long red brick goes across the front").
+- Address the builder directly and the same way in every step: an instruction \
+("Put the cap on the stem.", German with "du": "Setze den Hut auf den Stiel.", \
+"Jetzt baust du die Ohren."), never "we".
 - Write every quantity as digits ("2 red bricks", "2 rote Steine"). Do not \
 mention step numbers, part numbers, layers or coordinates; write part sizes as \
 "2 × 4".
@@ -93,6 +97,8 @@ be named to say where the new parts go; do not list those.
 - A sub-assembly step says what is being built; an attach step says where the \
 sub-assembly goes. When the model needs a hand after a step, the booklet adds \
 that hint itself.
+- The section titles in the step list say what a group of steps builds; use \
+them ("the ear grows taller", not "the tower grows").
 - Vary the wording; use render_preview when a step is hard to picture.
 
 Answer in the JSON format: "texts" with one entry (step, text, mentions) for \

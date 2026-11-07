@@ -343,10 +343,9 @@ class LlmSession:
 
     # ------------------------------------------------------------------- helpers
     def _model_block(self) -> dict[str, Any]:
-        """The model description, marked as a cache breakpoint."""
-        block = text_block(
-            describe_model(self.context.model, self.settings.output.language)
-        )
+        """The model description (with accepted sections), a cache breakpoint."""
+        model = self.annotate(self.context.model)
+        block = text_block(describe_model(model, self.settings.output.language))
         block["cache_control"] = {"type": "ephemeral"}
         return block
 
