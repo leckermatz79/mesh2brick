@@ -471,3 +471,29 @@ is cut short. The time includes about 1 s for starting the placement process.
   first stability checks (about 60 s each), the final merge and the PDF.
 - **Toadstool with a 120 s limit** (gallery picture): stopped during the final merge after 63 s,
   the state after placement and repair has the same 1,240 parts and is stable; 96 s in total.
+
+**Slopes on the new path** (product-owner question: is the Phase 1 slope slowdown the same
+crossover problem?). Low-poly bunny, `parts.categories=[brick, plate, slope]`, placement and
+steps in one process, every LP attempt logged (`one_run.py`, not in the repository). "IPM
+first" moves the crossover-free interior point attempt to the front, in the scipy path only or
+also in the direct-highspy path legolization uses for step planning (not in mesh2brick yet).
+
+| Case | 1.1 chain | 1.2 chain | IPM first (scipy) | IPM first (both paths) |
+|---|---:|---:|---:|---:|
+| 16 studs, `luo`, slopes (224 parts, 4 slopes) | 147 s | 147 s | 68 s | **17.5 s** |
+| 16 studs, `luo`, no slopes (226 parts) | – | 7.8 s | – | 17.1 s |
+| 32 studs, `kollsker`, slopes (873 parts, 14 slopes) | 108 s | 99 s | **49 s** | – |
+| 32 studs, `kollsker`, no slopes (873 parts) | – | 53 s | – | 39 s |
+
+- **Not the same problem, but the same cure.** On the 16-stud slope layout the LPs are small;
+  simplex presolve hits its 5 s cap on 18 of 45 LPs (the stall of upstream #88), presolve-free
+  simplex on 5 more, while the interior point method solves each of them in under 1 s (with or
+  without crossover). The crossover never comes into play, so the 1.2 chain does not help.
+- **IPM first makes slopes nearly free:** 17.5 s with slopes against 17.1 s without under the
+  same order; 49 s for the 32-stud bunny with 14 slopes, faster than today's 53 s without.
+  Every run gave the same layout as the 1.1 chain (parts, slopes, steps, stable).
+- **But small easy LPs get slower:** simplex solves them in 0.1–0.4 s, the interior point
+  method in 0.3–0.9 s (16 studs without slopes: 7.8 s → 17.1 s). A short simplex attempt
+  (about 1 s) before the crossover-free interior point method should keep both; not measured.
+- legolization's `preserve` mode adds few slopes at brick height (4 on 224 parts, 14 on 873):
+  it only swaps exact profile matches. More slopes need Roadmap 8's candidate selection.
