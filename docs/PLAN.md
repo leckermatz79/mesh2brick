@@ -139,15 +139,9 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Beispielgalerie (`scripts/make_gallery.py`, `docs/gallery/README.md`), Doku de/en, `v1.0.0`.
 - **Abnahme:** `.blend` → glTF → Ingest läuft; `inspect` schreibt ein PNG; Galerie und Doku vollständig; Definition of Done (SPEC §9) geprüft.
 
-## Fahrplan nach 1.0 (PO-Entscheidung 2026-11-07)
+## Nach 1.0
 
-**1.1 – große Modelle** (zuerst): Wer 40 cm will, bekommt heute nichts; Duo bei 48 Noppen wird mit 5 Minuten nicht stabil und mit 20 Minuten nach über einer Stunde nicht fertig.
-
-- Größe in cm als Einstellung (z. B. „längste Seite 40 cm“), umgerechnet in Noppen (1 Noppe = 0,8 cm); `inspect` zeigt die cm heute nur an.
-- Harte Zeitgrenze über **alle** Schritte, auch legolizations letzte Optimierung („remerge“), die sich heute an keine Grenze hält (Upstream #5). Ergebnis bei Zeitablauf: das beste stabile Modell bis dahin, mit Hinweis. Erster Ansatz zum Prüfen: die Platzierung in einem Kindprozess laufen lassen (wie schon die Schrittreihenfolge, ADR 0006) und den letzten stabilen Zwischenstand behalten; parallel Upstream #5 als Fehlerbericht.
-- Messlatte: Duo bei 48 Noppen (≈ 38 cm) und ein 40-cm-Modell in unter 5 Minuten, stabil.
-
-**2.0 – Formtreue:** Dachsteine (Slopes, hängt an legolization #88/#89), Tiles, Rundungen.
+Was als Nächstes kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (vom PO, 2026-11-07): 1.x macht große Modelle möglich (Größe in cm, harte Zeitgrenze, Stabilitätsprüfung, PDF-Größe, Schätzung), 2.0 bringt Formtreue (Dachsteine, Tiles, Rundungen, SNOT). Jeder Punkt bekommt ein Issue mit Abnahmekriterien, wie die Phasen.
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)
 

@@ -1,5 +1,6 @@
 # mesh2brick – working agreement
 - Read SPEC.md before any non-trivial change; it is the source of truth.
+- Read ROADMAP.md for what comes next.
 - Keep docs/STATUS.md current: current phase, done, next, open questions (in plain language, no jargon).
 - Plan before coding: for any change > 1 file, write the plan in the PR description.
 - Run `uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest` before every commit.
