@@ -6,6 +6,8 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-07 - Roadmap 2: hard time limit
+
 A conversion no longer runs past `placement.time_limit_s`. Duo at 48 studs (local model) with
 a 20-minute limit is one stable piece of 2,308 parts after 733 s (1.0: stopped after more than
 an hour); with the default 5 minutes it is cut short after 289 s and marked. Every fixture
