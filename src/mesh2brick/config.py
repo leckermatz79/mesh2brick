@@ -204,11 +204,31 @@ class StepsConfig(_Section):
 
 
 class LlmConfig(_Section):
-    """Optional LLM layer (needs the ``llm`` extra and an API key)."""
+    """Optional LLM layer (needs the ``llm`` extra and an API key, ADR 0013).
+
+    Claude proposes, mesh2brick checks: merged steps, section titles, step
+    texts and part choices are only used when they pass the same checks as
+    the rest of the pipeline; anything else falls back to the result without
+    the LLM layer.
+    """
 
     enabled: bool = False
     model: str = DEFAULT_LLM_MODEL
     tasks: tuple[LlmTask, ...] = ("group_steps", "write_step_text")
+    """``group_steps``: merge steps and name build sections;
+    ``write_step_text``: a short sentence per step; ``choose_part``: pick
+    replacements for parts LEGO does not make in their colour (only with
+    ``parts.availability: report``)."""
+    effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    """How thoroughly Claude thinks (more effort costs more tokens)."""
+    max_cost_usd: Annotated[float, Field(gt=0)] = 1.0
+    """Cost limit per run in US dollars; tasks stop when it is reached."""
+    max_turns: Annotated[int, Field(ge=1, le=30)] = 8
+    """Requests per task conversation (tool calls and one round of fixes)."""
+    examples: Annotated[int, Field(ge=0, le=20)] = 6
+    """Example lines per task from well-rated earlier runs (0: none)."""
+    feedback: bool = True
+    """Record runs in the local feedback store and learn from ratings."""
 
 
 class OutputConfig(_Section):
@@ -259,6 +279,9 @@ class Settings(_Section):
     def _check_combinations(self) -> Self:
         if self.llm.enabled and not self.llm.tasks:
             msg = "llm.enabled is true but llm.tasks is empty"
+            raise ValueError(msg)
+        if len(set(self.llm.tasks)) != len(self.llm.tasks):
+            msg = "llm.tasks contains duplicates"
             raise ValueError(msg)
         return self
 

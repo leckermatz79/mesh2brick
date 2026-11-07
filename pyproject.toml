@@ -96,6 +96,7 @@ convention = "google"
 "scripts/**" = ["D", "T201"]
 "src/mesh2brick/cli.py" = ["FBT001", "FBT002", "PLR0917"]  # typer options are boolean parameters
 "src/mesh2brick/render/text.py" = ["RUF001", "RUF002"]  # the multiplication sign is intended
+"src/mesh2brick/agent/prompts.py" = ["RUF001"]  # the multiplication sign is intended
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
