@@ -6,6 +6,35 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-07 - Phase 6: instruction quality
+
+### Added
+- Own PDF instructions (`mesh2brick.render.pdf`, ADR 0011) in German or English: cover with
+  a picture of the model, part and step count, size in cm, weight, colours and a plain
+  stability verdict; parts-list pages with one picture per part and colour (common scale),
+  quantity, name and LDraw number; step pages with part call-outs, faded earlier parts,
+  sub-assemblies on tinted panels, an attach call-out, "put together first" views from
+  below, and hints in plain words. DejaVu Sans is embedded; step pictures are embedded as
+  palette PNGs without re-encoding.
+- `output.steps_per_page` (1–4, default 2); `output.language` now applies to the PDF.
+- Own step passes (`mesh2brick.steps`, ADR 0012): parts that would hang in the air in
+  layer-order steps move into the step of the part holding them (pre-assembly units);
+  steps below half of `steps.parts_per_step` are merged into a neighbour, oversized
+  layer-order steps are split. Real test model: hanging parts 155 → 0, steps with fewer than
+  3 parts 11 → 4.
+- `BrickModel` schema 2: per-step `stable`/`fragile`, per-part `unit`, `mass_g`,
+  `buildable`, `size_mm()`; schema 1 files still load.
+- Step pictures grow with the model instead of always showing the finished model's frame.
+- `scripts/benchmark_instructions.py` (step sizes, hanging parts, PDF size and time).
+
+### Changed
+- Default `output.formats` writes `.mpd` instead of `.ldr`, so sub-assemblies stay LDraw
+  sub-models with their own steps (`ldr` is still available).
+- `reportlab` is now a direct dependency (it was already installed through legolization).
+
+### Removed
+- `LegolizationBackend.write_instructions` (legolization's booklet).
+
 ## [0.5.0] - 2026-11-01 - Phase 5: strategy benchmark and colour availability
 
 ### Added
