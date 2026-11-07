@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · Aktuelle Phase: **8 – Blender, Politur, v1.0: fertig** (PR offen, siehe „Als Nächstes“) · Danach: **Version 1.0.0**; alle Phasen der SPEC sind umgesetzt
+Stand: 2026-11-07 · Aktuelle Phase: **8 – Blender, Politur, v1.0: fertig** ([PR #21](https://github.com/leckermatz79/mesh2brick/pull/21) offen) · Danach: **Version 1.0.0**; alle Phasen der SPEC sind umgesetzt
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md)
 
 ## Fazit in zwei Sätzen
@@ -68,7 +68,7 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 
 ## Als Nächstes
 
-1. **Du:** den Phase-8-PR prüfen und mergen, danach Tag `v1.0.0` und (falls gewünscht) die Release-Seite anlegen. Die Befehle stehen unten unter „Offene Kleinigkeiten“.
+1. **Du:** [PR #21](https://github.com/leckermatz79/mesh2brick/pull/21) prüfen und mergen, danach Tag `v1.0.0` und (falls gewünscht) die Release-Seite anlegen. Die Befehle stehen unten unter „Offene Kleinigkeiten“.
 2. **Du:** die drei Fragen unten beantworten (wenn nicht, gelten die Standardannahmen).
 3. **Optional, du:** ein eigenes Blender-Modell ausprobieren: `uv run mesh2brick inspect modell.blend -o out/`, dann `out/modell.inspect.png` ansehen und mit `convert` umwandeln.
 4. Upstream: Antworten auf legolization #88/#89 und #90/#91 abwarten; trimesh #14 nach deiner Freigabe.
@@ -142,7 +142,7 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 
 ## Offene Kleinigkeiten
 
-- **Phase-8-PR mergen:** `gh pr merge <Nummer> --squash --delete-branch` (Nummer siehe PR-Link oben).
+- **PR #21 mergen:** `gh pr merge 21 --squash --delete-branch`
 - **Tag und Release `v1.0.0`** nach dem Merge:
   `git checkout main && git pull && git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0`
   `awk '/^## \[1.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v1.0.0 --title "v1.0.0 – Blender, inspect, gallery" --notes-file -`
