@@ -51,6 +51,7 @@ from mesh2brick.render.pdf import PdfOptions, write_instructions
 from mesh2brick.render.preview import PreviewOptions, render_png, render_preview
 from mesh2brick.render.text import colour_label, sized_label
 from mesh2brick.voxel.color import colors_needed
+from mesh2brick.voxel.estimate import parts_estimate
 from mesh2brick.voxel.io import load_npz, save_npz
 from mesh2brick.voxel.voxelize import voxelize
 
@@ -72,6 +73,23 @@ if TYPE_CHECKING:
 VOXEL_SUFFIXES = (".npz", ".vox", ".npy")
 LLM_MIN_S: Final = 30.0
 """The LLM layer is skipped when less time is left before the export."""
+TIME_HINT_PARTS: Final = 2_000
+"""Above this estimate the 5-minute default usually stops the optimisation."""
+RECOMMENDED_TIME: Final = "20min"
+RECOMMENDED_TIME_S: Final = 1200.0
+"""Duo at 48 studs (about 2,400 parts) needed 12 minutes (docs/benchmarks.md)."""
+
+
+def time_hint(expected_parts: int, time_limit_s: float) -> str | None:
+    """Advice to allow more time for a big model, or ``None``.
+
+    mesh2brick never lengthens the limit by itself (predictable runs, product
+    owner decision 2026-11-07); it says when more time would likely help.
+    """
+    if expected_parts <= TIME_HINT_PARTS or time_limit_s >= RECOMMENDED_TIME_S:
+        return None
+    advice = f"recommended: --time {RECOMMENDED_TIME}"
+    return f"expected about {expected_parts:,} parts; {advice}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +138,7 @@ def convert(
     with clock("voxelize"):
         grid = _grid(source, settings, warnings, say)
     files: list[Path] = [save_npz(grid, out_dir / f"{stem}.grid.npz")]
-    say(f"voxels: {grid.filled_count:,} cells, grid {grid.shape} ({clock.last:.1f} s)")
+    _say_grid(grid, settings, clock.last, say)
 
     backend = LegolizationBackend(progress=say)
     with clock("place"):
@@ -198,6 +216,16 @@ def convert(
         seconds=dict(clock.seconds),
         llm=llm,
     )
+
+
+def _say_grid(
+    grid: VoxelGrid, settings: Settings, seconds: float, say: Callable[[str], None]
+) -> None:
+    """Report the voxel grid and, for a big model, the time advice."""
+    say(f"voxels: {grid.filled_count:,} cells, grid {grid.shape} ({seconds:.1f} s)")
+    expected = parts_estimate(grid.occupancy)[1]
+    if hint := time_hint(expected, settings.placement.time_limit_s):
+        say(f"note: {hint}")
 
 
 def _llm_in_time(

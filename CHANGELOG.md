@@ -25,6 +25,11 @@ gives the parts of 1.0, stays stable and converts up to 48 s faster (docs/benchm
   when no stable state existed.
 - `buildable: not checked` in the command-line summary when the limit stopped the stability
   check (`StabilityReport.checked`).
+- `convert --time 20min` (also `90s`, `1h`) sets the time limit; like `--size` it overrides
+  `--config` and `--set`.
+- `inspect` and the start of `convert` print "expected about 3,905 parts; recommended:
+  --time 20min" when the rough estimate is above 2,000 parts and the limit is below 20
+  minutes. The limit itself never grows by itself (product-owner decision).
 - Up to three parts that nothing holds after placement are removed and the stability is
   checked again, with a note naming the parts; more stay (the model is reported as not
   buildable, as before).

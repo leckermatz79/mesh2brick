@@ -53,6 +53,11 @@ honest "best so far" within the time limit.
   the child removes them and checks the stability again; the unchanged result is reported
   first, so it counts if the limit stops the re-check. More loose parts stay, with the
   existing note, because removing them would change the model visibly.
+- **More time is the user's choice** (product owner, 2026-11-07): the limit never grows by
+  itself, so 5 minutes are 5 minutes. `convert --time 20min` (also `90s`, `1h`) sets it like
+  `--size` sets the size, and `inspect` and the start of `convert` print "expected about
+  3,900 parts; recommended: --time 20min" when the rough estimate is above 2,000 parts and
+  the limit is below 20 minutes (Duo at 48 studs, about 2,400 parts, needed 12 minutes).
 - The hook is a documented local patch: during `run()` mesh2brick wraps legolization's
   `pipeline._phase_gauge` (its per-phase readings) and `pipeline.analyze`; an import-time
   check fails loudly if they disappear (docs/UPSTREAM.md #5).

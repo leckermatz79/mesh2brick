@@ -15,6 +15,7 @@ from mesh2brick.config import (
     parse_override,
     settings_to_yaml,
     size_overrides,
+    time_overrides,
 )
 
 EXAMPLE = Path(__file__).parents[1] / "examples" / "mesh2brick.yaml"
@@ -182,6 +183,43 @@ def test_invalid_sizes_are_rejected(text: str, message: str) -> None:
 def test_size_above_the_limit_is_a_config_error() -> None:
     with pytest.raises(ConfigError, match=r"input\.target_height_cm"):
         load_settings(None, size_overrides("5000mm"))
+
+
+@pytest.mark.parametrize(
+    ("text", "seconds"),
+    [
+        ("20min", 1200.0),
+        ("90s", 90.0),
+        ("1h", 3600.0),
+        ("1,5h", 5400.0),
+        (" 2.5 MIN ", 150.0),
+    ],
+)
+def test_time_sets_the_hard_limit(text: str, seconds: float) -> None:
+    assert load_settings(None, time_overrides(text)).placement.time_limit_s == seconds
+
+
+def test_time_wins_over_config_and_set(tmp_path: Path) -> None:
+    path = tmp_path / "slow.yaml"
+    path.write_text("placement:\n  time_limit_s: 60\n")
+    settings = load_settings(
+        path, ["placement.time_limit_s=90", *time_overrides("20min")]
+    )
+    assert settings.placement.time_limit_s == 1200.0
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("20", "give a number with a unit"),
+        ("20m", "give a number with a unit"),
+        ("-1min", "give a number with a unit"),
+        ("0s", "greater than 0"),
+    ],
+)
+def test_invalid_times_are_rejected(text: str, message: str) -> None:
+    with pytest.raises(ConfigError, match=message):
+        time_overrides(text)
 
 
 def test_missing_file_is_a_config_error(tmp_path: Path) -> None:

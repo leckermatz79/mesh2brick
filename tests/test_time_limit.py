@@ -194,3 +194,28 @@ def test_many_loose_parts_stay(heart: VoxelGrid) -> None:
     assert (
         drop_loose_parts(RunState("finished", layout, final.stability), config) is None
     )
+
+
+# ------------------------------------------------------------ advice for big models
+def test_time_hint_from_two_thousand_parts_below_twenty_minutes() -> None:
+    from mesh2brick.pipeline import time_hint  # noqa: PLC0415
+
+    assert time_hint(2_000, 300) is None
+    assert time_hint(3_905, 300) == (
+        "expected about 3,905 parts; recommended: --time 20min"
+    )
+    assert time_hint(3_905, 1200) is None  # enough time given already
+
+
+def test_convert_and_inspect_give_the_hint(
+    heart: VoxelGrid, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mesh2brick import pipeline  # noqa: PLC0415
+
+    said: list[str] = []
+    pipeline._say_grid(heart, Settings(), 0.1, said.append)
+    assert len(said) == 1  # 12 parts: no advice
+    monkeypatch.setattr(pipeline, "TIME_HINT_PARTS", 5)
+    pipeline._say_grid(heart, Settings(), 0.1, said.append)
+    assert said[-1].startswith("note: expected about ")
+    assert said[-1].endswith("recommended: --time 20min")

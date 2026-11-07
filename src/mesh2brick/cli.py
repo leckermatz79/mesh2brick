@@ -16,7 +16,13 @@ from typing import TYPE_CHECKING, Annotated, Final, NoReturn
 import typer
 
 from mesh2brick import __version__
-from mesh2brick.config import ConfigError, Settings, load_settings, size_overrides
+from mesh2brick.config import (
+    ConfigError,
+    Settings,
+    load_settings,
+    size_overrides,
+    time_overrides,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -70,6 +76,18 @@ OutputDirOption = Annotated[
         "-o",
         help="Output directory (overrides output.dir).",
         file_okay=False,
+    ),
+]
+TimeOption = Annotated[
+    str | None,
+    typer.Option(
+        "--time",
+        help=(
+            "Time limit for the whole conversion (20min, 90s, 1h; default 5min). "
+            "When it is reached you get the best stable model found so far. "
+            "Overrides placement.time_limit_s of --config/--set."
+        ),
+        metavar="TIME",
     ),
 ]
 SizeOption = Annotated[
@@ -220,9 +238,10 @@ def convert(
     overrides: SetOption = None,
     output_dir: OutputDirOption = None,
     size: SizeOption = None,
+    time_limit: TimeOption = None,
 ) -> None:
     """Full pipeline: 3D model -> LDraw, parts lists, PDF instructions."""
-    settings = _settings(config, overrides, output_dir, size)
+    settings = _settings(config, overrides, output_dir, size, time_limit)
     from mesh2brick.backends import BackendError  # noqa: PLC0415 - keep --help fast
     from mesh2brick.ingest import IngestError  # noqa: PLC0415
     from mesh2brick.pipeline import convert as run_convert  # noqa: PLC0415
@@ -706,11 +725,14 @@ def _settings(
     overrides: list[str] | None,
     output_dir: Path | None,
     size: str | None = None,
+    time_limit: str | None = None,
 ) -> Settings:
     extra = [f"output.dir={output_dir}"] if output_dir is not None else []
     try:
         if size is not None:
             extra += size_overrides(size)
+        if time_limit is not None:
+            extra += time_overrides(time_limit)
         return load_settings(config, [*(overrides or []), *extra])
     except ConfigError as error:
         _fail(str(error))
