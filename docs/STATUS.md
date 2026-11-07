@@ -1,56 +1,37 @@
 # Projektstatus
 
-Stand: 2026-11-07 · **1.0 veröffentlicht** ([v1.0.0](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.0.0), Phasen 0–8 der SPEC fertig) · Nächster Punkt: **Roadmap 1 – Größe in Zentimetern** ([#24](https://github.com/leckermatz79/mesh2brick/issues/24), [ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
-Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md)
+Stand: 2026-11-07 · **Roadmap 1 – Größe in Zentimetern fertig** ([#24](https://github.com/leckermatz79/mesh2brick/issues/24), wird Version 1.1.0) · Nächster Punkt: **Roadmap 2 – harte Zeitgrenze** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), [ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
+Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **Blender-Dateien gehen jetzt direkt:** `mesh2brick convert rakete.blend` startet dein Blender unsichtbar im Hintergrund, nimmt alle sichtbaren Objekte mit ihren Farben und Modifiern und macht daraus in 14 Sekunden eine Rakete aus 263 Steinen, die stabil steht.
-- **Vorher schauen, was herauskommt:** `mesh2brick inspect` zeigt in wenigen Sekunden ein Bild „Modell ↔ Noppen“, die Größe in cm, die LEGO-Farben und ungefähr die Teilezahl. Damit ist der Plan aus der SPEC komplett, und mesh2brick kann als Version 1.0 erscheinen.
+- **Größe in Zentimetern:** `mesh2brick convert duo.stl --size 30cm` baut Duo 30 cm hoch (genau 29,8 cm, weil es auf ganze Steine rundet); vorher musstest du Noppen umrechnen.
+- **Erst schauen, dann bauen:** `mesh2brick inspect duo.stl --size 40cm` zeigt in Sekunden, wie groß das Modell wird (45,6 × 28,8 × 40,3 cm) und wie viele Teile es ungefähr braucht (rund 3.900), bevor eine lange Umwandlung startet.
 
-| Von Blender zu LEGO: `rocket.blend` wie eingelesen, als Noppen-Gitter, als fertiges Modell |
+| Die Rakete mit `--size 20cm`, `30cm` und `40cm`, im gleichen Maßstab |
 |---|
-| ![Rakete in drei Stufen](gallery/phase8-blender-rocket.png) |
+| ![Rakete in drei Größen](gallery/roadmap1-size-cm.png) |
 
-| Beispielgalerie: alle Beispielmodelle bei Standardgröße (32 Noppen), alle stabil |
-|---|
-| ![Galerie](gallery/phase8-gallery.png) |
+## Erledigt (Roadmap 1)
 
-| Raketen-Anleitung: Deckblatt und eine Seite mit Baugruppe |
-|---|
-| ![Raketen-PDF](gallery/phase8-rocket-pdf.png) |
+- **Neue Option `--size`** für `convert`, `voxelize` und `inspect`, wie von dir gewünscht:
+  - `--size 30cm` oder `--size 300mm`: das Modell wird so **hoch** (deine Entscheidung: cm meint die Höhe).
+  - `--size 40studs`: die **längste Kante** wird 40 Noppen lang, wie bisher mit `target_studs`.
+  - `--size` gilt immer, auch wenn eine Config-Datei etwas anderes sagt. Tippfehler wie `--size 40` (ohne Einheit) melden einen klaren Fehler.
+- **In der Config-Datei:** `input.target_height_cm: 30` (ersetzt `target_studs`). Ohne Angabe bleibt alles wie in 1.0 (32 Noppen).
+- **Rundung:** Die Höhe wird auf ganze Steine gerundet, zum nächstgelegenen Wert: 30 cm werden 31 Steine = 29,8 cm (32 Steine wären 30,7 cm). Mit `voxel.height_unit: plate` auf ganze Platten (30 cm → 94 Platten = 30,1 cm).
+- **`inspect` und `voxelize` sagen, woher die Größe kommt:** `scale: 1.61 mm of model per stud (height 30 cm -> 31 bricks)`, darunter wie bisher `LEGO size: 33.6 x 21.6 x 29.8 cm`.
+- **Abnahme:**
 
-## Erledigt (Phase 8)
+| Duo (nur lokal) | Noppen × Noppen × Steine | LEGO-Größe | grob geschätzt |
+|---|---|---|---|
+| `--size 20cm` | 28 × 18 × 21 | 22,4 × 14,4 × 20,2 cm | ~570 Teile (umgewandelt: 799, 45 s, stabil) |
+| `--size 30cm` | 42 × 27 × 31 | 33,6 × 21,6 × 29,8 cm | ~1.700 Teile |
+| `--size 40cm` | 57 × 36 × 42 | 45,6 × 28,8 × 40,3 cm | ~3.900 Teile |
 
-- **`.blend`-Dateien** (ADR 0014). mesh2brick ruft dein installiertes Blender auf (gefunden unter `/Applications`, über `PATH` oder `MESH2BRICK_BLENDER`). Blender läuft mit Werkseinstellungen und führt keine in der Datei gespeicherten Skripte aus; die Datei wird nur gelesen. Übernommen werden die **sichtbaren** Objekte der aktiven Szene, mit angewendeten Modifiern; Kurven und Text werden zu Flächen, versteckte Objekte, Kamera und Licht bleiben weg. Die Einheiten der Szene zählen (eine „Millimeter-Szene“ bleibt in Millimetern). Blender braucht etwa 1 Sekunde pro Datei.
-- **glTF-Dateien** (`.glb`, `.gltf`) gehen auch direkt, mit den Regeln des Formats (Y nach oben, Meter, Farben in linearem Licht).
-- **Fehler in trimesh gefunden und umgangen:** Vertexfarben, die Blender standardmäßig mit 16 Bit speichert, kamen falsch an (Orange wurde zu Gelb-Orange). mesh2brick rechnet sie jetzt selbst um. Ein fertiger Fehlerbericht für trimesh liegt in `docs/UPSTREAM.md` (#14, Frage 1 unten).
-- **`mesh2brick inspect`** ersetzt den Platzhalter. Ausgabe für die Rakete (gekürzt):
+  Auf GitHub prüft ein Test dasselbe mit dem L-Winkel aus den Testmodellen (20/30/40 cm → 21/31/42 Steine hoch). Die Rakete mit `--size 30cm`: 376 Teile in 31 s, stabil; das Deckblatt zeigt 15,2 × 15,2 × 29,0 cm (mit den Noppen obendrauf).
 
-```
-rocket.blend: 578 triangles, 5 part(s) (Fins, Nozzle, Window, Nose, Body)
-  size in the file: 52.0 x 52.0 x 100.0 mm, closed
-  colours in the file: part/material colours on 100 % of the surface
-  grid: 17 x 17 studs x 26 bricks, 1,012 filled cells
-  LEGO size: 13.6 x 13.6 x 25.0 cm
-  LEGO colours: White 66 %, Red 27 %, Dark Bluish Grey 6 %, Blue 2 %
-  rough estimate: about 291 parts (202-448); `convert` gives the exact count
-```
-
-- Das Bild dazu zeigt links das Modell, wie mesh2brick es einliest, rechts die Noppen-Voxel, beide aus demselben Blickwinkel. Dafür gibt es einen kleinen eigenen Renderer, der auch Modelle mit 2 Millionen Dreiecken (Duo) in wenigen Sekunden sauber zeichnet.
-- **Teileschätzung:** mesh2brick füllt das Gitter probeweise mit den größten passenden Steinen und rechnet mit der gemessenen Abweichung hoch. Bei 14 von 15 Testläufen lag die echte Teilezahl im angezeigten Bereich. Ausnahme: dünne, große Bodenplatten, die legolization aus vielen Platten baut (Burghof: 1.651 statt geschätzt 602).
-- **Testmodell `rocket.blend`** (selbst gebaut, frei verwendbar): Rumpf, Spitze, Fenster, Düse mit Farben; die vier Flossen entstehen aus einer Flosse über einen Modifier; ein verstecktes Hilfsobjekt darf nicht mitkommen.
-- **Beispielgalerie** [gallery/README.md](gallery/README.md): jedes Beispielmodell wie eingelesen, als Voxel und als Steine, mit Teilezahl und Zeit.
-- **Doku** auf Deutsch und Englisch ergänzt (Blender, glTF, inspect, Galerie).
-
-## v1.0-Abnahme (Definition of Done aus der SPEC)
-
-| Anforderung | Ergebnis |
-|---|---|
-| `convert model.step --config mesh2brick.yaml` liefert `.mpd`, drei Teilelisten und PDF in < 5 min für ≤ 2.000 Teile | **Erfüllt:** STEP-Burg mit `--config examples/mesh2brick.yaml` 1.651 Teile in 239 s; STEP-Würfel 1.952 Teile in 265 s |
-| Alle Beispielmodelle zusammenhängend und stabil, Dateien fehlerfrei | **Erfüllt:** alle 12 Beispielmodelle (und die Burg) stabil, aus einem Stück; Teileliste = Teilezahl = Teile in der LDraw-Datei (strenges Wieder-Einlesen). Studio-Prüfung durch dich: Duo, Phase 5 |
-| Testabdeckung ≥ 80 %, CI grün | **Erfüllt:** 96 %, 636 Tests (CI siehe PR) |
-| Doku Deutsch/Englisch, Lizenz- und Upstream-Übersicht aktuell | **Erfüllt:** README/README.de, THIRD_PARTY, UPSTREAM (#14 neu) |
+## Messwerte von 1.0 (Ausgangspunkt für 1.x)
 
 | Modell | Teile | Zeit | stabil |
 |---|---|---|---|
@@ -64,7 +45,7 @@ rocket.blend: 578 triangles, 5 part(s) (Fins, Nozzle, Window, Nose, Body)
 | Duo (32, nur lokal) | 1.025 | 100 s | ja |
 | Duo (48, nur lokal) | 2.313 | 479 s | **nein** |
 
-Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt „v1.0 acceptance“.
+Alle Zahlen: [benchmarks.md](benchmarks.md), Abschnitte „v1.0 acceptance“ und „Size in centimetres“.
 
 ## Als Nächstes
 
@@ -72,8 +53,8 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 **1.x – große Modelle möglich machen** (keine neuen Steinarten):
 
-1. **Roadmap 1 – Größe in Zentimetern als Einstellung** ([#24](https://github.com/leckermatz79/mesh2brick/issues/24), nächster Punkt). Heute gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm).
-2. Roadmap 2 ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)) – harte Zeitgrenze über alle Schritte, sonst „bestes stabiles Modell bis dahin“ (Duo bei 48 Noppen in ≤ 20 min).
+1. ~~Roadmap 1 – Größe in Zentimetern~~ ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): **fertig**, siehe oben.
+2. **Roadmap 2 – harte Zeitgrenze** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), nächster Punkt) über alle Schritte, sonst „bestes stabiles Modell bis dahin“ (Duo bei 48 Noppen in ≤ 20 min). Wichtig auch für `--size 40cm`: Duo bräuchte dann rund 3.900 Teile.
 3. Roadmap 3 ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)) – Stabilitätsprüfung auch für große Modelle.
 4. Roadmap 4 ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)) – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
 5. Roadmap 5 ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)) – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
@@ -103,6 +84,7 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | Duo bei 48 Noppen: 2.313 Teile, 8 Minuten, nicht stabil. Mit 20 statt 5 Minuten Zeitgrenze war der Lauf nach über einer Stunde noch nicht fertig (abgebrochen): Der letzte Optimierungsschritt in legolization hält sich an keine Zeitgrenze. 48 Noppen liegen über der 2.000-Teile-Grenze der SPEC. | Roadmap 2 (Upstream-Kandidat #5) |
 | Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen 4,5–5 Minuten; auf einem langsameren Laptop kann es länger dauern. Ihre PDFs sind 20–23 MB groß. | Standard bleibt 32 Noppen; PDF-Größe: Roadmap 4 |
 | Die Teileschätzung von `inspect` ist grob (Bereich etwa Faktor 2) und liegt bei dünnen, großen Platten zu niedrig. | `convert` gibt die genaue Zahl; Roadmap 5 |
+| Spitze Formen werden mit `--size` etwas niedriger als gewünscht: Eine Spitze, die nicht einmal eine halbe Zelle füllt, fällt weg (dieselbe Regel wie bei allen dünnen Details). Rakete: 38,4 statt 40 cm, ihr fehlen oben 2 Lagen der Nasenspitze. Duo trifft die Höhe auf einen halben Stein genau. `inspect` zeigt die echte Höhe vorher. | akzeptieren; eigener Code (Größe nachregeln), falls es stört |
 | `.blend`: Blender muss installiert sein. Die Tests mit echtem Blender laufen nur hier auf dem Mac; die automatischen Tests auf GitHub nutzen einen Blender-Ersatz. Verknüpfte Bibliotheken müssen vom Ordner der Datei aus erreichbar sein. | akzeptieren |
 | glTF mit Draco-Kompression kann trimesh nicht lesen. | bei Bedarf; in Blender ohne Kompression exportieren |
 
@@ -145,10 +127,12 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | 2026-11-07 | Fehlerbericht an trimesh (#14) einreichen? | **Ja.** trimesh ist groß und aktiv gepflegt, da kommen Antworten. Wie bei legolization: Text überfliegen, dann den fertigen Befehl ausführen. Erledigt: [Issue #2669](https://github.com/mikedh/trimesh/issues/2669). |
 | 2026-11-07 | Was nach 1.0 zuerst? | **[ROADMAP.md](../ROADMAP.md)**: 1.x = große Modelle (Größe in cm, harte Zeitgrenze, Stabilitätsprüfung, PDF-Größe, Schätzung), 2.0 = Formtreue (Dachsteine, Tiles, Rundungen, SNOT), 2.x = Robustheit und Anleitung. Grund: Wer 40 cm will, bekommt heute gar nichts. 2.0 ist vor allem für Familienbauten; ein persönliches Teilelager ist nicht Teil des Plans; Fork oder Warten bei legolization entscheidest du, wenn der erste 2.0-Punkt daran hängt. |
 | 2026-11-07 | Eigenes Modell in der Galerie? | **Duo nein.** Ein selbst entworfenes Fusion-Modell wäre das beste Schaufenster (echtes CAD-Teil statt Testkörper). Es gibt keins (Fusion lässt sich hier nicht ohne Oberfläche steuern), also bleibt die Galerie bei den Testmodellen. |
+| 2026-11-07 | Roadmap 1: Was meint „30 cm“? | **Die Höhe.** So denkt man über eine Figur; die längste Kante bleibt über `target_studs` (`--size 40studs`) erreichbar. |
+| 2026-11-07 | Eigene kurze Option für die Größe? | **Ja, `--size 30cm`**, versteht auch `300mm` und `40studs`; `--set input.target_cm=30` tippt niemand gern zweimal. Umgesetzt; in der Config heißt der Wert `target_height_cm`, damit klar ist, dass er die Höhe meint. |
 
 ## Fragen an dich
 
-Zurzeit keine. Deine Antworten zu Phase 8 stehen unter „Deine Entscheidungen“.
+Zurzeit keine. Deine Antworten zu Roadmap 1 stehen unter „Deine Entscheidungen“.
 
 ## Offene Kleinigkeiten
 
