@@ -7,7 +7,9 @@ Algorithm (see ADR 0003):
 1. **Lattice.** One cell is 1 x 1 stud horizontally and one brick (1.2 studs)
    or plate (0.4 studs) tall. Rounding rule: per horizontal axis the model
    gets ``round_half_up(extent / pitch)`` cells (at least 1) and is centred on
-   them; vertically the lattice starts at the model's lowest point. The
+   them; vertically the lattice starts at the model's lowest point. A target
+   height in cm is rounded to whole cell layers first, so the model's height
+   fills exactly that many layers (:func:`target_layers`). The
    lattice is padded so no material can fall outside, and empty border cells
    are cropped at the end.
 2. **Columns.** Every cell is sampled by ``S x S`` vertical rays. For each ray
@@ -42,8 +44,10 @@ from mesh2brick.voxel.grid import (
     EMPTY,
     LDU_PER_PLATE,
     LDU_PER_STUD,
+    LEGO_MM_PER_STUD,
     PLATES_PER_UNIT,
     VoxelGrid,
+    lego_cell_height_mm,
 )
 from mesh2brick.voxel.rays import JITTER, ray_hits
 
@@ -165,7 +169,8 @@ def voxelize(
     if not occupancy.any():
         warnings.append(
             "no voxel reached the fill threshold; the model is too small or thin "
-            "for this scale (increase input.target_studs or lower voxel.threshold)"
+            "for this scale (make it bigger, e.g. --size 30cm, or lower "
+            "voxel.threshold)"
         )
     grid = VoxelGrid(
         occupancy=occupancy,
@@ -190,19 +195,51 @@ def voxelize(
 def model_pitch(extents: NDArray[np.float64], settings: Settings) -> float:
     """Model millimetres per stud for the configured scale mode.
 
-    ``studs``: the longest axis (any direction, measured in studs of 8 mm
-    proportion) becomes ``target_studs`` long. ``mm``: ``mm_per_stud``.
+    ``studs`` with ``target_height_cm``: the model gets :func:`target_layers`
+    cell layers, exactly filling its height. ``studs`` otherwise: the longest
+    axis (any direction, measured in studs of 8 mm proportion) becomes
+    ``target_studs`` long. ``mm``: ``mm_per_stud``.
 
     Raises:
-        ValueError: for a mesh without extent.
+        ValueError: for a mesh without extent (or without height, when the
+            height is what sets the scale).
     """
     if settings.input.scale_mode == "mm":
         return settings.input.mm_per_stud
+    height_cm = settings.input.target_height_cm
+    if height_cm is not None:
+        height = float(extents[2])
+        if not height > 0:
+            msg = "the mesh has no height; give its size in studs (e.g. --size 32studs)"
+            raise ValueError(msg)
+        unit: HeightUnit = settings.voxel.height_unit
+        studs_per_layer = lego_cell_height_mm(unit) / LEGO_MM_PER_STUD
+        return height / (target_layers(height_cm, unit) * studs_per_layer)
     longest = float(np.max(extents))
     if not longest > 0:
         msg = "the mesh has no extent"
         raise ValueError(msg)
     return longest / settings.input.target_studs
+
+
+def target_layers(height_cm: float, height_unit: HeightUnit) -> int:
+    """Cell layers for a LEGO model ``height_cm`` tall: the nearest whole number.
+
+    30 cm become 31 bricks (29.76 cm; 32 would be 30.72 cm) or 94 plates.
+    """
+    return max(1, round_half_up(height_cm * 10 / lego_cell_height_mm(height_unit)))
+
+
+def scale_note(settings: Settings) -> str:
+    """What sets the size, for summaries: ``" (height 30 cm -> 31 bricks)"``."""
+    scale = settings.input
+    if scale.scale_mode == "mm":
+        return ""
+    if scale.target_height_cm is None:
+        return f" (longest axis -> {scale.target_studs} studs)"
+    unit = settings.voxel.height_unit
+    layers = target_layers(scale.target_height_cm, unit)
+    return f" (height {scale.target_height_cm:g} cm -> {layers} {unit}s)"
 
 
 def plan_lattice(

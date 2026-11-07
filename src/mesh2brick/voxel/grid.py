@@ -32,7 +32,16 @@ LDU_PER_STUD: Final = 20
 LDU_PER_PLATE: Final = 8
 PLATES_PER_BRICK: Final = 3
 PLATES_PER_UNIT: Final[dict[HeightUnit, int]] = {"brick": PLATES_PER_BRICK, "plate": 1}
+LEGO_MM_PER_STUD: Final = 8.0
+"""Real stud pitch of a LEGO brick in millimetres."""
 _NDIM: Final = 3
+
+
+def lego_cell_height_mm(height_unit: HeightUnit) -> float:
+    """Real height of one cell layer: 9.6 mm (brick) or 3.2 mm (plate)."""
+    return (
+        LEGO_MM_PER_STUD * PLATES_PER_UNIT[height_unit] * LDU_PER_PLATE / LDU_PER_STUD
+    )
 
 
 @dataclass(frozen=True, slots=True, eq=False)

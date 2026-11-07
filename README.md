@@ -53,12 +53,17 @@ Python package is added. mesh2brick finds it in the usual places or via
 uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/
 
 # Everything in one go: LDraw, parts lists (CSV, BrickLink XML, Rebrickable CSV), PDF
-uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
 uv run mesh2brick convert tests/fixtures/rocket.blend -o out/
+
+# Size: the height in cm or mm, or the longest edge in studs (default: 32 studs, about
+# 26 cm). Try sizes with inspect first; it shows the LEGO size in seconds.
+uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/ --size 30cm
+uv run mesh2brick convert tests/fixtures/rocket.blend -o out/ --size 30cm
+uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs
 
 # Or stage by stage:
 # 1. Voxelize a mesh onto the stud grid (longest axis = 32 studs by default)
-uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs
 
 # 2. Place bricks on the grid: LDraw file, brick model JSON, PNG preview
 uv run mesh2brick place out/bunny_lowpoly.grid.npz -o out/

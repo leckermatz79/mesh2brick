@@ -8,8 +8,10 @@
 input:
   up_axis: z            # x|y|z, optionally negative, e.g. -y (glTF/.blend: keep z)
   auto_orient: false
-  scale_mode: studs     # studs: longest axis = target_studs | mm: use mm_per_stud
+  scale_mode: studs     # studs: scale to target_height_cm or target_studs | mm: use mm_per_stud
   target_studs: 32      # longest model axis in studs (~26 cm; 48 = ~38 cm)
+  target_height_cm: null    # height of the LEGO model in cm, e.g. 30 (replaces target_studs;
+                            # rounded to whole bricks); on the command line: --size 30cm
   mm_per_stud: 8.0      # model millimetres per stud (a real stud pitch is 8 mm)
   multi_body: union     # union: merge several bodies | error: reject such files
   step_tolerance_mm: 0.05   # STEP: max distance surface <-> triangles

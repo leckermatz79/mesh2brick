@@ -55,12 +55,17 @@ oder über `MESH2BRICK_BLENDER=/pfad/zu/blender`.
 uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/
 
 # Alles in einem Schritt: LDraw, Teilelisten (CSV, BrickLink-XML, Rebrickable-CSV), PDF
-uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
 uv run mesh2brick convert tests/fixtures/rocket.blend -o out/
+
+# Größe: die Höhe in cm oder mm oder die längste Kante in Noppen (Standard: 32 Noppen,
+# etwa 26 cm). Größen erst mit inspect ausprobieren; es zeigt die LEGO-Größe in Sekunden.
+uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/ --size 30cm
+uv run mesh2brick convert tests/fixtures/rocket.blend -o out/ --size 30cm
+uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs
 
 # Oder Schritt für Schritt:
 # 1. Mesh auf das Noppenraster voxelisieren (längste Achse standardmäßig 32 Noppen)
-uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs
 
 # 2. Steine auf das Gitter setzen: LDraw-Datei, Steinmodell (JSON), PNG-Vorschau
 uv run mesh2brick place out/bunny_lowpoly.grid.npz -o out/

@@ -6,6 +6,22 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-07 - Roadmap 1: size in centimetres
+
+### Added
+- Roadmap 1 ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): the size of the
+  LEGO model in centimetres. `input.target_height_cm` sets the height (a size in cm means the
+  height, by product-owner decision); it replaces `input.target_studs` and is rounded to the
+  nearest whole brick or plate, so 30 cm become 31 bricks = 29.8 cm.
+- `--size` for `convert`, `voxelize` and `inspect`: `30cm` or `300mm` (height) or `40studs`
+  (longest edge, as `input.target_studs`). It overrides the size settings of `--config` and
+  `--set`, also `scale_mode: mm`.
+- `inspect` and `voxelize` name what sets the size: `(height 30 cm -> 31 bricks)` or
+  `(longest axis -> 32 studs)`.
+
+### Changed
+- Messages for models that are too small suggest `--size` instead of `input.target_studs`.
+
 ## [1.0.0] - 2026-11-07 - Phase 8: Blender, inspect, v1.0
 
 First complete release: every phase of the plan is done and the v1.0 Definition of Done

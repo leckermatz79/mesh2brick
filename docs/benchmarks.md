@@ -368,3 +368,25 @@ whose thin courtyard slab legolization builds from plates (~250 plates per plate
 A first version based on cells of the hollow shell was much worse (0.07–0.42 parts per
 cell, a factor of 6). `inspect` therefore shows 1.3 x the quick fill with the range
 0.9–2.0 x; 14 of the 15 runs fall inside it.
+
+## Size in centimetres (Roadmap 1, 2026-11-07)
+
+`uv run mesh2brick inspect <model> --size <height>`; a size in cm means the height of the LEGO
+model and is rounded to the nearest whole brick (`target layers`). "LEGO size" counts the
+filled layers without the studs on top; the PDF cover adds the studs (1.7 mm).
+
+| Model (file size, mm) | --size | target layers | grid (studs x studs x bricks) | LEGO size (cm) | estimate | converted |
+|---|---|---:|---|---|---:|---|
+| Duo (67.6 x 43.3 x 60.0, local only) | 20cm | 21 | 28 x 18 x 21 | 22.4 x 14.4 x 20.2 | 571 (395-878) | 799 parts, 45 s, stable |
+| Duo | 30cm | 31 | 42 x 27 x 31 | 33.6 x 21.6 x 29.8 | 1,676 (1,160-2,578) | – |
+| Duo | 40cm | 42 | 57 x 36 x 42 | 45.6 x 28.8 x 40.3 | 3,906 (2,704-6,010) | – (Roadmap 2) |
+| L-bracket (30 x 10 x 40, CI) | 20cm / 30cm / 40cm | 21 / 31 / 42 | 19 x 6 x 21 / 28 x 9 x 31 / 38 x 13 x 42 | height 20.2 / 29.8 / 40.3 | – | – |
+| Rocket (52 x 52 x 100) | 20cm | 21 | 13 x 13 x 20 | 10.4 x 10.4 x 19.2 | 179 (124-276) | – |
+| Rocket | 30cm | 31 | 19 x 19 x 30 | 15.2 x 15.2 x 28.8 | 446 (309-686) | 376 parts, 31 s, stable |
+| Rocket | 40cm | 42 | 26 x 26 x 40 | 20.8 x 20.8 x 38.4 | 606 (419-932) | – |
+
+Duo and the L-bracket fill exactly the target layers, so their height is within half a brick
+of the request. The rocket loses its top one or two layers: the tip of the nose fills less
+than half a cell (`voxel.threshold`), the same rule that drops other thin details. `inspect`
+shows the real height before converting. Duo at 40 cm (about 3,900 parts) is beyond the
+5-minute budget; that is Roadmap 2 (hard time limit).

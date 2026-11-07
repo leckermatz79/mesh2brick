@@ -119,6 +119,7 @@ input:
   auto_orient: false
   scale_mode: studs     # studs|mm
   target_studs: 32      # längste Achse in Noppen (PO-Entscheidung 2026-11-01: Standard 32, 48 erst später)
+  target_height_cm: null   # 2026-11-07 (Roadmap 1): Höhe des LEGO-Modells in cm, ersetzt target_studs; auf ganze Steine gerundet. CLI: --size 30cm | 300mm | 40studs (PO: cm meint die Höhe)
   mm_per_stud: 8.0
   multi_body: union     # union|error (Phase 3: Mehrkörper vereinigen oder ablehnen)
   step_tolerance_mm: 0.05   # Phase 3: Tessellierungs-Toleranz für STEP

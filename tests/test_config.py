@@ -14,6 +14,7 @@ from mesh2brick.config import (
     load_settings,
     parse_override,
     settings_to_yaml,
+    size_overrides,
 )
 
 EXAMPLE = Path(__file__).parents[1] / "examples" / "mesh2brick.yaml"
@@ -22,6 +23,7 @@ EXAMPLE = Path(__file__).parents[1] / "examples" / "mesh2brick.yaml"
 def test_defaults_match_spec() -> None:
     s = Settings()
     assert s.input.target_studs == 32  # PO decision 2026-11-01 (SPEC said 48)
+    assert s.input.target_height_cm is None  # Roadmap 1: opt-in size in cm
     assert s.input.mm_per_stud == 8.0
     assert s.voxel.height_unit == "brick"
     assert s.voxel.fill == "hollow"
@@ -103,6 +105,12 @@ def test_override_into_scalar_is_rejected() -> None:
         (["voxel.height_unit=duplo"], "voxel.height_unit"),
         (["voxel.threshold=0"], "voxel.threshold"),
         (["input.target_studs=-4"], "input.target_studs"),
+        (["input.target_height_cm=0"], "input.target_height_cm"),
+        (["input.target_height_cm=500"], "input.target_height_cm"),
+        (
+            ["input.scale_mode=mm", "input.target_height_cm=30"],
+            "target_height_cm needs scale_mode: studs",
+        ),
         (["placement.colour=red"], "placement.colour: Extra inputs are not permitted"),
         (["unknown.key=1"], "unknown"),
         (["output.formats=[ldr, mpd]"], "either 'ldr' or 'mpd'"),
@@ -118,6 +126,62 @@ def test_invalid_settings_have_readable_errors(
         load_settings(None, overrides)
     assert message in str(caught.value)
     assert str(caught.value).startswith("invalid configuration")
+
+
+@pytest.mark.parametrize(
+    ("text", "height_cm", "studs"),
+    [
+        ("30cm", 30.0, 32),
+        ("30 cm", 30.0, 32),
+        ("30,5cm", 30.5, 32),
+        ("12.5CM", 12.5, 32),
+        ("300mm", 30.0, 32),
+        ("40studs", None, 40),
+        ("1stud", None, 1),
+        (" 48 Studs ", None, 48),
+    ],
+)
+def test_size_sets_height_in_cm_or_longest_axis_in_studs(
+    text: str, height_cm: float | None, studs: int
+) -> None:
+    settings = load_settings(None, size_overrides(text))
+    assert settings.input.scale_mode == "studs"
+    assert settings.input.target_height_cm == height_cm
+    assert settings.input.target_studs == studs
+
+
+def test_size_wins_over_config_and_set(tmp_path: Path) -> None:
+    path = tmp_path / "mm.yaml"
+    path.write_text("input:\n  scale_mode: mm\n  target_height_cm: null\n")
+    settings = load_settings(path, ["input.target_studs=20", *size_overrides("30cm")])
+    assert settings.input.scale_mode == "studs"
+    assert settings.input.target_height_cm == 30.0
+    back = load_settings(
+        None, ["input.target_height_cm=30", *size_overrides("40studs")]
+    )
+    assert back.input.target_height_cm is None
+    assert back.input.target_studs == 40
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("40", "give a number with a unit"),
+        ("30 inch", "give a number with a unit"),
+        ("-3cm", "give a number with a unit"),
+        ("", "give a number with a unit"),
+        ("0cm", "greater than 0"),
+        ("40.5studs", "whole numbers"),
+    ],
+)
+def test_invalid_sizes_are_rejected(text: str, message: str) -> None:
+    with pytest.raises(ConfigError, match=message):
+        size_overrides(text)
+
+
+def test_size_above_the_limit_is_a_config_error() -> None:
+    with pytest.raises(ConfigError, match=r"input\.target_height_cm"):
+        load_settings(None, size_overrides("5000mm"))
 
 
 def test_missing_file_is_a_config_error(tmp_path: Path) -> None:

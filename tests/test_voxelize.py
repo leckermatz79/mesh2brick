@@ -5,17 +5,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 import trimesh
 
-from mesh2brick.config import InputConfig, Settings, load_settings
+from mesh2brick.config import InputConfig, Settings, load_settings, size_overrides
 from mesh2brick.ingest import load_model
 from mesh2brick.ingest.base import RawModel
 from mesh2brick.ingest.normalize import normalize
 from mesh2brick.voxel import rays as rays_module
-from mesh2brick.voxel.grid import VoxelGrid
+from mesh2brick.voxel.grid import VoxelGrid, lego_cell_height_mm
 from mesh2brick.voxel.voxelize import (
     Lattice,
     VoxelizeResult,
@@ -24,8 +25,13 @@ from mesh2brick.voxel.voxelize import (
     model_pitch,
     plan_lattice,
     round_half_up,
+    scale_note,
+    target_layers,
     voxelize,
 )
+
+if TYPE_CHECKING:
+    from mesh2brick.voxel.grid import HeightUnit
 
 
 def run(mesh: trimesh.Trimesh, *overrides: str) -> VoxelizeResult:
@@ -110,6 +116,78 @@ def test_model_pitch_modes() -> None:
     assert model_pitch(extents, mm) == 5.0
     with pytest.raises(ValueError, match="no extent"):
         model_pitch(np.zeros(3), Settings())
+
+
+# ------------------------------------------------------------------ size in cm
+@pytest.mark.parametrize(
+    ("size", "unit", "shape", "height_cm"),
+    [
+        # Roadmap 1 acceptance in CI (Duo stays local): the L-bracket is
+        # 30 x 10 x 40 mm with a flat top, so its height fills whole layers.
+        ("20cm", "brick", (19, 6, 21), 20.16),
+        ("30cm", "brick", (28, 9, 31), 29.76),
+        ("40cm", "brick", (38, 13, 42), 40.32),
+        ("300mm", "brick", (28, 9, 31), 29.76),
+        ("30cm", "plate", (28, 9, 94), 30.08),
+        ("40cm", "plate", (38, 13, 125), 40.0),
+    ],
+)
+def test_acceptance_size_in_cm_sets_the_height(
+    fixtures_dir: Path,
+    size: str,
+    unit: str,
+    shape: tuple[int, int, int],
+    height_cm: float,
+) -> None:
+    settings = load_settings(None, [*size_overrides(size), f"voxel.height_unit={unit}"])
+    model = load_model(fixtures_dir / "l_bracket.stl", settings.input)
+    grid = voxelize(model, settings).grid
+    assert grid.shape == shape
+    lego_height_cm = grid.shape[2] * lego_cell_height_mm(grid.height_unit) / 10
+    assert lego_height_cm == pytest.approx(height_cm)
+    half_layer_cm = lego_cell_height_mm(grid.height_unit) / 20
+    target = settings.input.target_height_cm
+    assert target is not None
+    assert abs(lego_height_cm - target) <= half_layer_cm + 1e-9
+
+
+@pytest.mark.parametrize(
+    ("height_cm", "unit", "layers"),
+    [
+        (30, "brick", 31),  # 29.76 cm is nearer than 30.72 cm
+        (20, "brick", 21),
+        (40, "brick", 42),
+        (30, "plate", 94),
+        (0.1, "brick", 1),  # never less than one layer
+        (400, "brick", 417),  # the upper bound of input.target_height_cm
+    ],
+)
+def test_target_layers_rounds_to_the_nearest_layer(
+    height_cm: float, unit: HeightUnit, layers: int
+) -> None:
+    assert target_layers(height_cm, unit) == layers
+
+
+def test_model_pitch_from_height_fills_whole_layers() -> None:
+    settings = load_settings(None, ["input.target_height_cm=30"])
+    extents = np.array([67.6, 43.3, 60.0])  # Duo, wider than tall
+    pitch = model_pitch(extents, settings)
+    assert pitch == pytest.approx(60.0 / (31 * 1.2))
+    bounds = np.array([[0.0, 0.0, 0.0], extents])
+    assert plan_lattice(bounds, pitch=pitch, height_unit="brick").shape[2] == 31
+    with pytest.raises(ValueError, match="no height"):
+        model_pitch(np.array([10.0, 10.0, 0.0]), settings)
+
+
+def test_scale_note_names_what_sets_the_size() -> None:
+    assert scale_note(Settings()) == " (longest axis -> 32 studs)"
+    cm = load_settings(None, ["input.target_height_cm=30"])
+    assert scale_note(cm) == " (height 30 cm -> 31 bricks)"
+    plates = load_settings(
+        None, ["input.target_height_cm=29.5", "voxel.height_unit=plate"]
+    )
+    assert scale_note(plates) == " (height 29.5 cm -> 92 plates)"
+    assert scale_note(load_settings(None, ["input.scale_mode=mm"])) == ""
 
 
 # ------------------------------------------------------------------ fractions

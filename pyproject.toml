@@ -1,6 +1,6 @@
 [project]
 name = "mesh2brick"
-version = "1.0.0"
+version = "1.1.0"
 description = "Turn 3D models (STL, OBJ, 3MF, PLY, STEP) into buildable LEGO-compatible models with LDraw files, parts lists and PDF instructions."
 readme = "README.md"
 license = "GPL-3.0-or-later"
