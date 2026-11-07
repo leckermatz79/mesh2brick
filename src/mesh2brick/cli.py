@@ -28,14 +28,13 @@ if TYPE_CHECKING:
 
 _LAYER_PROGRESS: Final = re.compile(r"layer (\d+)/(\d+)\b")
 EXIT_ERROR: Final = 1
-EXIT_NOT_YET: Final = 3
-"""Exit code of commands that are planned but not implemented yet."""
 
 app = typer.Typer(
     name="mesh2brick",
     help=(
-        "Turn 3D models (STL, OBJ, 3MF, PLY, STEP) into buildable LEGO-compatible "
-        "models: LDraw file, parts lists and PDF building instructions."
+        "Turn 3D models (STL, OBJ, 3MF, PLY, glTF, STEP, Blender) into buildable "
+        "LEGO-compatible models: LDraw file, parts lists and PDF building "
+        "instructions."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -195,7 +194,10 @@ def convert(
         Path,
         typer.Argument(
             metavar="INPUT",
-            help="3D model (STL, OBJ, PLY, 3MF) or voxel grid (.grid.npz, .vox, .npy).",
+            help=(
+                "3D model (STL, OBJ, PLY, 3MF, glTF, STEP, .blend) or voxel grid "
+                "(.grid.npz, .vox, .npy)."
+            ),
             exists=True,
             dir_okay=False,
             readable=True,
@@ -237,7 +239,7 @@ def voxelize(
         Path,
         typer.Argument(
             metavar="INPUT",
-            help="3D model: STL, OBJ, PLY or 3MF.",
+            help="3D model: STL, OBJ, PLY, 3MF, glTF, STEP or .blend.",
             exists=True,
             dir_okay=False,
             readable=True,
@@ -485,9 +487,62 @@ def _yes_no(value: bool | None) -> str:
 
 
 @app.command()
-def inspect() -> None:
-    """Inspect an input model with a PNG preview (Phase 8)."""
-    _not_yet("inspect", phase=8)
+def inspect(
+    input_file: Annotated[
+        Path,
+        typer.Argument(
+            metavar="INPUT",
+            help=(
+                "3D model (STL, OBJ, PLY, 3MF, glTF, STEP, .blend) or voxel grid "
+                "(.grid.npz, .vox, .npy)."
+            ),
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ],
+    config: ConfigOption = None,
+    overrides: SetOption = None,
+    output_dir: OutputDirOption = None,
+    preview: Annotated[
+        bool,
+        typer.Option(help="Also write <name>.inspect.png: model and voxels."),
+    ] = True,
+) -> None:
+    """Check a model before converting: size, colours, voxels, rough part count.
+
+    Takes seconds (no brick placement). The picture shows the model as read
+    next to its voxels at the configured size, seen from the same side.
+    """
+    settings = _settings(config, overrides, output_dir)
+    from mesh2brick.backends import BackendError  # noqa: PLC0415 - keep --help fast
+    from mesh2brick.backends.legolization import color_info  # noqa: PLC0415
+    from mesh2brick.ingest import IngestError  # noqa: PLC0415
+    from mesh2brick.inspection import (  # noqa: PLC0415
+        inspect_file,
+        inspection_text,
+        render_inspection,
+    )
+    from mesh2brick.voxel.color import colors_needed  # noqa: PLC0415
+
+    _require_ldraw_library()
+    stem = model_name(input_file)
+    try:
+        color_info(colors_needed(settings.color))  # fail fast on bad colours
+        result = inspect_file(input_file, settings, name=stem)
+        colors = color_info(result.grid.colors_used)
+    except (IngestError, BackendError, ValueError) as error:
+        _fail(str(error))
+    for warning in result.warnings:
+        typer.secho(f"  note: {warning}", fg=typer.colors.YELLOW)
+    typer.echo(inspection_text(result, settings, colors))
+    if not result.grid.filled_count:
+        _fail("no voxels at this size; increase input.target_studs")
+    if preview:
+        path = settings.output.dir / f"{stem}.inspect.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(render_inspection(result, colors))
+        typer.echo(f"wrote {path}")
 
 
 @app.command()
@@ -675,14 +730,6 @@ def _echo_summary(model: BrickModel, buildable: bool) -> None:
             "  buildable: NO - try another --set placement.strategy=... or seed",
             fg=typer.colors.YELLOW,
         )
-
-
-def _not_yet(command: str, *, phase: int, hint: str = "") -> NoReturn:
-    message = f"`{command}` is planned for Phase {phase} (see docs/PLAN.md)"
-    typer.secho(
-        message + (f"; {hint}" if hint else ""), fg=typer.colors.YELLOW, err=True
-    )
-    raise typer.Exit(EXIT_NOT_YET)
 
 
 def _fail(message: str) -> NoReturn:

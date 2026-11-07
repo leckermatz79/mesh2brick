@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from mesh2brick import __version__
-from mesh2brick.cli import EXIT_NOT_YET, app, model_name, progress_printer
+from mesh2brick.cli import app, model_name, progress_printer
 from mesh2brick.model import BrickModel
 
 runner = CliRunner()
@@ -41,13 +41,6 @@ def test_version() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
     assert __version__ in result.output
-
-
-@pytest.mark.parametrize("args", [["inspect"]])
-def test_planned_commands_say_so(args: list[str]) -> None:
-    result = runner.invoke(app, args)
-    assert result.exit_code == EXIT_NOT_YET
-    assert "planned for Phase" in result.output
 
 
 def test_place_reports_config_errors(fixtures_dir: Path) -> None:
