@@ -104,6 +104,26 @@ _TEXT: Final[dict[str, dict[Language, str]]] = {
         "en": "Put these together first (view from below), then place them as one.",
     },
     "first": {"de": "zuerst", "en": "first"},
+    "best_so_far_stable": {
+        "de": (
+            "Zeitgrenze erreicht: Das ist das beste stabile Modell, das bis dahin "
+            "gefunden wurde. Mit mehr Rechenzeit käme es meist mit weniger Teilen aus."
+        ),
+        "en": (
+            "Time limit reached: this is the best stable model found by then. With "
+            "more computing time it would usually need fewer parts."
+        ),
+    },
+    "best_so_far": {
+        "de": (
+            "Zeitgrenze erreicht, bevor ein stabiles Modell gefunden war: Das ist "
+            "der letzte Zwischenstand."
+        ),
+        "en": (
+            "Time limit reached before a stable model was found: this is the last "
+            "intermediate result."
+        ),
+    },
     "layer_order": {
         "de": (
             "Die Schritte folgen den Schichten von unten nach oben. Das Modell "

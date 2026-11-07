@@ -195,8 +195,10 @@ class PlacementConfig(_Section):
     counts (docs/benchmarks.md); SPEC §4 had ``luo``."""
     seed: Annotated[int, Field(ge=0)] = 0
     time_limit_s: Annotated[float, Field(gt=0)] = 300.0
-    """Wall-clock budget for a whole conversion. When it runs short, cheaper
-    steps are chosen (layer-order instructions) and the result says so."""
+    """Wall-clock limit for a whole conversion (ADR 0006, 0015). When it runs
+    short, cheaper steps are chosen (layer-order instructions); when it is
+    reached, the backend is stopped and the best stable model found so far is
+    used, marked on the cover page. Time for the export is kept free."""
     backend_options: dict[str, Any] = Field(default_factory=dict)
     """Backend-specific options, validated by the backend (not duplicated here)."""
 

@@ -22,6 +22,7 @@ from mesh2brick.backends.legolization import (
     LegolizationBackend,
     color_info,
     color_quantizer,
+    export_reserve_s,
     load_voxel_file,
     placeable_parts,
     placement_footprint,
@@ -69,6 +70,8 @@ if TYPE_CHECKING:
     from mesh2brick.voxel.grid import VoxelGrid
 
 VOXEL_SUFFIXES = (".npz", ".vox", ".npy")
+LLM_MIN_S: Final = 30.0
+"""The LLM layer is skipped when less time is left before the export."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,8 +135,14 @@ def convert(
     outcome = LlmOutcome(placement, None)
     if settings.llm.enabled:
         with clock("llm"):
-            outcome = improve_with_llm(
-                placement, backend, settings, source=source, say=say, send=send
+            outcome = _llm_in_time(
+                placement,
+                backend,
+                settings,
+                source=source,
+                left=deadline - time.monotonic(),
+                say=say,
+                send=send,
             )
         files.extend(_llm_files(outcome, out_dir / f"{stem}.llm.json", say))
         warnings.extend(outcome.notes)
@@ -176,9 +185,9 @@ def convert(
     elapsed = time.monotonic() - started
     if elapsed > settings.placement.time_limit_s:
         warnings.append(
-            f"took {elapsed:.0f} s, more than placement.time_limit_s="
-            f"{settings.placement.time_limit_s:.0f} s (the placement itself could "
-            "not be cut shorter)"
+            f"took {elapsed:.0f} s, {elapsed - settings.placement.time_limit_s:.0f} s "
+            f"more than placement.time_limit_s={settings.placement.time_limit_s:.0f} s "
+            "(the time kept free for the export was too short)"
         )
     return ConvertResult(
         model=model,
@@ -188,6 +197,33 @@ def convert(
         warnings=tuple(warnings),
         seconds=dict(clock.seconds),
         llm=llm,
+    )
+
+
+def _llm_in_time(
+    placement: Placement,
+    backend: LegolizationBackend,
+    settings: Settings,
+    *,
+    source: Path,
+    left: float,
+    say: Callable[[str], None],
+    send: Sender | None,
+) -> LlmOutcome:
+    """:func:`improve_with_llm`, unless the time limit leaves too little time.
+
+    ``left`` is the time until ``placement.time_limit_s``; the export's
+    share is kept free.
+    """
+    left -= export_reserve_s(placement.model.part_count)
+    if left < LLM_MIN_S:
+        note = (
+            f"LLM layer skipped: only {max(left, 0):.0f} s of placement.time_limit_s "
+            "left before the export"
+        )
+        return LlmOutcome(placement, None, (note,))
+    return improve_with_llm(
+        placement, backend, settings, source=source, say=say, send=send
     )
 
 

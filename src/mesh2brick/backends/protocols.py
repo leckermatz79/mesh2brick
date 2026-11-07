@@ -36,6 +36,8 @@ class StabilityReport:
         floating_count: parts not connected to the ground.
         max_score: worst per-part instability score (0 = perfectly stable).
         min_capacity_n: weakest connection's remaining friction capacity in N.
+        checked: whether the physics check ran; ``False`` when the time limit
+            stopped it (then ``stable`` is ``False`` and ``max_score`` NaN).
     """
 
     stable: bool
@@ -43,11 +45,17 @@ class StabilityReport:
     floating_count: int
     max_score: float
     min_capacity_n: float | None = None
+    checked: bool = True
 
     @property
     def buildable(self) -> bool:
-        """Stable, one connected piece, and nothing floating."""
-        return self.stable and self.component_count == 1 and self.floating_count == 0
+        """Checked stable, one connected piece, and nothing floating."""
+        return (
+            self.checked
+            and self.stable
+            and self.component_count == 1
+            and self.floating_count == 0
+        )
 
 
 @dataclass(frozen=True, slots=True)

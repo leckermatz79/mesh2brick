@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from mesh2brick.agent.feedback import RunSummary
+    from mesh2brick.backends.protocols import StabilityReport
     from mesh2brick.catalog.listing import CatalogRow
     from mesh2brick.model import BrickModel
     from mesh2brick.voxel.grid import HeightUnit
@@ -160,7 +161,7 @@ def place(
     typer.echo(f"wrote {model_path}")
     if preview:
         typer.echo(f"wrote {_write_preview(placement.model, out_dir / f'{stem}.png')}")
-    _echo_summary(placement.model, placement.stability.buildable)
+    _echo_summary(placement.model, placement.stability)
 
 
 @app.command()
@@ -243,7 +244,7 @@ def convert(
     timing = ", ".join(f"{k} {v:.0f} s" for k, v in result.seconds.items())
     typer.echo(f"  time: {sum(result.seconds.values()):.0f} s ({timing})")
     typer.echo(f"  parts list total: {result.bom.total} = parts placed")
-    _echo_summary(result.model, result.stability.buildable)
+    _echo_summary(result.model, result.stability)
 
 
 @app.command()
@@ -741,13 +742,18 @@ def _write_preview(
     )
 
 
-def _echo_summary(model: BrickModel, buildable: bool) -> None:
+def _echo_summary(model: BrickModel, stability: StabilityReport) -> None:
     typer.echo(
         f"  parts: {model.part_count}   steps: {model.step_count}   "
         f"colours: {len(model.colors)}"
     )
-    if buildable:
+    if stability.buildable:
         typer.secho("  buildable: yes (stable, one piece)", fg=typer.colors.GREEN)
+    elif not stability.checked:
+        typer.secho(
+            "  buildable: not checked (the time limit stopped the stability check)",
+            fg=typer.colors.YELLOW,
+        )
     else:
         typer.secho(
             "  buildable: NO - try another --set placement.strategy=... or seed",

@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 
 import highspy
 import numpy as np
-from legolization import MeshOptions, PipelineConfig, PipelineResult, run
+from legolization import MeshOptions, PipelineConfig, run
 from legolization import VoxelGrid as LegoGrid
 from legolization import pipeline as _lego_pipeline
 from legolization.catalog import Catalog, default_catalog
@@ -65,6 +65,7 @@ from legolization.layout import CollisionError
 from legolization.ldraw_in import LdrawImportError, layout_from_ldraw
 from legolization.ldraw_out import write_model
 from legolization.mesh import grid_from_mesh
+from legolization.placement.merge import resolve_ignore_colours
 from legolization.placement.registry import strategy_names
 from legolization.placement.repair import RepairConfig
 from legolization.stability import solver as _lego_solver
@@ -640,6 +641,290 @@ def _placement_catalog(catalog: Catalog) -> Iterator[None]:
         namespace["default_catalog"] = original
 
 
+# ---------------------------------------------------------------- hard time limit
+STAGE_GAUGES: Final = {
+    "pipeline.placed": "placed",
+    "pipeline.restored": "restored",
+    "pipeline.remerged": "remerged",
+}
+"""legolization's phase readings (``_phase_gauge``) kept as fallback states."""
+STAGE_LABELS: Final = {
+    "unchecked": "placement, before its stability check",
+    "placed": "placement and repair",
+    "restored": "refilling weak hollow parts",
+    "remerged": "the final merge",
+    "finished": "the finished run",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class RunState:
+    """A layout legolization reached during its run (ADR 0015).
+
+    ``stability`` is ``None`` for a layout whose stability check had not
+    finished (``stage == "unchecked"``).
+    """
+
+    stage: str
+    layout: Layout
+    stability: StabilityResult | None
+    loose_removed: tuple[str, ...] = ()
+    """LDraw numbers of loose parts :func:`drop_loose_parts` took out."""
+
+
+MAX_LOOSE_PARTS: Final = 3
+"""Up to this many parts that nothing holds are removed after placement."""
+
+
+def drop_loose_parts(
+    state: RunState,
+    config: PipelineConfig,
+    before_check: Callable[[RunState], None] | None = None,
+) -> RunState | None:
+    """``state`` without the few parts not connected to the ground, re-checked.
+
+    legolization sometimes leaves a single part that no stud connection
+    reaches (Duo at 48 studs: one 1 x 1 brick under an overhang), which makes
+    the whole model unbuildable. Up to :data:`MAX_LOOSE_PARTS` such parts are
+    removed and the stability is checked again; more are kept (removing
+    them would change the model visibly). ``before_check`` receives ``state``
+    before the new stability check starts. Returns ``None`` if nothing changes.
+    """
+    if state.stability is None:
+        return None
+    loose = ConnectionGraph.from_layout(state.layout).floating_ids()
+    if not loose or len(loose) > MAX_LOOSE_PARTS:
+        return None
+    layout = state.layout.copy()
+    removed = tuple(sorted(layout.part_of(layout.bricks[i]).ldraw_part for i in loose))
+    layout.remove_many(sorted(loose))
+    if before_check is not None:
+        before_check(state)
+    return RunState(state.stage, layout, analyze(layout, config.solver), removed)
+
+
+@dataclass(frozen=True, slots=True)
+class RunOutcome:
+    """What :func:`run_placement` got from legolization."""
+
+    states: tuple[RunState, ...]
+    """Intermediate states in the order legolization reached them."""
+    final: RunState | None
+    """The finished run's result; ``None`` if the time limit stopped it."""
+
+
+def state_rank(state: RunState) -> int:
+    """2: checked and buildable, 1: checked, 0: stability not checked."""
+    if state.stability is None:
+        return 0
+    return 2 if _report(state.layout, state.stability).buildable else 1
+
+
+def choose_state(
+    outcome: RunOutcome, rank: Callable[[RunState], int] = state_rank
+) -> tuple[RunState, list[str]]:
+    """The best state of a run: highest :func:`state_rank`, the latest on ties.
+
+    A finished run keeps its result unless only an earlier state is
+    buildable. Returns the state and notes for the user.
+
+    Raises:
+        BackendError: if the time limit stopped the run before any layout.
+    """
+    candidates = [*outcome.states, *(() if outcome.final is None else (outcome.final,))]
+    if not candidates:
+        msg = (
+            "the time limit was reached before legolization placed a first model; "
+            "raise placement.time_limit_s or make the model smaller (e.g. --size)"
+        )
+        raise BackendError(msg)
+    ranks = [rank(state) for state in candidates]
+    best = max(range(len(candidates)), key=lambda i: (ranks[i], i))
+    state = candidates[best]
+    label = STAGE_LABELS.get(state.stage, state.stage)
+    if outcome.final is None:
+        kind = {2: "best stable", 1: "best (not stable)", 0: "only"}[ranks[best]]
+        note = (
+            f"time limit reached: legolization was stopped; using the {kind} model "
+            f"found so far, after {label} ({len(state.layout)} parts). Raise "
+            "placement.time_limit_s for the full optimisation (usually fewer parts)"
+        )
+        return state, [note]
+    if state is outcome.final:
+        return state, []
+    note = (
+        "legolization's last passes left the model unstable; using the stable "
+        f"model after {label} ({len(state.layout)} parts)"
+    )
+    return state, [note]
+
+
+@contextmanager
+def _state_hook(on_state: Callable[[RunState], None]) -> Iterator[None]:
+    """Report every layout legolization's ``run()`` reaches (local patch).
+
+    ``run()`` has no callback for its intermediate results; it calls
+    ``_phase_gauge(name, layout, stability)`` after placement, every
+    refill round and the final merge, and ``analyze`` (module global)
+    before every stability check. Both are wrapped for the duration of
+    ``run()`` (docs/UPSTREAM.md #5).
+    """
+    namespace = _lego_pipeline.__dict__
+    gauge, check = namespace["_phase_gauge"], namespace["analyze"]
+
+    def phase_gauge(name: str, layout: Layout, stability: StabilityResult) -> None:
+        gauge(name, layout, stability)
+        if name in STAGE_GAUGES:
+            on_state(RunState(STAGE_GAUGES[name], layout, stability))
+
+    def analyze_hook(layout: Layout, *args: Any, **kwargs: Any) -> StabilityResult:
+        on_state(RunState("unchecked", layout, None))
+        result: StabilityResult = check(layout, *args, **kwargs)
+        return result
+
+    namespace["_phase_gauge"] = phase_gauge  # documented local patch
+    namespace["analyze"] = analyze_hook
+    try:
+        yield
+    finally:
+        namespace["_phase_gauge"], namespace["analyze"] = gauge, check
+
+
+def _check_state_hook() -> None:
+    """Fail early if legolization no longer has what :func:`_state_hook` wraps."""
+    namespace = _lego_pipeline.__dict__
+    if not all(callable(namespace.get(n)) for n in ("_phase_gauge", "analyze")):
+        msg = (
+            f"legolization {VERSION}: pipeline._phase_gauge/analyze changed; "
+            "revisit the local patch in backends/legolization.py"
+        )
+        raise BackendError(msg)
+
+
+_check_state_hook()
+
+
+def run_placement(
+    grid: LegoGrid,
+    config: PipelineConfig,
+    parts: frozenset[str],
+    *,
+    stop_at: Callable[[int], float] | None = None,
+    progress: Callable[[str], None] | None = None,
+) -> RunOutcome:
+    """Run legolization's pipeline, stopped at ``stop_at`` (ADR 0015).
+
+    ``stop_at(parts)`` gives the :func:`time.monotonic` time to stop, given
+    the part count of the latest state (0 before the first). With a stop
+    time the run happens in a child process that reports its states and is
+    terminated when the time is up; without one it runs in this process.
+    ``parts`` are the placeable LDraw parts (the whitelist).
+
+    Raises:
+        BackendError: if legolization rejects the input or fails.
+    """
+    if stop_at is None:
+        states: list[RunState] = []
+
+        def keep(state: RunState) -> None:
+            states.append(dataclasses.replace(state, layout=state.layout.copy()))
+
+        try:
+            with _placement_catalog(restricted_catalog(parts)), _state_hook(keep):
+                result = run(grid, config)
+        except ValueError as error:
+            raise BackendError(f"legolization rejected the input: {error}") from error
+        final = RunState("finished", result.layout, result.stability)
+        final = drop_loose_parts(final, config, states.append) or final
+        return RunOutcome(states=tuple(states), final=final)
+    return _run_in_child(grid, config, parts, stop_at, progress)
+
+
+def _run_in_child(
+    grid: LegoGrid,
+    config: PipelineConfig,
+    parts: frozenset[str],
+    stop_at: Callable[[int], float],
+    progress: Callable[[str], None] | None,
+) -> RunOutcome:
+    context = multiprocessing.get_context("spawn")
+    receiver, sender = context.Pipe(duplex=False)
+    worker = context.Process(
+        target=_run_worker,
+        args=(grid, dataclasses.replace(config, progress=None), parts, sender),
+        kwargs={"report_progress": progress is not None},
+        daemon=True,
+    )
+    worker.start()
+    sender.close()
+    states: list[RunState] = []
+    try:
+        while True:
+            known = len(states[-1].layout) if states else 0
+            wait = stop_at(known) - time.monotonic()
+            if wait <= 0 or not receiver.poll(wait):
+                if progress is not None:
+                    progress("time limit reached: stopping legolization")
+                return RunOutcome(states=tuple(states), final=None)
+            kind, payload = receiver.recv()
+            if kind == "progress" and progress is not None:
+                progress(payload)
+            elif kind == "state":
+                states.append(payload)
+            elif kind == "done":
+                return RunOutcome(states=tuple(states), final=payload)
+            elif kind == "rejected":
+                msg = f"legolization rejected the input: {payload}"
+                raise BackendError(msg)
+            elif kind == "error":
+                raise BackendError(f"placement failed: {payload}") from payload
+    except EOFError as error:
+        msg = "the placement process ended without a result"
+        raise BackendError(msg) from error
+    finally:
+        receiver.close()
+        if worker.is_alive():
+            worker.terminate()
+        worker.join(timeout=10)
+        if worker.is_alive():
+            worker.kill()
+            worker.join(timeout=10)
+
+
+def _run_worker(
+    grid: LegoGrid,
+    config: PipelineConfig,
+    parts: frozenset[str],
+    sender: Connection,
+    *,
+    report_progress: bool,
+) -> None:
+    """Child-process entry point: run and send states, progress and result."""
+
+    def send(kind: str, payload: object) -> None:
+        sender.send((kind, payload))
+
+    if report_progress:
+        config = dataclasses.replace(config, progress=lambda m: send("progress", m))
+    try:
+        with (
+            _placement_catalog(restricted_catalog(parts)),
+            _state_hook(lambda state: send("state", state)),
+        ):
+            result = run(grid, config)
+        final = RunState("finished", result.layout, result.stability)
+        # The unchanged result is sent first; it counts if the limit stops
+        # the new stability check.
+        final = drop_loose_parts(final, config, lambda s: send("state", s)) or final
+        send("done", final)
+    except ValueError as error:
+        send("rejected", str(error))
+    except Exception as error:  # reported to the parent
+        send("error", error)
+    finally:
+        sender.close()
+
+
 @dataclass(frozen=True, slots=True)
 class _Native:
     """What we keep of legolization's result to export without a round trip."""
@@ -703,19 +988,32 @@ class LegolizationBackend:
         config = self.pipeline_config(
             settings, height_unit=grid.height_unit, allowed=allowed
         )
-        lego_grid = to_lego_grid(grid)
-        try:
-            with _placement_catalog(restricted_catalog(allowed.parts)):
-                result = run(lego_grid, config)
-        except ValueError as error:
-            raise BackendError(f"legolization rejected the input: {error}") from error
-        stability = _report_from_result(result)
+        outcome = run_placement(
+            to_lego_grid(grid),
+            config,
+            allowed.parts,
+            stop_at=(
+                None
+                if deadline is None
+                else lambda parts: deadline - export_reserve_s(parts)
+            ),
+            progress=self._progress,
+        )
+        state, chosen = choose_state(outcome)
+        early.extend(chosen)
+        if state.loose_removed:
+            early.append(
+                f"removed {len(state.loose_removed)} loose part(s) that nothing holds "
+                f"({', '.join(state.loose_removed)}); stability checked again"
+            )
+        layout = state.layout
+        resolve_ignore_colours(layout)  # states before the final merge have them
+        stability = _report(layout, state.stability)
         if availability == "split":
-            report = split_unavailable(result.layout)
+            report = split_unavailable(layout)
+            if report.replaced and stability.checked:
+                stability = _report(layout, analyze(layout, config.solver))
             if report.replaced:
-                stability = _report(
-                    result.layout, analyze(result.layout, config.solver)
-                )
                 early.append(
                     f"replaced {report.replaced} part(s) LEGO does not make in their "
                     f"colour by {report.added} shorter one(s) "
@@ -726,15 +1024,15 @@ class LegolizationBackend:
                     f"{len(report.unresolved)} part(s) could not be replaced by "
                     "existing shorter parts; see the parts list"
                 )
-        plan, notes, checked = self._plan(result.layout, config, settings, deadline)
+        plan, notes, checked = self._plan(layout, config, settings, deadline)
         plan, units, refined = refine_plan(
-            result.layout, plan, settings.steps, checked=checked
+            layout, plan, settings.steps, checked=checked
         )
         notes = [*allowed.notes, *early, *notes, *refined]
-        native = _Native(layout=result.layout, plan=plan, checked=checked, units=units)
+        native = _Native(layout=layout, plan=plan, checked=checked, units=units)
         return Placement(
             model=to_brick_model(
-                result.layout,
+                layout,
                 plan,
                 name=name,
                 source=(
@@ -742,7 +1040,8 @@ class LegolizationBackend:
                 ),
                 checked=checked,
                 units=units,
-                buildable=stability.buildable,
+                buildable=stability.buildable if stability.checked else None,
+                best_so_far=outcome.final is None,
             ),
             stability=stability,
             backend=NAME,
@@ -1336,12 +1635,14 @@ def to_brick_model(
     checked: bool = True,
     units: Mapping[int, int] | None = None,
     buildable: bool | None = None,
+    best_so_far: bool = False,
 ) -> BrickModel:
     """Convert legolization's layout + plan into a :class:`BrickModel`.
 
     ``checked`` says whether the plan's per-step stability verdicts are real
     (layer-order plans carry placeholders); ``units`` maps brick ids to
-    their pre-assembly unit within the step.
+    their pre-assembly unit within the step; ``best_so_far`` marks a layout
+    the time limit cut short (ADR 0015).
     """
     step_of: dict[int, int] = {}
     steps: tuple[BuildStep, ...] = ()
@@ -1404,6 +1705,7 @@ def to_brick_model(
         source=source,
         mass_g=round(float(layout.total_mass_g()), 1),
         buildable=buildable,
+        best_so_far=best_so_far,
     )
 
 
@@ -1430,18 +1732,17 @@ def _backend_options(options: dict[str, Any]) -> dict[str, Any]:
     return dict(options)
 
 
-def _report_from_result(result: PipelineResult) -> StabilityReport:
-    return StabilityReport(
-        stable=result.stability.stable,
-        component_count=result.component_count,
-        floating_count=result.floating_count,
-        max_score=float(result.stability.max_score),
-        min_capacity_n=float(result.stability.min_capacity),
-    )
-
-
-def _report(layout: Layout, stability: StabilityResult) -> StabilityReport:
+def _report(layout: Layout, stability: StabilityResult | None) -> StabilityReport:
+    """Stability report; ``stability=None`` means the check did not finish."""
     graph = ConnectionGraph.from_layout(layout)
+    if stability is None:
+        return StabilityReport(
+            stable=False,
+            component_count=graph.component_count(),
+            floating_count=len(graph.floating_ids()),
+            max_score=math.nan,
+            checked=False,
+        )
     return StabilityReport(
         stable=stability.stable,
         component_count=graph.component_count(),

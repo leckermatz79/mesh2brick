@@ -114,6 +114,35 @@ def test_subassemblies_units_and_hints_render(tmp_path: Path) -> None:
     assert pages_of(data) == 3
 
 
+def test_cover_marks_a_model_cut_short_by_the_time_limit() -> None:
+    model = BrickModel(
+        name="big",
+        parts=(make_brick("3001", 0, 0, 0, 0),),
+        steps=(BuildStep(stable=None),),
+        best_so_far=True,
+        buildable=True,
+    )
+    notes = pdf_module._cover_notes(model, "de")
+    assert notes[0][0].startswith("Zeitgrenze erreicht: Das ist das beste stabile")
+    assert notes[0][1] == pdf_module.HINT_FILL
+    unchecked = pdf_module._cover_notes(replace(model, buildable=None), "en")
+    assert unchecked[0][0].startswith("Time limit reached before a stable model")
+    assert unchecked[0][1] == pdf_module.WARN_FILL
+    unstable = pdf_module._cover_notes(replace(model, buildable=False), "en")
+    assert [n[1] for n in unstable[:2]] == [pdf_module.WARN_FILL] * 2
+    assert not any(
+        "Time limit" in n[0]
+        for n in pdf_module._cover_notes(replace(model, best_so_far=False), "en")
+    )
+
+
+def test_booklet_of_a_model_cut_short_renders(
+    tmp_path: Path, sample_model: BrickModel
+) -> None:
+    model = replace(sample_model, best_so_far=True, buildable=True)
+    assert pages_of(write(model, tmp_path / "cut.pdf")) == 3
+
+
 @pytest.mark.parametrize("per_page", [1, 2, 4])
 def test_section_titles_and_step_texts_render(
     tmp_path: Path, sample_model: BrickModel, per_page: int
