@@ -21,7 +21,11 @@ on some LPs (reproducer: the low-poly bunny at 16 studs, after the slope pass
 and again during step sequencing), which hangs the whole pipeline. We add a
 time limit to all but the last attempt - in both LP paths (scipy ``linprog``
 and direct ``highspy``) - so a stalled variant gives up and the next one,
-which solves such LPs in seconds, takes over.
+which solves such LPs in seconds, takes over. For large models (Duo at 48
+studs: 2,392 parts) neither simplex variant finishes and the interior-point
+method spends hours in its final "crossover"; the scipy path therefore tries
+the interior-point method *without* crossover before the original last
+attempt (49 s instead of more than an hour).
 """
 
 from __future__ import annotations
@@ -33,6 +37,7 @@ import multiprocessing
 import re
 import time
 import types
+import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Final, cast
@@ -137,11 +142,18 @@ _LAYER_PLAN_WARNING: Final = (
     "(steps.sequencing=layers); support overhangs by hand"
 )
 LP_ATTEMPT_TIME_LIMIT_S: Final = 5.0
-"""Wall-clock limit for every LP attempt except the last (local patch)."""
+"""Wall-clock limit for every simplex LP attempt (local patch)."""
+LP_IPM_TIME_LIMIT_S: Final = 300.0
+"""Wall-clock limit for the interior-point attempt without crossover."""
+IPM_WITHOUT_CROSSOVER: Final = ("highs-ipm", {"run_crossover": "off"})
 
 
 def _limit_lp_attempts() -> None:
     """Give legolization's LP attempts a time limit (idempotent local patch).
+
+    Every attempt but the last gets :data:`LP_ATTEMPT_TIME_LIMIT_S`; before
+    the last, the interior-point method without crossover gets
+    :data:`LP_IPM_TIME_LIMIT_S`.
 
     Raises:
         BackendError: if legolization changed in a way the patch does not expect.
@@ -153,15 +165,38 @@ def _limit_lp_attempts() -> None:
             "revisit the local patch in backends/legolization.py"
         )
         raise BackendError(msg)
-    patched = (
-        *(
-            (method, {**(options or {}), "time_limit": LP_ATTEMPT_TIME_LIMIT_S})
-            for method, options in attempts[:-1]
-        ),
-        attempts[-1],
-    )
-    _lego_solver._LP_ATTEMPTS = patched  # documented local patch
+    if not isinstance(_lego_solver.__dict__.get("linprog"), _QuietLinprog):
+        method, options = IPM_WITHOUT_CROSSOVER
+        patched = (
+            *(
+                (method, {**(options or {}), "time_limit": LP_ATTEMPT_TIME_LIMIT_S})
+                for method, options in attempts[:-1]
+            ),
+            (method, {**options, "time_limit": LP_IPM_TIME_LIMIT_S}),
+            attempts[-1],
+        )
+        _lego_solver._LP_ATTEMPTS = patched  # documented local patch
+        namespace = _lego_solver.__dict__
+        namespace["linprog"] = _QuietLinprog(namespace["linprog"])
     _lego_solver.__dict__["highspy"] = _HIGHSPY_SHIM
+
+
+class _QuietLinprog:
+    """scipy's ``linprog`` without its warning for HiGHS-only options.
+
+    scipy passes options it does not know (``run_crossover``) to HiGHS
+    verbatim and warns about each call; the option is intended here.
+    """
+
+    def __init__(self, linprog: Callable[..., Any]) -> None:
+        self._linprog = linprog
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", re.escape("Unrecognized options detected: {'run_crossover'")
+            )
+            return self._linprog(*args, **kwargs)
 
 
 class TimeLimitedHighs(highspy.Highs):

@@ -5,12 +5,14 @@
 ``stalled_lp.npz`` is a stability LP captured from legolization 0.5.0 (low-poly
 bunny, 16 studs, slopes on) on which HiGHS presolve stalls indefinitely. With
 the patch, the first attempt gives up after ``LP_ATTEMPT_TIME_LIMIT_S`` and
-the presolve-free attempt solves it in a few seconds.
+the presolve-free attempt solves it in a few seconds. Large LPs that neither
+simplex variant solves get the interior-point method without crossover next.
 """
 
 from __future__ import annotations
 
 import time
+import warnings
 from pathlib import Path
 
 import highspy
@@ -20,7 +22,12 @@ from legolization.stability import solver
 from scipy import sparse
 from scipy.optimize import linprog
 
-from mesh2brick.backends.legolization import LP_ATTEMPT_TIME_LIMIT_S, TimeLimitedHighs
+from mesh2brick.backends.legolization import (
+    LP_ATTEMPT_TIME_LIMIT_S,
+    LP_IPM_TIME_LIMIT_S,
+    TimeLimitedHighs,
+    _limit_lp_attempts,
+)
 
 pytestmark = pytest.mark.slow
 
@@ -39,10 +46,42 @@ def stalled_lp(fixtures_dir: Path) -> Lp:
 
 def test_patch_is_installed() -> None:
     attempts = solver._LP_ATTEMPTS
-    assert all(o["time_limit"] == LP_ATTEMPT_TIME_LIMIT_S for _, o in attempts[:-1])
+    assert len(attempts) == 4
+    assert all(o["time_limit"] == LP_ATTEMPT_TIME_LIMIT_S for _, o in attempts[:2])
+    assert attempts[2] == (
+        "highs-ipm",
+        {"run_crossover": "off", "time_limit": LP_IPM_TIME_LIMIT_S},
+    )
     assert attempts[-1][1] is None or "time_limit" not in attempts[-1][1]
     assert solver.highspy.Highs is TimeLimitedHighs
     assert solver.highspy.HighsLp is highspy.HighsLp  # everything else untouched
+
+
+def test_patch_is_idempotent() -> None:
+    attempts = solver._LP_ATTEMPTS
+    _limit_lp_attempts()
+    assert attempts is solver._LP_ATTEMPTS
+
+
+def test_ipm_without_crossover_agrees_and_stays_quiet(stalled_lp: Lp) -> None:
+    """The extra attempt finds the same optimum, without scipy's option warning."""
+    cost, a_ub, b_ub = stalled_lp
+    reference = linprog(
+        c=cost, A_ub=a_ub, b_ub=b_ub, bounds=(0, None), options={"presolve": False}
+    )
+    method, options = solver._LP_ATTEMPTS[2]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = solver.linprog(
+            c=cost,
+            A_ub=a_ub,
+            b_ub=b_ub,
+            bounds=(0, None),
+            method=method,
+            options=options,
+        )
+    assert result.success
+    assert result.fun == pytest.approx(reference.fun, rel=1e-3)  # IPM tolerance
 
 
 def test_scipy_path_solves_the_stalled_lp(stalled_lp: Lp) -> None:

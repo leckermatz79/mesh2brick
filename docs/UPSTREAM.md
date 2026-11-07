@@ -10,7 +10,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 
 | # | Where | What | Remove when |
 |---|---|---|---|
-| 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`) | Adds a 5 s time limit to every stability-LP attempt except the last, in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`). | legolization ships per-attempt time limits (candidate #2) |
+| 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`, `_QuietLinprog`) | Adds a 5 s time limit to every stability-LP attempt except the last, in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`). Since Roadmap 2 the scipy path also tries the interior-point method **without crossover** (300 s limit) before the original last attempt: the first stability LP of Duo at 48 studs (2,392 parts, 52,476 × 113,101) is not solved by any simplex variant in 180 s, and IPM with crossover ran for more than an hour; without crossover it takes 49 s. | legolization ships per-attempt time limits (candidate #2) and a crossover-free IPM attempt |
 | 8 | `src/mesh2brick/backends/legolization.py` (`_placement_catalog`) | During `run()`, `legolization.pipeline.default_catalog` returns a catalogue reduced to the whitelisted parts; restored afterwards (also on errors). | a legolization release contains `run(..., catalog=...)` (on `main` since 65d6afb); then pass the catalogue instead |
 
 ## Candidates
