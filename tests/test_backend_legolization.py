@@ -316,12 +316,25 @@ def test_plan_with_timeout(heart_placement: Placement) -> None:
 
 
 def test_expired_deadline_falls_back_to_layers(
-    backend: LegolizationBackend, heart: VoxelGrid
+    backend: LegolizationBackend, heart_placement: Placement
 ) -> None:
     settings = load_settings(None, ["steps.sequencing=thorough"])
-    placement = backend.place(heart, settings, name="h", deadline=time.monotonic())
-    assert any("time limit reached" in note for note in placement.notes)
-    assert placement.model.part_count > 0
+    layout = heart_placement.native.layout  # type: ignore[union-attr]
+    plan, notes, checked = backend._plan(
+        layout, backend.pipeline_config(settings), settings, time.monotonic()
+    )
+    assert not checked
+    assert any("time limit reached" in note for note in notes)
+    assert sorted(b for s in plan.steps for b in s.brick_ids) == sorted(
+        b.brick_id for b in layout
+    )
+
+
+def test_expired_deadline_before_placement_is_reported(
+    backend: LegolizationBackend, heart: VoxelGrid
+) -> None:
+    with pytest.raises(BackendError, match="before legolization placed a first"):
+        backend.place(heart, Settings(), name="h", deadline=time.monotonic())
 
 
 def test_auto_uses_layers_for_big_models(

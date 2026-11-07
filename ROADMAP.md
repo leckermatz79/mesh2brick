@@ -1,6 +1,7 @@
 # mesh2brick – Roadmap after 1.0
 
-Status: draft by the product owner, 2026-11-07. Lives in the repo root next to SPEC.md.
+Status: draft by the product owner, 2026-11-07; updated 2026-11-07 after Roadmap 2 (item 8 split: its speed part
+moved to 1.x as 1.3.0). Lives in the repo root next to SPEC.md.
 SPEC.md stays the source of truth for *how* we work; this file says *what* comes next and in which order.
 Claude Code: treat each numbered item as a candidate issue. Before starting one, write the acceptance
 criteria into the issue, as in Phases 0–8.
@@ -38,6 +39,17 @@ Goal: whatever size the user asks for, they get a stable model or an honest "bes
    Add a plate-aware term; acceptance: 15 of 15 test runs inside the shown range.
 6. **Feedback scale documented** in `--help` and README (1–5 stars, 5 = best).
 7. Housekeeping: trimesh bug report (owner submits), optional release pages for v0.0.0–v0.7.0.
+8. **Slopes, fast: solver order and slopes back on (moved up from 2.0, product owner 2026-11-07).** The
+   "HiGHS hang" with slopes is solved by the order of the LP attempts, not by new placement code: on slope
+   layouts simplex presolve stalls (upstream #88) while the interior-point method without crossover solves
+   the same LPs in under a second (bunny, 16 studs, slopes: 147 s → 17.5 s with it first; docs/benchmarks.md,
+   "Slopes on the new path"). Change the order to "simplex 1 s, then interior point without crossover, then
+   the 1.2 chain"; the 5 s cap per attempt stays. Acceptance: small models are not noticeably slower than in
+   1.2; slopes are on by default only if every fixture stays one stable piece and needs at most twice the time
+   without slopes; slopes are drawn as slopes in previews and PDFs. Placing *more* slopes stays in 2.0 (item 8
+   there).
+
+Order of work: 1 and 2 (done), then 8 (1.3.0), then 3–7.
 
 ---
 
@@ -46,9 +58,11 @@ Goal: whatever size the user asks for, they get a stable model or an honest "bes
 Goal: organic shapes (Duo's wings, the toadstool cap) look like LEGO designs, not voxel art.
 Metric for every item: surface deviation to the input mesh (and part count) at unchanged stability.
 
-8. **Slopes, fast.** Prerequisite: the HiGHS hang (upstream #88/#89) is fixed or bypassed. Pre-select slope
-   candidates geometrically (outer edges with matching neighbour pattern) so the solver sees few options.
-   Acceptance: bunny with slopes in < 2× the time without slopes; deviation measurably lower.
+8. **More slopes** (the 2.0 part of item 8; its speed part moved to 1.x as 1.3.0, which also removed the
+   HiGHS hang). legolization's `preserve` mode only swaps exact profile matches and places few slopes at brick
+   height (4 on 224 parts, 14 on 873). Pre-select slope candidates geometrically (outer edges with matching
+   neighbour pattern) so more slopes are placed. Acceptance: deviation measurably lower at unchanged
+   stability, bunny with slopes in < 2× the time without slopes.
 9. **Tiles on surfaces meant to be smooth** (tops, bases, eyes). Rule: a top face that the input mesh renders
    flat and that no part sits on gets a tile instead of a plate.
 10. **Curved parts** (arches, round bricks, round plates) at convex edges. Start with 1×1 round and 2×2 round;

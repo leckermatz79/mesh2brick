@@ -10,7 +10,8 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 
 | # | Where | What | Remove when |
 |---|---|---|---|
-| 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`) | Adds a 5 s time limit to every stability-LP attempt except the last, in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`). | legolization ships per-attempt time limits (candidate #2) |
+| 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`, `_QuietLinprog`) | Adds a 5 s time limit to every stability-LP attempt except the last, in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`). Since Roadmap 2 the scipy path also tries the interior-point method **without crossover** (300 s limit) before the original last attempt: the first stability LP of Duo at 48 studs (2,392 parts, 52,476 × 113,101) is not solved by any simplex variant in 180 s, and IPM with crossover ran for more than an hour; without crossover it takes 49 s. | legolization ships per-attempt time limits (candidate #2) and a crossover-free IPM attempt |
+| 5 | `src/mesh2brick/backends/legolization.py` (`_state_hook`) | During `run()`, `legolization.pipeline._phase_gauge` and `pipeline.analyze` are wrapped to report every intermediate layout (before each stability check, after placement, refill rounds and the final merge), so a run stopped at the time limit can return its best state (ADR 0015). | `run()` offers a phase callback and a deadline for all phases (candidate #5) |
 | 8 | `src/mesh2brick/backends/legolization.py` (`_placement_catalog`) | During `run()`, `legolization.pipeline.default_catalog` returns a catalogue reduced to the whitelisted parts; restored afterwards (also on errors). | a legolization release contains `run(..., catalog=...)` (on `main` since 65d6afb); then pass the catalogue instead |
 
 ## Candidates
@@ -18,10 +19,10 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | # | Project | Topic | Why | Status | Link |
 |---|---|---|---|---|---|
 | 1 | legolization | Ship a `py.typed` marker (PEP 561) | The package is fully annotated, but type checkers ignore it without the marker. We currently work around it with a mypy override (`follow_untyped_imports`). It's a one-line change in the package data. | idea | – |
-| 2 | legolization | **Stability LPs can hang forever: HiGHS presolve stalls, and no attempt has a time limit** | Makes the pipeline hang indefinitely on some models with slopes enabled. Filed after approval (2026-11-01), with a note that it surfaced in a vibe-coding project; draft PR adds `SolverConfig.lp_attempt_time_limit_s` (default 5 s) in both LP paths, 5 tests. | opened | [issue #88](https://github.com/hbmartin/legolization/issues/88), [draft PR #89](https://github.com/hbmartin/legolization/pull/89) (branch `leckermatz79:fix/lp-attempt-time-limit`) |
+| 2 | legolization | **Stability LPs can hang forever: HiGHS presolve stalls, and no attempt has a time limit** | Makes the pipeline hang indefinitely on some models with slopes enabled. Filed after approval (2026-11-01), with a note that it surfaced in a vibe-coding project; draft PR adds `SolverConfig.lp_attempt_time_limit_s` (default 5 s) in both LP paths, 5 tests. Follow-up (2026-11-07): the slow part is often the attempt order; the crossover-free interior point attempt solves the large LPs (Duo at 48 studs) and the slope LPs (bunny 147 s → 17.5 s with it first); posted as a [comment on #89](https://github.com/hbmartin/legolization/pull/89#issuecomment-6712391855) with a [pointer on #88](https://github.com/hbmartin/legolization/issues/88#issuecomment-6712393969) (draft #2b). | opened | [issue #88](https://github.com/hbmartin/legolization/issues/88), [draft PR #89](https://github.com/hbmartin/legolization/pull/89) (branch `leckermatz79:fix/lp-attempt-time-limit`) |
 | 3 | legolization | Volume-fraction voxelization for `legolization.mesh` | Its surface-plus-fill voxelizer adds +8 % to +27 % volume on our fixtures. mesh2brick's column rasterization (ADR 0003) is exact to ~0.1 % and faster. We could offer it as an option. | idea | – |
 | 4 | legolization | Solid palette contains non-brick and non-solid colours ("Conductive Black", "Fluorescent * Ink", "Cool Silver", "Flat Silver" (a pearl finish), rare colours like "Warm Yellowish Orange") | RGB quantization can pick colours no brick is sold in. mesh2brick restricts the palette itself (ADR 0008: common colours from Rebrickable statistics). An optional "common colours" palette upstream would help every user. | idea | – |
-| 5 | legolization | Time budget for `final_remerge` and step sequencing | Both ignore `time_budget_s` in 0.5.0 and dominate large models (remerge 40–170 s, sequencing 4–7 min at ~1,000 parts, docs/benchmarks.md). mesh2brick works around sequencing with a child process and a layer-order fallback (ADR 0006). | idea | – |
+| 5 | legolization | Time budget for every phase of `run()` and a phase callback | `final_remerge`, the stability checks and step sequencing ignore `time_budget_s` in 0.5.0 and dominate large models (remerge 40–170 s, sequencing 4–7 min at ~1,000 parts, one stability check > 1 h for 2,392 parts, docs/benchmarks.md). mesh2brick works around it with child processes: steps since ADR 0006, the whole run since ADR 0015 (local patch #5 reads the intermediate layouts). An optional `on_phase(name, layout, stability)` callback in `PipelineConfig` plus the deadline checked before the remerge would let callers stop early and keep the best stable layout. A crossover-free IPM attempt for large stability LPs belongs to the same topic (see local patch #2). | idea | – |
 | 6 | legolization | `plan_instructions` ignores `InstructionsConfig.mode="layer"`; booklet only English, fonts not embedded | A cheap layer plan helper (mesh2brick's `layer_plan`) and i18n/embedded fonts would help every user. Since Phase 6 mesh2brick draws its own booklet (ADR 0011), so this is no longer needed here. | idea | – |
 | 7 | trimesh | glTF `baseColorFactor` is kept as bytes of the *linear* value | Converting back to sRGB loses up to ±3 levels in dark tones (STEP 0.1 grey arrives as 28 instead of 26). Harmless for LEGO colours; storing floats would be exact. | idea | – |
 | 8 | legolization | **Part whitelist: `PipelineConfig.catalog` (or `allowed_parts`) for `run()`** | `run()` always places from `default_catalog()`; users cannot exclude parts they do not own or want. mesh2brick patches `default_catalog` for the duration of `run()`. Also worth documenting: the 1 x 1 brick/plate and the three slopes are looked up by name, so a filtered catalogue must keep them (else `KeyError`). Approved by the product owner on 2026-11-01. **Update:** upstream `main` already has `run(grid, config, *, catalog=None)` (commit 65d6afb, not in a release yet), so no new field is needed; what remains is failing early with a clear error when a catalogue lacks the parts placed by key (prepared: branch `feat/pipeline-catalog` on the fork, 3 files, +115/−2, legolization's full test suite green). Remove our local patch #8 once a release contains `run(catalog=)`. Filed by the product owner on 2026-11-01; the issue mentions the vibe-coding context and refers to #88/#89. | opened | [issue #90](https://github.com/hbmartin/legolization/issues/90), [draft PR #91](https://github.com/hbmartin/legolization/pull/91) (branch `leckermatz79:feat/pipeline-catalog`) |
@@ -58,6 +59,38 @@ slopes off it takes 8 s.
 optional pipeline deadline already on `main`. A follow-up question worth a look: why
 slope-substituted layouts make the LP so much harder for presolve (degenerate or
 near-duplicate contact rows?).
+
+## Draft #2b: comment on #89 and pointer on #88 (posted by the product owner on 2026-11-07: [#89 comment](https://github.com/hbmartin/legolization/pull/89#issuecomment-6712391855), [#88 pointer](https://github.com/hbmartin/legolization/issues/88#issuecomment-6712393969))
+
+Comment on [draft PR #89](https://github.com/hbmartin/legolization/pull/89):
+
+A follow-up from more measurements, because it changes what I think the real fix is: the slow part is often the *order* of the attempts, not a missing time limit.
+
+**1. Large stability LPs: the time goes into the interior-point crossover.** On a 2,392-part layout (a hollow figure at 48 studs, placed with `kollsker`), the first `analyze()` after placement builds an LP of 52,476 × 113,101 with about 1 million non-zeros. Solved on its own (HiGHS via scipy 1.18.1 / highspy 1.15.1, Apple M2 Max):
+
+| Attempt | Result |
+|---|---|
+| `highs` (dual simplex, presolve on), 1st attempt | not solved in 180 s |
+| `highs` with `presolve=False`, 2nd attempt | not solved in 180 s |
+| primal simplex | not solved in 180 s |
+| `highs-ipm` (3rd attempt, crossover on by default) | still running after 19 minutes |
+| `highs-ipm` with `run_crossover="off"` | optimal in 48.6 s |
+
+So with this PR's 5 s cap that run still never finishes: attempts 1 and 2 give up after 5 s each, and the last attempt spends its unbounded time in crossover.
+
+**2. Layouts with slopes (the #88 case): simplex is the slow part.** The low-poly bunny at 16 studs (`luo`, slopes `preserve`, 224 bricks) takes 147 s with the 5 s cap, against 7.8 s without slopes. Logging every attempt shows why: presolve hits the cap on 18 of 45 LPs (scipy and direct-highspy path), and several presolve-free attempts as well, while `highs-ipm` solves each of those LPs in under 1 s, even with crossover. With the crossover-free IPM tried *first* in both paths, the same run takes 17.5 s and gives the same layout (224 bricks, 4 slopes, 45 steps, stable). On a bigger case (873 bricks, `kollsker`, slopes on) it goes from 99 s to 49 s, faster than the same model without slopes today, because both simplex attempts hit the cap on every LP of that size.
+
+IPM first is not free on small, easy LPs: the bunny *without* slopes goes from 7.8 s to 17 s. A short simplex attempt first (around 1 s, where the easy LPs finish), then the crossover-free IPM, then the current chain, would probably get the best of both; I haven't measured that order yet.
+
+**Does the crossover-free IPM change verdicts?** `_score` only needs a feasible, optimal force vector, not a vertex. I solved every stability LP of five placements (153 to 1,499 bricks, 34 LPs) with the current chain and with `("highs-ipm", {"run_crossover": "off"})`, and scored both solutions with `_score`: all 34 `stable` verdicts agree, including two unstable ones with the same bricks out of equilibrium. The objective agrees within the IPM tolerance; per-brick drag differs slightly where the optimum is not unique (largest score 0.064 instead of 0.070 in one case).
+
+**Suggestion:** add `("highs-ipm", {"run_crossover": "off"})` to `_LP_ATTEMPTS` (and `setOptionValue("run_crossover", "off")` for an IPM run in `_solve_lp_highspy`), at least before the final `("highs-ipm", None)`, and consider moving it to second place after a short simplex attempt. scipy passes `run_crossover` to HiGHS verbatim and emits an `OptimizeWarning` for the unknown option, so the call may want to filter that warning. The 5 s cap from this PR still matters for the presolve stall itself.
+
+mesh2brick uses the crossover-free attempt before the last one as a local patch (all fixtures unchanged, Duo at 48 studs from "stopped after an hour" to a stable model in 12 minutes). Happy to add it to this PR, or to open a separate one with the attempt order and a size threshold, whichever you prefer.
+
+Pointer on [issue #88](https://github.com/hbmartin/legolization/issues/88):
+
+Update: the stall reported here turned out to be part of a broader pattern. On slope layouts, simplex (presolve on, and sometimes off) is slow on many stability LPs, while the interior-point method solves them in under a second; on very large layouts, the interior-point crossover is what never finishes. Measurements and a suggested attempt order are in the new comment on #89.
 
 ## Draft #8 (approved 2026-11-01; superseded: upstream `main` already accepts `catalog=`, so the filed contribution only adds the early check, see issue #90 / draft PR #91)
 

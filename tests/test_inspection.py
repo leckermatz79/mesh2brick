@@ -16,13 +16,12 @@ from mesh2brick.backends.legolization import color_info
 from mesh2brick.cli import app
 from mesh2brick.config import load_settings
 from mesh2brick.inspection import (
-    CELLS_PER_PART,
     PANEL_PX,
     inspect_file,
     inspection_text,
-    quick_fill,
     render_inspection,
 )
+from mesh2brick.voxel.estimate import CELLS_PER_PART, quick_fill
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -81,6 +80,20 @@ def test_voxel_file(fixtures_dir: Path) -> None:
     assert text.startswith("heart.vox: voxel grid, ")
     picture = Image.open(io.BytesIO(render_inspection(result, colors)))
     assert picture.size == (PANEL_PX, PANEL_PX)
+
+
+def test_big_models_get_a_time_advice(
+    fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = load_settings(None, [])
+    result = inspect_file(fixtures_dir / "heart.vox", settings, name="heart")
+    colors = color_info(result.grid.colors_used)
+    assert "--time" not in inspection_text(result, settings, colors)
+    monkeypatch.setattr("mesh2brick.pipeline.TIME_HINT_PARTS", 5)
+    text = inspection_text(result, settings, colors)
+    assert text.splitlines()[-1].endswith("recommended: --time 20min")
+    patient = load_settings(None, ["placement.time_limit_s=1200"])
+    assert "--time" not in inspection_text(result, patient, colors)
 
 
 def test_unsupported_file(tmp_path: Path) -> None:
@@ -195,7 +208,7 @@ def test_estimate_falls_back_to_cells_for_huge_grids(
 ) -> None:
     result = inspect_file(fixtures_dir / "heart.vox", load_settings(None, []), name="h")
     exact = result.parts_estimate
-    monkeypatch.setattr("mesh2brick.inspection.MAX_FILL_CELLS", 0)
+    monkeypatch.setattr("mesh2brick.voxel.estimate.MAX_FILL_CELLS", 0)
     rough = result.parts_estimate
     assert rough[1] == round(result.grid.filled_count / CELLS_PER_PART * 1.3)
     assert exact[0] <= 12 <= exact[2]  # heart.vox places 12 parts

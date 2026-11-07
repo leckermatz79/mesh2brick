@@ -22,11 +22,12 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 Cell = tuple[int, int, int]
-SCHEMA_VERSION: Final = 3
+SCHEMA_VERSION: Final = 4
 """Version 2 (Phase 6) added step verdicts, pre-assembly units, mass and the
 buildability verdict; version 3 (Phase 7) added section titles and step
-texts. Older files still load (the new fields default)."""
-READABLE_SCHEMAS: Final = frozenset({1, 2, SCHEMA_VERSION})
+texts; version 4 (Roadmap 2) the time-limit mark ``best_so_far``. Older
+files still load (the new fields default)."""
+READABLE_SCHEMAS: Final = frozenset({1, 2, 3, SCHEMA_VERSION})
 MAX_SECTION_CHARS: Final = 40
 MAX_STEP_TEXT_CHARS: Final = 200
 MM_PER_STUD: Final = 8.0
@@ -146,6 +147,9 @@ class BrickModel:
     buildable: bool | None = None
     """Backend verdict on the finished model: stable, one piece, nothing loose
     (``None``: not checked)."""
+    best_so_far: bool = False
+    """The time limit stopped the backend; this is the best model it had found
+    by then (ADR 0015)."""
 
     def __post_init__(self) -> None:
         if self.parts and not self.steps:
@@ -232,6 +236,7 @@ class BrickModel:
             "source": self.source,
             "mass_g": self.mass_g,
             "buildable": self.buildable,
+            "best_so_far": self.best_so_far,
             "steps": [asdict(step) for step in self.steps],
             "colors": {str(code): asdict(info) for code, info in self.colors.items()},
             "parts": [
@@ -267,6 +272,7 @@ class BrickModel:
             buildable=(
                 None if data.get("buildable") is None else bool(data["buildable"])
             ),
+            best_so_far=bool(data.get("best_so_far", False)),
         )
 
     def to_json(self) -> str:

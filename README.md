@@ -61,6 +61,11 @@ uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/ --size 30cm
 uv run mesh2brick convert tests/fixtures/rocket.blend -o out/ --size 30cm
 uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs
 
+# Time limit: a conversion takes at most 5 minutes. If a big model needs longer, you get
+# the best stable model found by then, and the PDF cover says so. inspect and convert
+# suggest more time from about 2,000 parts ("recommended: --time 20min"):
+uv run mesh2brick convert model.stl -o out/ --size 40cm --time 20min
+
 # Or stage by stage:
 # 1. Voxelize a mesh onto the stud grid (longest axis = 32 studs by default)
 uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs

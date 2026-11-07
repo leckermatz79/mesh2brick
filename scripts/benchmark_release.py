@@ -3,7 +3,7 @@
 """v1.0 acceptance (SPEC §9): every fixture end to end, plus a big STEP model.
 
     uv run python scripts/benchmark_release.py --out out/release \\
-        [--local samples/model.3mf@32 ...]
+        [--local samples/model.3mf@32 ...] [--local samples/model.3mf@48:1200]
 
 Runs the real command line (``mesh2brick convert``) once per input, one after
 the other, and measures the wall-clock time of the whole process. Afterwards
@@ -15,7 +15,8 @@ cell count of ``mesh2brick inspect`` to calibrate its rough part estimate.
 The STEP case is built on the fly (a small castle of boxes, see
 ``castle_step``) and converted with ``--config examples/mesh2brick.yaml``,
 the literal SPEC §9 command. ``--local`` adds models that must not be
-published (only their numbers are printed).
+published (only their numbers are printed); ``@STUDS:SECONDS`` also sets
+``placement.time_limit_s``.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import subprocess
 import sys
 import time
@@ -58,7 +60,9 @@ def castle_step() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=Path("out/release"))
-    parser.add_argument("--local", action="append", default=[], help="MODEL@STUDS")
+    parser.add_argument(
+        "--local", action="append", default=[], help="MODEL@STUDS[:SECONDS]"
+    )
     parser.add_argument("--skip-fixtures", action="store_true")
     parser.add_argument("--results", default="results.json", help="file name in OUT")
     args = parser.parse_args()
@@ -83,15 +87,19 @@ def main() -> None:
         }
     )
     for text in args.local:
-        source, _, studs = text.rpartition("@")
+        source, _, size = text.rpartition("@")
+        studs, _, limit = size.partition(":")
         path = Path(source)
+        overrides = [f"input.target_studs={studs}"]
+        if limit:
+            overrides.append(f"placement.time_limit_s={limit}")
         cases.append(
             {
-                "label": f"{path.stem} @{studs} (local)",
+                "label": f"{path.stem} @{size} (local)",
                 "path": path,
                 "public": False,
-                "set": [f"input.target_studs={studs}"],
-                "name": f"{path.stem}-{studs}",
+                "set": overrides,
+                "name": f"{path.stem}-{size.replace(':', '-')}",
             }
         )
     rows: list[dict[str, Any]] = []
@@ -159,6 +167,8 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
         "steps": model.step_count,
         "colours": len(model.colors),
         "buildable": model.buildable,
+        "best_so_far": model.best_so_far,
+        "stages": _stages(done.stdout),
         "all_files": all(f.is_file() for f in files),
         "bom_total": bom_total,
         "ldraw_parts": LegolizationBackend().verify_ldraw(ldraw),
@@ -169,6 +179,13 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     }
     print(json.dumps(row, default=str), flush=True)
     return row
+
+
+def _stages(stdout: str) -> dict[str, float]:
+    """Seconds per stage from the ``time: ... (voxelize 12 s, ...)`` line."""
+    line = next((x for x in stdout.splitlines() if x.strip().startswith("time:")), "")
+    stages = re.findall(r"(\w+) (\d+) s", line.partition("(")[2])
+    return {name: float(seconds) for name, seconds in stages}
 
 
 def _print_table(rows: list[dict[str, Any]]) -> None:
@@ -190,7 +207,9 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
         ratio = row["parts"] / row["shell_cells"] if row["shell_cells"] else 0
         print(
             f"| {row['label']} | {row['parts']:,} | {row['steps']} | {row['colours']} "
-            f"| {'yes' if row['buildable'] else 'NO'} | {'yes' if checks else 'NO'} "
+            f"| {'yes' if row['buildable'] else 'NO'}"
+            f"{' (best so far)' if row.get('best_so_far') else ''} "
+            f"| {'yes' if checks else 'NO'} "
             f"| {row['pdf_mb']} | {row['seconds']:.0f} | {row['shell_cells']:,} "
             f"| {ratio:.2f} |"
         )

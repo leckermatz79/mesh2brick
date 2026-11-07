@@ -141,6 +141,7 @@ placement:
   backend: legolization
   strategy: kollsker    # wird 1:1 an legolization durchgereicht; Standard per Benchmark (2026-11-01, docs/benchmarks.md), vorher luo
   seed: 0
+  time_limit_s: 300     # 2026-11-01 (ADR 0006): Zeitbudget pro Umwandlung; seit 2026-11-07 (Roadmap 2, ADR 0015) eine harte Grenze: danach das beste stabile Modell bis dahin, auf dem Deckblatt markiert. CLI: --time 20min | 90s | 1h (PO); keine automatische Verlängerung, aber ab ~2.000 geschätzten Teilen der Hinweis „recommended: --time 20min“ in inspect und convert
 stability:
   enabled: true
   max_repair_iterations: 20

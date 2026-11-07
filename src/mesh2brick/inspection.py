@@ -20,10 +20,11 @@ import numpy as np
 
 from mesh2brick.backends.legolization import load_voxel_file
 from mesh2brick.ingest import load_model, supported_suffixes
-from mesh2brick.pipeline import VOXEL_SUFFIXES, palette_for
+from mesh2brick.pipeline import VOXEL_SUFFIXES, palette_for, time_hint
 from mesh2brick.render.mesh import NEUTRAL_RGB, render_mesh_png, side_by_side
 from mesh2brick.render.preview import PreviewOptions, grid_to_model, render_png
 from mesh2brick.voxel.color import sample_rgb
+from mesh2brick.voxel.estimate import parts_estimate
 from mesh2brick.voxel.grid import LEGO_MM_PER_STUD, lego_cell_height_mm
 from mesh2brick.voxel.io import load_npz
 from mesh2brick.voxel.voxelize import hollow, scale_note, voxelize
@@ -40,18 +41,6 @@ if TYPE_CHECKING:
     from mesh2brick.voxel.grid import VoxelGrid
     from mesh2brick.voxel.voxelize import VoxelizeReport
 
-FOOTPRINTS: Final = ((2, 8), (2, 6), (2, 4), (2, 3), (2, 2), (1, 8), (1, 6), (1, 4))
-"""Brick/plate footprints (studs) for the quick fill, beside 1 x 3, 1 x 2, 1 x 1."""
-ESTIMATE_FACTORS: Final = (0.9, 1.3, 2.0)
-"""Placed parts per part of the quick fill (low, typical, high). Measured on
-15 conversions (docs/benchmarks.md, Phase 8): 14 between 0.93 and 1.76, median
-1.3. The quick fill knows neither the hollowing nor the stability repairs,
-which add parts; thin wide slabs that legolization builds from plates can
-need more (3.6 x for a castle courtyard)."""
-MAX_FILL_CELLS: Final = 400_000
-"""Bigger grids are estimated from their cell count (the fill is a Python loop)."""
-CELLS_PER_PART: Final = 6.0
-"""Fallback: filled cells per part of the quick fill (typical for big models)."""
 PANEL_PX: Final = 800
 
 
@@ -88,40 +77,7 @@ class Inspection:
         Based on :func:`quick_fill` of the solid grid; the real placement
         hollows the model and repairs stability, which the factors cover.
         """
-        filled = self.grid.filled_count
-        fill = (
-            quick_fill(self.grid.occupancy)
-            if filled <= MAX_FILL_CELLS
-            else filled / CELLS_PER_PART
-        )
-        low, typical, high = (max(1, round(fill * f)) for f in ESTIMATE_FACTORS)
-        return low, typical, high
-
-
-def quick_fill(occupancy: NDArray[np.bool_]) -> int:
-    """Parts a layer-by-layer greedy fill with the largest bricks needs.
-
-    Every layer is scanned cell by cell; the first free cell gets the largest
-    footprint (either orientation) that fits into free cells. A quick stand-in
-    for placement, used only for the estimate.
-    """
-    shapes = sorted(
-        {s for w, d in (*FOOTPRINTS, (1, 3), (1, 2), (1, 1)) for s in ((w, d), (d, w))},
-        key=lambda s: (-s[0] * s[1], s),
-    )
-    nx, ny, nz = occupancy.shape
-    parts = 0
-    for z in range(nz):
-        free = occupancy[:, :, z].copy()
-        for x, y in np.argwhere(free):
-            if not free[x, y]:
-                continue
-            for w, d in shapes:
-                if x + w <= nx and y + d <= ny and free[x : x + w, y : y + d].all():
-                    free[x : x + w, y : y + d] = False
-                    parts += 1
-                    break
-    return parts
+        return parts_estimate(self.grid.occupancy)
 
 
 def inspect_file(source: Path, settings: Settings, *, name: str) -> Inspection:
@@ -283,6 +239,8 @@ def inspection_text(
             f"  rough estimate: about {expected:,} parts ({low:,}-{high:,}); "
             "`convert` gives the exact count"
         )
+        if hint := time_hint(expected, settings.placement.time_limit_s):
+            lines.append(f"  {hint}")
     return "\n".join(lines)
 
 

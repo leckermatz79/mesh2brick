@@ -713,6 +713,14 @@ def _colour_summary(model: BrickModel, lang: Language, width: float) -> str:
 
 def _cover_notes(model: BrickModel, lang: Language) -> list[tuple[str, Color]]:
     notes: list[tuple[str, Color]] = []
+    if model.best_so_far:
+        stable = model.buildable is True
+        notes.append(
+            (
+                text("best_so_far_stable" if stable else "best_so_far", lang),
+                HINT_FILL if stable else WARN_FILL,
+            )
+        )
     if model.buildable is False:
         notes.append((text("stable_no", lang).capitalize() + ".", WARN_FILL))
     if any(step.stable is None for step in model.steps):
