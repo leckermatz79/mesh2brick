@@ -251,6 +251,8 @@ def test_convert_end_to_end(fixtures_dir: Path, tmp_path: Path) -> None:
             str(tmp_path),
             "-s",
             "input.target_studs=8",
+            "--time",
+            "2min",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -267,6 +269,14 @@ def test_convert_reports_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["convert", str(path), "-o", str(tmp_path)])
     assert result.exit_code == 1
     assert "unsupported input format" in result.output
+
+
+def test_convert_rejects_a_time_without_unit(fixtures_dir: Path) -> None:
+    result = runner.invoke(
+        app, ["convert", str(fixtures_dir / "l_bracket.stl"), "--time", "20"]
+    )
+    assert result.exit_code == 1
+    assert "invalid time '20'" in result.output
 
 
 def test_progress_printer_thins_layer_lines(capsys: pytest.CaptureFixture[str]) -> None:

@@ -226,6 +226,37 @@ def test_convert_with_and_without_llm(tmp_path: Path, fixtures_dir: Path) -> Non
     assert improved.bom.total == model.part_count
 
 
+def test_llm_layer_is_skipped_when_the_time_limit_is_near() -> None:
+    from pathlib import Path  # noqa: PLC0415
+
+    from mesh2brick.backends.protocols import Placement, StabilityReport  # noqa: PLC0415
+    from mesh2brick.pipeline import LLM_MIN_S, _llm_in_time  # noqa: PLC0415
+
+    placement = Placement(
+        model=row_model(),
+        stability=StabilityReport(
+            stable=True, component_count=1, floating_count=0, max_score=0.0
+        ),
+        backend="fake",
+    )
+
+    def no_api(**_request: Any) -> dict[str, Any]:
+        raise AssertionError("the LLM must not be called")
+
+    outcome = _llm_in_time(
+        placement,
+        None,  # type: ignore[arg-type]
+        load_settings(None, ["llm.enabled=true", "llm.feedback=false"]),
+        source=Path("row.stl"),
+        left=LLM_MIN_S,  # the export's share comes off first
+        say=lambda _message: None,
+        send=no_api,
+    )
+    assert outcome.placement is placement
+    assert outcome.report is None
+    assert outcome.notes[0].startswith("LLM layer skipped: only ")
+
+
 def test_improve_with_llm_merges_through_the_backend() -> None:
     from pathlib import Path  # noqa: PLC0415
 

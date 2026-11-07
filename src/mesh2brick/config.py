@@ -44,6 +44,8 @@ DEFAULT_LLM_MODEL = "claude-sonnet-5-5"
 MAX_HEIGHT_CM: Final = 400.0
 """Upper bound for ``input.target_height_cm`` (about as tall as 512 studs)."""
 _SIZE: Final = re.compile(r"(\d+(?:[.,]\d+)?)\s*(cm|mm|studs?)", re.IGNORECASE)
+_TIME: Final = re.compile(r"(\d+(?:[.,]\d+)?)\s*(s|min|h)", re.IGNORECASE)
+_SECONDS_PER: Final = {"s": 1, "min": 60, "h": 3600}
 
 
 class ConfigError(ValueError):
@@ -195,8 +197,10 @@ class PlacementConfig(_Section):
     counts (docs/benchmarks.md); SPEC §4 had ``luo``."""
     seed: Annotated[int, Field(ge=0)] = 0
     time_limit_s: Annotated[float, Field(gt=0)] = 300.0
-    """Wall-clock budget for a whole conversion. When it runs short, cheaper
-    steps are chosen (layer-order instructions) and the result says so."""
+    """Wall-clock limit for a whole conversion (ADR 0006, 0015). When it runs
+    short, cheaper steps are chosen (layer-order instructions); when it is
+    reached, the backend is stopped and the best stable model found so far is
+    used, marked on the cover page. Time for the export is kept free."""
     backend_options: dict[str, Any] = Field(default_factory=dict)
     """Backend-specific options, validated by the backend (not duplicated here)."""
 
@@ -361,6 +365,28 @@ def size_overrides(text: str) -> tuple[str, ...]:
         )
     height_cm = number / 10 if unit == "mm" else number
     return ("input.scale_mode=studs", f"input.target_height_cm={height_cm!r}")
+
+
+def time_overrides(text: str) -> tuple[str, ...]:
+    """Overrides for a time limit such as ``20min``, ``90s`` or ``1h``.
+
+    Sets ``placement.time_limit_s``, the hard limit for a whole conversion
+    (Roadmap 2, ADR 0015).
+
+    Raises:
+        ConfigError: if ``text`` is not a positive number with one of the units.
+    """
+    match = _TIME.fullmatch(text.strip())
+    if match is None:
+        msg = f"invalid time {text!r}; give a number with a unit, e.g. 20min, 90s or 1h"
+        raise ConfigError(msg)
+    seconds = (
+        float(match.group(1).replace(",", ".")) * _SECONDS_PER[match.group(2).lower()]
+    )
+    if seconds <= 0:
+        msg = f"invalid time {text!r}; the time must be greater than 0"
+        raise ConfigError(msg)
+    return (f"placement.time_limit_s={seconds!r}",)
 
 
 def apply_overrides(

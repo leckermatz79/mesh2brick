@@ -36,7 +36,7 @@ placement:
   backend: legolization
   strategy: kollsker    # passed to the backend (also: luo, greedy, bond, fast, smga, beauty)
   seed: 0
-  time_limit_s: 300     # budget for a whole conversion; cheaper steps when it runs short
+  time_limit_s: 300     # hard limit for a whole conversion (CLI: --time 20min); when reached: best stable model so far
   backend_options: {}   # extra legolization PipelineConfig fields, validated
 stability:
   enabled: true

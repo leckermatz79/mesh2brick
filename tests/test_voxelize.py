@@ -18,9 +18,14 @@ from mesh2brick.ingest.normalize import normalize
 from mesh2brick.voxel import rays as rays_module
 from mesh2brick.voxel.grid import VoxelGrid, lego_cell_height_mm
 from mesh2brick.voxel.voxelize import (
+    HOLD_FOOTPRINTS,
+    HOLD_FOOTPRINTS_2,
     Lattice,
     VoxelizeResult,
+    clean_up,
+    drop_unholdable,
     fill_fractions,
+    holdable_cells,
     hollow,
     model_pitch,
     plan_lattice,
@@ -303,3 +308,86 @@ def test_up_axis_changes_the_grid(fixtures_dir: Path) -> None:
     lying = load_model(fixtures_dir / "l_bracket.stl", InputConfig(up_axis="x"))
     assert np.argmax(upright.mesh.extents) == 2
     assert np.argmax(lying.mesh.extents) != 2
+
+
+# ------------------------------------------------------------ holdable cells
+def _holdable_reference(occupancy: np.ndarray) -> np.ndarray:
+    """Brute force: try every standard footprint at every position."""
+    nx, ny, nz = occupancy.shape
+    held = np.zeros_like(occupancy)
+    for z in range(nz):
+        layer = occupancy[:, :, z]
+        near = np.zeros_like(layer)
+        if z == 0:
+            near[:] = True
+        else:
+            near |= occupancy[:, :, z - 1]
+        if z + 1 < nz:
+            near |= occupancy[:, :, z + 1]
+        for w, length in (*HOLD_FOOTPRINTS, *HOLD_FOOTPRINTS_2):
+            for a, b in {(w, length), (length, w)}:
+                for x in range(nx - a + 1):
+                    for y in range(ny - b + 1):
+                        window = layer[x : x + a, y : y + b]
+                        if window.all() and (window & near[x : x + a, y : y + b]).any():
+                            held[x : x + a, y : y + b, z] = True
+    return held & occupancy
+
+
+def test_a_sideways_stub_loses_the_cell_no_brick_can_hold() -> None:
+    # A column three layers high and, in the middle layer, a stub that turns
+    # a corner (as on Duo at 48 studs): x+1, then y+1.
+    occupancy = np.zeros((3, 3, 3), dtype=bool)
+    occupancy[0, 0, :] = True
+    occupancy[1, 0, 1] = occupancy[1, 1, 1] = True
+    held = holdable_cells(occupancy)
+    assert held[1, 0, 1]  # a 1 x 2 across to the column holds it
+    assert not held[1, 1, 1]  # nothing above or below, no straight part reaches
+    kept, notes = drop_unholdable(occupancy)
+    assert kept.sum() == occupancy.sum() - 1
+    assert not kept[1, 1, 1]
+    assert notes[0].startswith("removed 1 cell(s) that no brick could hold")
+
+
+def test_the_ground_holds_the_bottom_layer_and_parts_reach_eight_studs() -> None:
+    occupancy = np.zeros((12, 1, 2), dtype=bool)
+    occupancy[:, 0, 0] = True  # a long row on the ground
+    occupancy[0, 0, 1] = True  # one column ...
+    occupancy[1:10, 0, 1] = True  # ... with a brim of 9 cells in the layer above
+    held = holdable_cells(occupancy)
+    assert held[:, 0, 0].all()
+    assert held[:10, 0, 1].all()  # the brim rests on the bottom row everywhere
+    occupancy[:, 0, 0] = False
+    occupancy[0, 0, 0] = True  # now only the column holds the brim
+    held = holdable_cells(occupancy)
+    assert held[:8, 0, 1].all()  # a 1 x 8 from the column
+    assert not held[8:10, 0, 1].any()
+
+
+def test_drop_unholdable_keeps_buildable_grids_unchanged() -> None:
+    occupancy = np.ones((5, 4, 3), dtype=bool)
+    kept, notes = drop_unholdable(occupancy)
+    assert kept is occupancy
+    assert notes == []
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_holdable_cells_match_brute_force(seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    occupancy = rng.random((9, 7, 4)) < 0.55
+    assert np.array_equal(holdable_cells(occupancy), _holdable_reference(occupancy))
+
+
+def test_clean_up_reports_specks_as_islands_and_stubs_as_unholdable() -> None:
+    occupancy = np.zeros((12, 3, 3), dtype=bool)
+    occupancy[0:8, 0, :] = True  # the body: a wall along x
+    occupancy[7, 1, 1] = True  # a stub off its end, then around the corner
+    occupancy[8, 1, 1] = True
+    occupancy[10, 2, 2] = True  # a loose speck
+    cleaned, notes = clean_up(occupancy, min_island_fraction=0.05)
+    assert not cleaned[10, 2, 2]
+    assert notes[0].startswith("removed 1 loose voxel island")
+    assert cleaned[7, 1, 1]  # a 1 x 2 into the wall holds it
+    assert not cleaned[8, 1, 1]  # no straight part through it reaches support
+    assert notes[1].startswith("removed 1 cell(s) that no brick could hold")
+    assert len(notes) == 2

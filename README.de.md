@@ -63,6 +63,12 @@ uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/ --size 30cm
 uv run mesh2brick convert tests/fixtures/rocket.blend -o out/ --size 30cm
 uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs
 
+# Zeitgrenze: Eine Umwandlung dauert höchstens 5 Minuten. Braucht ein großes Modell länger,
+# bekommst du das beste stabile Modell, das bis dahin gefunden wurde, und das Deckblatt
+# sagt das. inspect und convert empfehlen ab etwa 2.000 Teilen mehr Zeit
+# („recommended: --time 20min“):
+uv run mesh2brick convert modell.stl -o out/ --size 40cm --time 20min
+
 # Oder Schritt für Schritt:
 # 1. Mesh auf das Noppenraster voxelisieren (längste Achse standardmäßig 32 Noppen)
 uv run mesh2brick voxelize tests/fixtures/bunny_lowpoly.stl -o out/ --size 16studs

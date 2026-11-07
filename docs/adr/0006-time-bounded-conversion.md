@@ -1,6 +1,6 @@
 # 6. Time-bounded conversion
 
-- Status: accepted
+- Status: accepted; extended by [ADR 0015](0015-hard-time-limit-via-checkpointed-child-process.md) (the limit is hard since Roadmap 2)
 - Date: 2026-11-01
 
 ## Context

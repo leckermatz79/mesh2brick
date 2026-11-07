@@ -6,6 +6,49 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-07 - Roadmap 2: hard time limit
+
+A conversion no longer runs past `placement.time_limit_s`. Duo at 48 studs (local model) with
+a 20-minute limit is one stable piece of 2,308 parts after 733 s (1.0: stopped after more than
+an hour); with the default 5 minutes it is cut short after 289 s and marked. Every fixture
+gives the parts of 1.0, stays stable and converts up to 48 s faster (docs/benchmarks.md,
+"Hard time limit").
+
+### Added
+- Roadmap 2 ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)): `placement.time_limit_s`
+  is a **hard limit** for the whole conversion (ADR 0015). legolization runs in a child
+  process that reports every intermediate layout; at the limit (minus the time kept for the
+  export) it is stopped and the best state is used: checked and stable before checked before
+  not checked, the latest on ties. The command line names the stage and part count.
+- A model cut short is marked `best_so_far` (brick-model schema 4); the PDF cover says "time
+  limit reached: the best stable model found by then", or "the last intermediate result"
+  when no stable state existed.
+- `buildable: not checked` in the command-line summary when the limit stopped the stability
+  check (`StabilityReport.checked`).
+- `convert --time 20min` (also `90s`, `1h`) sets the time limit; like `--size` it overrides
+  `--config` and `--set`.
+- `inspect` and the start of `convert` print "expected about 3,905 parts; recommended:
+  --time 20min" when the rough estimate is above 2,000 parts and the limit is below 20
+  minutes. The limit itself never grows by itself (product-owner decision).
+- Up to three parts that nothing holds after placement are removed and the stability is
+  checked again, with a note naming the parts; more stay (the model is reported as not
+  buildable, as before).
+
+### Changed
+- A finished run whose last passes left the model unstable now keeps the stable state before
+  them, with a note.
+- Local patch #2: large stability LPs get the interior-point method without crossover before
+  legolization's last attempt. Duo at 48 studs: the first stability check takes 49 s instead
+  of more than an hour.
+- The LLM layer is skipped (with a note) when less than 30 s remain before the export.
+- An already expired time limit before placement is an error with a clear message instead of
+  an unbounded placement.
+
+### Fixed
+- Voxelization removes cells no part can hold (no straight brick or plate through them
+  reaches a cell with something above or below), with a note. Duo at
+  48 studs had one such cell, which always became a loose 1 x 2 brick. No fixture has any.
+
 ## [1.1.0] - 2026-11-07 - Roadmap 1: size in centimetres
 
 ### Added
