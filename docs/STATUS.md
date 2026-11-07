@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · Aktuelle Phase: **8 – Blender, Politur, v1.0: fertig** ([PR #21](https://github.com/leckermatz79/mesh2brick/pull/21) gemergt) · **[Version 1.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.0.0)**; alle Phasen der SPEC sind umgesetzt
+Stand: 2026-11-07 · **1.0 veröffentlicht** ([v1.0.0](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.0.0), Phasen 0–8 der SPEC fertig) · Nächster Punkt: **Roadmap 1 – Größe in Zentimetern** ([ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md)
 
 ## Fazit in zwei Sätzen
@@ -68,9 +68,19 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 
 ## Als Nächstes
 
-1. **Nächste Version 1.1 – große Modelle** (deine Entscheidung, siehe [PLAN.md](PLAN.md), „Fahrplan nach 1.0“): Größe in cm als Einstellung und eine harte Zeitgrenze über alle Schritte mit dem Ergebnis „bestes stabiles Modell bis dahin“. Bis dahin gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm) und hängen dann an der Zeitgrenze.
-2. **Danach Version 2.0 – Formtreue:** Dachsteine, Tiles, Rundungen.
-3. Upstream: Antworten abwarten auf legolization #88/#89 und #90/#91 sowie [trimesh #2669](https://github.com/mikedh/trimesh/issues/2669) (16-Bit-Vertexfarben, von dir am 2026-11-07 eingereicht).
+Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von dir, 2026-11-07). Jeder Punkt bekommt ein [Issue mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap) und Abnahmekriterien, wie die Phasen.
+
+**1.x – große Modelle möglich machen** (keine neuen Steinarten):
+
+1. **Roadmap 1 – Größe in Zentimetern als Einstellung** (nächster Punkt). Heute gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm).
+2. Roadmap 2 – harte Zeitgrenze über alle Schritte, sonst „bestes stabiles Modell bis dahin“ (Duo bei 48 Noppen in ≤ 20 min).
+3. Roadmap 3 – Stabilitätsprüfung auch für große Modelle.
+4. Roadmap 4 – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
+5. Roadmap 5 – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
+6. Roadmap 6 – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
+7. Roadmap 7 – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
+
+**Danach 2.0 – Formtreue:** Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89 und #90/#91 sowie trimesh #2669 abwarten.
 
 ## Bekannte Einschränkungen
 
@@ -79,20 +89,20 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 | KI-Texte können plausibel klingen und trotzdem ungenau sein (z. B. „links“ statt „hinten“). Die Prüfung erkennt falsche Teile und Mengen, aber keine falsche Richtung; Claude sieht nicht jedes Schrittbild. | akzeptieren; mit Bewertungen und Notizen nachsteuern |
 | Die KI legt selten Schritte zusammen: Die kleinen hat mesh2brick schon vorher zusammengelegt, und die übrigen Nachbarn verdecken sich meist gegenseitig. | akzeptieren; der Nutzen liegt in Abschnitten und Texten |
 | Für Claude-Modelle, deren Preise mesh2brick nicht kennt, gilt die Kostengrenze nicht (der Lauf sagt das). | Preistabelle bei neuen Modellen ergänzen |
-| Große Modelle (> 500 Teile) bekommen Schritte Schicht für Schicht, nicht jeder Zwischenstand ist auf Standfestigkeit geprüft. | von dir akzeptiert; das Deckblatt sagt es in einem Satz |
+| Große Modelle (> 500 Teile) bekommen Schritte Schicht für Schicht, nicht jeder Zwischenstand ist auf Standfestigkeit geprüft. | von dir akzeptiert; das Deckblatt sagt es in einem Satz; Roadmap 3 |
 | Hängen mehrere vorher zusammengesteckte Teile aneinander, wird ein Schritt größer (Kugel bei 32 Noppen: einmal 18 Teile, sonst meist höchstens 10). | selten; eigener Code, falls es stört |
 | Bei kleinen Modellen übernimmt legolization die Reihenfolge. Wo es selbst „braucht Stütze“ meldet, steht im PDF „Halte das Modell fest“. | akzeptiert |
-| Dachsteine (Slopes) erscheinen in den Bildern als Quader. | eigener Code, wenn Slopes wieder an sind |
+| Dachsteine (Slopes) erscheinen in den Bildern als Quader. | eigener Code, wenn Slopes wieder an sind (Roadmap 8) |
 | „Teile weglassen“ gilt fürs ganze Modell, nicht pro Farbe. | Upstream #9 (nach #8) |
 | 1×1-Stein und 1×1-Platte lassen sich weder weglassen noch aufteilen. Gibt es sie in einer Modellfarbe nicht, meldet die Teileliste das. | selten; akzeptiert |
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
 | Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. | Upstream-Kandidat #5 |
-| Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an |
-| Duo bei 48 Noppen: 2.313 Teile, 8 Minuten, nicht stabil. Mit 20 statt 5 Minuten Zeitgrenze war der Lauf nach über einer Stunde noch nicht fertig (abgebrochen): Der letzte Optimierungsschritt in legolization hält sich an keine Zeitgrenze. 48 Noppen liegen über der 2.000-Teile-Grenze der SPEC. | Upstream-Kandidat #5; 48 Noppen erst danach angehen (Frage 2) |
-| Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen 4,5–5 Minuten; auf einem langsameren Laptop kann es länger dauern. Ihre PDFs sind 20–23 MB groß. | akzeptieren; Standard bleibt 32 Noppen |
-| Die Teileschätzung von `inspect` ist grob (Bereich etwa Faktor 2) und liegt bei dünnen, großen Platten zu niedrig. | akzeptieren; `convert` gibt die genaue Zahl |
+| Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an (Roadmap 8) |
+| Duo bei 48 Noppen: 2.313 Teile, 8 Minuten, nicht stabil. Mit 20 statt 5 Minuten Zeitgrenze war der Lauf nach über einer Stunde noch nicht fertig (abgebrochen): Der letzte Optimierungsschritt in legolization hält sich an keine Zeitgrenze. 48 Noppen liegen über der 2.000-Teile-Grenze der SPEC. | Roadmap 2 (Upstream-Kandidat #5) |
+| Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen 4,5–5 Minuten; auf einem langsameren Laptop kann es länger dauern. Ihre PDFs sind 20–23 MB groß. | Standard bleibt 32 Noppen; PDF-Größe: Roadmap 4 |
+| Die Teileschätzung von `inspect` ist grob (Bereich etwa Faktor 2) und liegt bei dünnen, großen Platten zu niedrig. | `convert` gibt die genaue Zahl; Roadmap 5 |
 | `.blend`: Blender muss installiert sein. Die Tests mit echtem Blender laufen nur hier auf dem Mac; die automatischen Tests auf GitHub nutzen einen Blender-Ersatz. Verknüpfte Bibliotheken müssen vom Ordner der Datei aus erreichbar sein. | akzeptieren |
 | glTF mit Draco-Kompression kann trimesh nicht lesen. | bei Bedarf; in Blender ohne Kompression exportieren |
 
@@ -133,7 +143,7 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 | 2026-11-07 | Bauabschnitte auf dem Deckblatt? | **Ja**, als Übersicht mit Seitenzahlen. Umgesetzt im Nachtrag zu Phase 7. |
 | 2026-11-07 | Phase 7: Zugang zur Anthropic-API? | **`ANTHROPIC_API_KEY` ist gesetzt.** Für Entwicklung und Messungen dieser Phase wurden insgesamt etwa 1,05 $ verbraucht. |
 | 2026-11-07 | Fehlerbericht an trimesh (#14) einreichen? | **Ja.** trimesh ist groß und aktiv gepflegt, da kommen Antworten. Wie bei legolization: Text überfliegen, dann den fertigen Befehl ausführen. Erledigt: [Issue #2669](https://github.com/mikedh/trimesh/issues/2669). |
-| 2026-11-07 | Was nach 1.0 zuerst? | **1.1 = große Modelle:** Größe in cm als Einstellung, harte Zeitgrenze über alle Schritte, Ergebnis „bestes stabiles Modell bis dahin“. Grund: Wer 40 cm will, bekommt heute gar nichts (Duo bei 48 Noppen wird nicht fertig). **2.0 = Formtreue** mit Dachsteinen, Tiles, Rundungen. So gehen große Modelle sofort, während die schönen Formen reifen. |
+| 2026-11-07 | Was nach 1.0 zuerst? | **[ROADMAP.md](../ROADMAP.md)**: 1.x = große Modelle (Größe in cm, harte Zeitgrenze, Stabilitätsprüfung, PDF-Größe, Schätzung), 2.0 = Formtreue (Dachsteine, Tiles, Rundungen, SNOT), 2.x = Robustheit und Anleitung. Grund: Wer 40 cm will, bekommt heute gar nichts. 2.0 ist vor allem für Familienbauten; ein persönliches Teilelager ist nicht Teil des Plans; Fork oder Warten bei legolization entscheidest du, wenn der erste 2.0-Punkt daran hängt. |
 | 2026-11-07 | Eigenes Modell in der Galerie? | **Duo nein.** Ein selbst entworfenes Fusion-Modell wäre das beste Schaufenster (echtes CAD-Teil statt Testkörper). Es gibt keins (Fusion lässt sich hier nicht ohne Oberfläche steuern), also bleibt die Galerie bei den Testmodellen. |
 
 ## Fragen an dich
@@ -142,5 +152,6 @@ Zurzeit keine. Deine Antworten zu Phase 8 stehen unter „Deine Entscheidungen�
 
 ## Offene Kleinigkeiten
 
-- **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite. Befehl für `v0.0.0`:
+- **Roadmap-Issues 1–7 anlegen und die fertigen Phasen-Issues #8/#9 schließen:** Das Rechtesystem lässt mich keine Issues anlegen oder schließen, auch nicht im eigenen Repo. Das fertige Skript bekommst du im Chat.
+- **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite (Roadmap 7). Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
