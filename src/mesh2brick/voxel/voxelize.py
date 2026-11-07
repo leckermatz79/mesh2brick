@@ -148,10 +148,10 @@ def voxelize(
     else:
         method = "surface"
         occupancy = surface_occupancy(mesh, lattice)
-    occupancy, island_notes = remove_islands(
-        occupancy, min_fraction=settings.voxel.min_island_fraction
+    occupancy, cleanup_notes = clean_up(
+        occupancy, min_island_fraction=settings.voxel.min_island_fraction
     )
-    warnings.extend(island_notes)
+    warnings.extend(cleanup_notes)
     # Model colours use the full lattice: surface points in empty border cells
     # (details too thin to fill a cell) still colour their filled neighbours.
     full_color, color_notes = model_colors(
@@ -370,6 +370,88 @@ def surface_occupancy(mesh: trimesh.Trimesh, lattice: Lattice) -> NDArray[np.boo
     shell[index[:, 0], index[:, 1], index[:, 2]] = True
     filled: NDArray[np.bool_] = ndimage.binary_fill_holes(shell)
     return filled
+
+
+HOLD_FOOTPRINTS: Final = ((1, 1), (1, 2), (1, 3), (1, 4), (1, 6), (1, 8))
+HOLD_FOOTPRINTS_2: Final = ((2, 2), (2, 3), (2, 4), (2, 6), (2, 8))
+"""Footprints of the standard bricks and plates (studs), both orientations."""
+
+
+def holdable_cells(occupancy: NDArray[np.bool_]) -> NDArray[np.bool_]:
+    """Cells that some straight brick or plate could hold in place.
+
+    Parts only connect through studs, i.e. to the cell directly above or
+    below; the bottom layer stands on the ground. A cell is holdable if a
+    standard footprint (:data:`HOLD_FOOTPRINTS`) fits completely into the
+    filled cells of its layer, covers the cell and touches at least one cell
+    with a filled neighbour above or below.
+    """
+    below = np.ones_like(occupancy)  # the ground holds the bottom layer
+    below[:, :, 1:] = occupancy[:, :, :-1]
+    above = np.zeros_like(occupancy)
+    above[:, :, :-1] = occupancy[:, :, 1:]
+    supported = (occupancy & (below | above)).astype(np.int32)
+    filled = occupancy.astype(np.int32)
+    held = np.zeros_like(occupancy)
+    nx, ny = occupancy.shape[:2]
+    for w, length in (*HOLD_FOOTPRINTS, *HOLD_FOOTPRINTS_2):
+        for a, b in {(w, length), (length, w)}:
+            if a > nx or b > ny:
+                continue
+            fits = (_window_sums(filled, a, b) == a * b) & (
+                _window_sums(supported, a, b) > 0
+            )
+            margin = ((a - 1, a - 1), (b - 1, b - 1), (0, 0))
+            padded = np.pad(fits.astype(np.int32), margin)
+            held |= _window_sums(padded, a, b) > 0  # covered by a fitting part
+    return held & occupancy
+
+
+def _window_sums(values: NDArray[np.int32], a: int, b: int) -> NDArray[np.int32]:
+    """Sum over every ``a x b`` window of each layer (summed-area table)."""
+    table = np.pad(values.cumsum(0).cumsum(1), ((1, 0), (1, 0), (0, 0)))
+    sums: NDArray[np.int32] = (
+        table[a:, b:] - table[:-a, b:] - table[a:, :-b] + table[:-a, :-b]
+    )
+    return sums
+
+
+def drop_unholdable(
+    occupancy: NDArray[np.bool_],
+) -> tuple[NDArray[np.bool_], list[str]]:
+    """Remove cells no part can hold (:func:`holdable_cells`), with a note.
+
+    Such a cell floats or sticks out sideways with nothing above or below it
+    within reach of any part, so its part would come loose (Duo at 48 studs:
+    one cell of a two-cell stub). Removing a cell never takes away another
+    cell's support, so one pass suffices (see :func:`clean_up`).
+    """
+    loose = occupancy & ~holdable_cells(occupancy)
+    count = int(loose.sum())
+    if not count:
+        return occupancy, []
+    note = (
+        f"removed {count} cell(s) that no brick could hold (no straight brick or "
+        "plate through them reaches a cell with something above or below)"
+    )
+    return occupancy & ~loose, [note]
+
+
+def clean_up(
+    occupancy: NDArray[np.bool_], *, min_island_fraction: float
+) -> tuple[NDArray[np.bool_], list[str]]:
+    """Remove small islands, then cells no part can hold, with notes.
+
+    Islands go first, so a loose speck is reported as one. A removed
+    unholdable cell may have been the only link of a small group, so the
+    islands are checked again then.
+    """
+    occupancy, notes = remove_islands(occupancy, min_fraction=min_island_fraction)
+    occupancy, held = drop_unholdable(occupancy)
+    if held:
+        occupancy, again = remove_islands(occupancy, min_fraction=min_island_fraction)
+        notes = [*notes, *held, *(n for n in again if n not in notes)]
+    return occupancy, notes
 
 
 def remove_islands(
