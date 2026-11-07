@@ -96,13 +96,16 @@ class PreviewOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class _Camera:
+class Camera:
+    """Orthographic camera: screen axes and the direction towards the viewer."""
+
     right: NDArray[np.float64]
     up: NDArray[np.float64]
     toward_viewer: NDArray[np.float64]
 
     @classmethod
-    def from_angles(cls, elevation: float, azimuth: float) -> _Camera:
+    def from_angles(cls, elevation: float, azimuth: float) -> Camera:
+        """Camera at ``elevation``/``azimuth`` degrees (see PreviewOptions)."""
         elev, azim = math.radians(elevation), math.radians(azimuth)
         toward = np.array(
             [
@@ -159,9 +162,9 @@ def render_png(
     if not visible:
         msg = "nothing to render: the model (or step selection) has no parts"
         raise ValueError(msg)
-    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    camera = Camera.from_angles(options.elevation, options.azimuth)
     polygons, fills = _scene(model, visible, highlight, camera, options.background)
-    return _draw(polygons, fills, options, extent)
+    return draw_png(polygons, fills, options, extent)
 
 
 def render_parts_png(
@@ -178,11 +181,11 @@ def render_parts_png(
         msg = "nothing to render: no parts selected"
         raise ValueError(msg)
     options = options or PreviewOptions()
-    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    camera = Camera.from_angles(options.elevation, options.azimuth)
     polygons, fills = _scene(
         model, frozenset(indices), None, camera, options.background
     )
-    return _palette_png(_draw(polygons, fills, options, None))
+    return _palette_png(draw_png(polygons, fills, options, None))
 
 
 def render_part_png(
@@ -206,7 +209,7 @@ def render_part_png(
     model = _part_alone(part, color)
     if reference is None:
         return render_parts_png(model, [0], options)
-    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    camera = Camera.from_angles(options.elevation, options.azimuth)
     x0, x1, y0, y1 = _screen_bounds(model.parts, camera)
     width, height = reference
     share = max((x1 - x0) / width, (y1 - y0) / height, min_share)
@@ -224,7 +227,7 @@ def part_view_size(part: PlacedPart, options: PreviewOptions | None = None) -> E
     Returned as ``(0, width, 0, height)`` so it can be combined with ``max``.
     """
     options = options or PreviewOptions()
-    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    camera = Camera.from_angles(options.elevation, options.azimuth)
     x0, x1, y0, y1 = _screen_bounds(_part_alone(part, None).parts, camera)
     return (0.0, x1 - x0, 0.0, y1 - y0)
 
@@ -316,7 +319,7 @@ def render_step_images(
     replaces the background colour of subassembly steps.
     """
     options = options or PreviewOptions()
-    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    camera = Camera.from_angles(options.elevation, options.azimuth)
     aspect = _axes_aspect(options)
     frames: dict[str | None, Extent] = {
         None: _fit_aspect(_fit_extent(_screen_bounds(model.parts, camera)), aspect)
@@ -343,10 +346,10 @@ def render_step_images(
         if context is not None and sub_background is not None:
             view = replace(options, background=sub_background)
         if not visible:  # an empty step (should not happen) gets a blank frame
-            images.append(_draw([], [], view, extent))
+            images.append(draw_png([], [], view, extent))
             continue
         polygons, fills = _scene(model, visible, highlight, camera, view.background)
-        images.append(_palette_png(_draw(polygons, fills, view, extent)))
+        images.append(_palette_png(draw_png(polygons, fills, view, extent)))
     return images
 
 
@@ -409,7 +412,7 @@ def _scene(
     model: BrickModel,
     visible: frozenset[int],
     highlight: frozenset[int] | None,
-    camera: _Camera,
+    camera: Camera,
     background: str,
 ) -> tuple[list[NDArray[np.float64]], NDArray[np.float64]]:
     """Back-to-front polygons (screen space) and their RGB fills."""
@@ -568,7 +571,7 @@ def _strips(
 
 
 def _stud_templates(
-    camera: _Camera,
+    camera: Camera,
 ) -> list[tuple[NDArray[np.float64], float, int]]:
     """Screen-space stud polygons relative to the stud's base centre."""
     angles = np.linspace(0.0, 2 * math.pi, _STUD_SEGMENTS, endpoint=False)
@@ -619,7 +622,7 @@ def _convex_hull(points: NDArray[np.float64]) -> NDArray[np.float64]:
 
 
 # --------------------------------------------------------------------------- drawing
-def _screen_bounds(parts: Sequence[PlacedPart], camera: _Camera) -> Extent:
+def _screen_bounds(parts: Sequence[PlacedPart], camera: Camera) -> Extent:
     cells = np.concatenate([np.asarray(p.cells, dtype=np.float64) for p in parts])
     lo, hi = cells.min(axis=0), cells.max(axis=0) + 1
     hi = hi + np.array([0.0, 0.0, STUD_HEIGHT / STUDS_PER_PLATE])
@@ -637,7 +640,7 @@ def _screen_bounds(parts: Sequence[PlacedPart], camera: _Camera) -> Extent:
 
 
 def _axes_aspect(options: PreviewOptions) -> float:
-    """Width / height of the drawing area in :func:`_draw`."""
+    """Width / height of the drawing area in :func:`draw_png`."""
     width, height = _axes_box(options)[2:]
     return (width * options.width_px) / (height * options.height_px)
 
@@ -691,12 +694,25 @@ def _fit_extent(bounds: Extent) -> Extent:
     return (x0 - pad, x1 + pad, y0 - pad, y1 + pad)
 
 
-def _draw(
-    polygons: list[NDArray[np.float64]],
-    fills: NDArray[np.float64] | list[object],
-    options: PreviewOptions,
-    extent: Extent | None,
+def fitted_extent(bounds: Extent, options: PreviewOptions) -> Extent:
+    """Screen rectangle showing ``bounds`` with a margin, in the axes' aspect."""
+    return _fit_aspect(_fit_extent(bounds), _axes_aspect(options))
+
+
+def axes_pixels(options: PreviewOptions) -> tuple[int, int]:
+    """Width and height in pixels of the drawing area of a preview."""
+    _, _, width, height = _axes_box(options)
+    return round(width * options.width_px), round(height * options.height_px)
+
+
+def draw_image_png(
+    image: NDArray[np.uint8], extent: Extent, options: PreviewOptions
 ) -> bytes:
+    """Place an RGBA raster covering ``extent`` in a preview-styled PNG.
+
+    Same layout, title and background as :func:`draw_png`; the raster may be
+    larger than the drawing area (it is downsampled with antialiasing).
+    """
     fig = Figure(
         figsize=(options.width_px / _DPI, options.height_px / _DPI),
         dpi=_DPI,
@@ -704,7 +720,42 @@ def _draw(
     )
     FigureCanvasAgg(fig)
     ax = fig.add_axes(_axes_box(options))
-    if polygons:
+    ax.imshow(
+        image,
+        extent=extent,
+        origin="upper",
+        interpolation="antialiased",
+        interpolation_stage="rgba",
+    )
+    ax.set_xlim(extent[0], extent[1])
+    ax.set_ylim(extent[2], extent[3])
+    ax.set_aspect("equal")
+    ax.set_axis_off()
+    if options.title:
+        fig.suptitle(options.title, fontsize=14)
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png", facecolor=options.background)
+    return buffer.getvalue()
+
+
+def draw_png(
+    polygons: Sequence[NDArray[np.float64]],
+    fills: NDArray[np.float64] | list[object],
+    options: PreviewOptions,
+    extent: Extent | None,
+) -> bytes:
+    """Draw screen-space polygons (back to front) into a PNG.
+
+    ``extent`` is the visible screen rectangle; ``None`` fits the polygons.
+    """
+    fig = Figure(
+        figsize=(options.width_px / _DPI, options.height_px / _DPI),
+        dpi=_DPI,
+        facecolor=options.background,
+    )
+    FigureCanvasAgg(fig)
+    ax = fig.add_axes(_axes_box(options))
+    if len(polygons):
         ax.add_collection(
             PolyCollection(
                 polygons,
@@ -715,8 +766,8 @@ def _draw(
             )
         )
     if extent is None:
-        if polygons:
-            every = np.concatenate(polygons)
+        if len(polygons):
+            every = np.concatenate(list(polygons))
             (x0, y0), (x1, y1) = every.min(axis=0), every.max(axis=0)
             extent = _fit_extent((float(x0), float(x1), float(y0), float(y1)))
         else:
