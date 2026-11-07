@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · Aktuelle Phase: **8 – Blender, Politur, v1.0: fertig** ([PR #21](https://github.com/leckermatz79/mesh2brick/pull/21) offen) · Danach: **Version 1.0.0**; alle Phasen der SPEC sind umgesetzt
+Stand: 2026-11-07 · Aktuelle Phase: **8 – Blender, Politur, v1.0: fertig** ([PR #21](https://github.com/leckermatz79/mesh2brick/pull/21) gemergt) · **[Version 1.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.0.0)**; alle Phasen der SPEC sind umgesetzt
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md)
 
 ## Fazit in zwei Sätzen
@@ -68,10 +68,10 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 
 ## Als Nächstes
 
-1. **Du:** [PR #21](https://github.com/leckermatz79/mesh2brick/pull/21) prüfen und mergen, danach Tag `v1.0.0` und (falls gewünscht) die Release-Seite anlegen. Die Befehle stehen unten unter „Offene Kleinigkeiten“.
-2. **Du:** die drei Fragen unten beantworten (wenn nicht, gelten die Standardannahmen).
-3. **Optional, du:** ein eigenes Blender-Modell ausprobieren: `uv run mesh2brick inspect modell.blend -o out/`, dann `out/modell.inspect.png` ansehen und mit `convert` umwandeln.
-4. Upstream: Antworten auf legolization #88/#89 und #90/#91 abwarten; trimesh #14 nach deiner Freigabe.
+1. **Du:** den trimesh-Fehlerbericht einreichen (Befehl unter „Offene Kleinigkeiten“; Text einmal überfliegen).
+2. **Nächste Version 1.1 – große Modelle** (deine Entscheidung, siehe [PLAN.md](PLAN.md), „Fahrplan nach 1.0“): Größe in cm als Einstellung und eine harte Zeitgrenze über alle Schritte mit dem Ergebnis „bestes stabiles Modell bis dahin“. Bis dahin gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm) und hängen dann an der Zeitgrenze.
+3. **Danach Version 2.0 – Formtreue:** Dachsteine, Tiles, Rundungen.
+4. Upstream: Antworten auf legolization #88/#89 und #90/#91 abwarten, dazu den trimesh-Bericht.
 
 ## Bekannte Einschränkungen
 
@@ -133,19 +133,17 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 | 2026-11-07 | Anrede in den Schritttexten? | **„du“** („Setze den Hut auf den Stiel.“). |
 | 2026-11-07 | Bauabschnitte auf dem Deckblatt? | **Ja**, als Übersicht mit Seitenzahlen. Umgesetzt im Nachtrag zu Phase 7. |
 | 2026-11-07 | Phase 7: Zugang zur Anthropic-API? | **`ANTHROPIC_API_KEY` ist gesetzt.** Für Entwicklung und Messungen dieser Phase wurden insgesamt etwa 1,05 $ verbraucht. |
+| 2026-11-07 | Fehlerbericht an trimesh (#14) einreichen? | **Ja.** trimesh ist groß und aktiv gepflegt, da kommen Antworten. Wie bei legolization: Text überfliegen, dann den fertigen Befehl ausführen. |
+| 2026-11-07 | Was nach 1.0 zuerst? | **1.1 = große Modelle:** Größe in cm als Einstellung, harte Zeitgrenze über alle Schritte, Ergebnis „bestes stabiles Modell bis dahin“. Grund: Wer 40 cm will, bekommt heute gar nichts (Duo bei 48 Noppen wird nicht fertig). **2.0 = Formtreue** mit Dachsteinen, Tiles, Rundungen. So gehen große Modelle sofort, während die schönen Formen reifen. |
+| 2026-11-07 | Eigenes Modell in der Galerie? | **Duo nein.** Ein selbst entworfenes Fusion-Modell wäre das beste Schaufenster (echtes CAD-Teil statt Testkörper). Es gibt keins (Fusion lässt sich hier nicht ohne Oberfläche steuern), also bleibt die Galerie bei den Testmodellen. |
 
 ## Fragen an dich
 
-1. **Fehlerbericht an trimesh einreichen?** trimesh (die Bibliothek, die mesh2brick zum Lesen von Meshes nutzt) liest Blenders 16-Bit-Vertexfarben falsch. mesh2brick umgeht das schon, aber andere Nutzer haben denselben Fehler. Der Text liegt fertig in `docs/UPSTREAM.md` (#14), mit Hinweis auf das Vibe-Coding-Projekt wie bei #88/#90. **Standard: Ja, einreichen** (du reichst ihn mit dem Befehl unter „Offene Kleinigkeiten“ ein; das Rechtesystem lässt mich keine Issues bei fremden Projekten anlegen).
-2. **Was ist dir nach 1.0 am wichtigsten?** (a) rundere Formen durch Dachsteine (hängt an legolization #88/#89), (b) weniger Teile durch größere Platten (Upstream #10), (c) größere Modelle mit 48 Noppen stabil bekommen, (d) etwas anderes. **Standard: (a)**, sobald legolization reagiert; bis dahin nur Fehlerbehebungen.
-3. **Darf ein eigenes Modell von dir in die öffentliche Galerie?** Zurzeit zeigt sie nur selbst erzeugte Testmodelle (Duo bleibt privat). Ein echtes Fusion-360- oder Blender-Modell, das du freigibst, würde zeigen, was mesh2brick im Alltag kann. **Standard: Nein**, die Galerie bleibt bei den Testmodellen.
+Zurzeit keine. Deine Antworten zu Phase 8 stehen unter „Deine Entscheidungen“.
 
 ## Offene Kleinigkeiten
 
-- **PR #21 mergen:** `gh pr merge 21 --squash --delete-branch`
-- **Tag und Release `v1.0.0`** nach dem Merge:
-  `git checkout main && git pull && git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0`
-  `awk '/^## \[1.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v1.0.0 --title "v1.0.0 – Blender, inspect, gallery" --notes-file -`
-- **Ältere Release-Seiten** fehlen weiterhin (die Tags existieren). Befehl für `v0.0.0`:
+- **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite. Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
-- **trimesh-Fehlerbericht (#14), falls du zustimmst:** `gh issue create --repo mikedh/trimesh --title "glTF: normalized integer COLOR_0 (e.g. UNSIGNED_SHORT) is truncated modulo 256" --body-file <Text aus docs/UPSTREAM.md, Abschnitt "Draft #14">`
+- **trimesh-Fehlerbericht (#14), von dir freigegeben:** Text in `docs/UPSTREAM.md`, Abschnitt „Draft #14“. Einreichen:
+  `awk '/^## Draft #14/{f=1;next} /^## /{f=0} f' docs/UPSTREAM.md | gh issue create --repo mikedh/trimesh --title "glTF: normalized integer COLOR_0 (e.g. UNSIGNED_SHORT) is truncated modulo 256" --body-file -`
