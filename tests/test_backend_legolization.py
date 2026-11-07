@@ -359,6 +359,21 @@ def test_default_placement_budget(backend: LegolizationBackend) -> None:
     assert explicit.time_budget_s == 7
 
 
+def test_slopes_carry_their_stud_row() -> None:
+    from legolization.catalog import default_catalog  # noqa: PLC0415
+    from legolization.layout import Layout  # noqa: PLC0415
+
+    from mesh2brick.backends.legolization import to_brick_model  # noqa: PLC0415
+
+    layout = Layout(catalog=default_catalog())
+    layout.add("slope_45_2x1", 0, 0, 0, 0, 4)
+    layout.add("brick_1x1", 3, 0, 0, 0, 4)
+    slope, brick = to_brick_model(layout, None, name="s").parts
+    assert slope.category == "slope"
+    assert slope.studs == ((0, 1),)  # the high row; the slope falls towards y = 0
+    assert brick.studs is None
+
+
 def test_verify_ldraw_rejects_broken_files(
     backend: LegolizationBackend, tmp_path: Path
 ) -> None:

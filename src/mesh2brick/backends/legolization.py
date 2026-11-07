@@ -1725,6 +1725,7 @@ def to_brick_model(
                 category=str(part.category.value),
                 backend_key=brick.part_key,
                 unit=(units or {}).get(brick.brick_id),
+                studs=_stud_columns(layout, brick),
             )
         )
     return BrickModel(
@@ -1740,6 +1741,17 @@ def to_brick_model(
 
 
 # ---------------------------------------------------------------- helpers
+def _stud_columns(
+    layout: Layout, brick: PlacedBrick
+) -> tuple[tuple[int, int], ...] | None:
+    """``(x, y)`` columns with a top stud, for slopes (the high row) only."""
+    if layout.part_of(brick).category.value != "slope":
+        return None
+    return tuple(
+        sorted({(c.cell[0], c.cell[1]) for c in layout.connectors_of(brick, top=True)})
+    )
+
+
 def _backend_options(options: dict[str, Any]) -> dict[str, Any]:
     known = {f.name for f in dataclasses.fields(PipelineConfig)}
     unknown = sorted(set(options) - known)

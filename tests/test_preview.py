@@ -15,6 +15,7 @@ from mesh2brick.render.preview import (
     PreviewOptions,
     grid_to_model,
     render_grid_preview,
+    render_png,
     render_preview,
     render_step_images,
     step_view,
@@ -160,3 +161,53 @@ def test_growing_frames_and_sub_backgrounds(sample_model: BrickModel) -> None:
         sub_background="#e9f1fb",
     )
     assert len(images) == 2
+
+
+# ------------------------------------------------------------------ slopes (1.3.0)
+def _slope_2x1(studs: tuple[tuple[int, int], ...] | None) -> BrickModel:
+    """A 3040b (2 deep, 1 wide, one brick high), stud on the y = 1 cell."""
+    from mesh2brick.model import PlacedPart  # noqa: PLC0415
+
+    cells = tuple((0, y, z) for y in (0, 1) for z in range(3))
+    part = PlacedPart(
+        part="3040b", color=4, x=0, y=0, layer=0, yaw=0, cells=cells, step=0,
+        category="slope", studs=studs,
+    )  # fmt: skip
+    return BrickModel(
+        name="slope",
+        parts=(part,),
+        steps=(BuildStep(),),
+        colors={4: ColorInfo(name="Red", rgb_hex="#c91a09")},
+    )
+
+
+def test_slope_wedge_falls_from_the_stud_row_to_a_half_plate_lip() -> None:
+    from mesh2brick.render.preview import LIP_PLATES, _slope_faces  # noqa: PLC0415
+
+    model = _slope_2x1(((0, 1),))
+    wedge = _slope_faces(model.parts[0])
+    assert wedge is not None
+    sloped, faces = wedge
+    assert sloped == {(0, 0, 0), (0, 0, 1), (0, 0, 2)}  # the stud cell stays a box
+    top = next(f for f in faces if f.outward == (0, 0, 1))
+    heights = {float(y): float(z) for _, y, z in top.corners}
+    assert heights == {1.0: 3.0, 0.0: LIP_PLATES}
+    assert any(f.outward == (0.0, -1.0, 0.0) for f in faces)  # the lip faces -y
+    assert _slope_faces(_slope_2x1(None).parts[0]) is None  # no stud data: a box
+
+
+def test_slopes_are_drawn_as_wedges() -> None:
+    wedge = render_png(_slope_2x1(((0, 1),)))
+    box = render_png(_slope_2x1(None))
+    assert wedge != box
+    pixels = np.asarray(Image.open(io.BytesIO(wedge)).convert("L"))
+    flat = np.asarray(Image.open(io.BytesIO(box)).convert("L"))
+    assert (pixels < 250).sum() < (flat < 250).sum()  # the cut-away corner
+
+
+def test_slopes_in_three_dimensions_and_part_pictures() -> None:
+    from mesh2brick.render.preview import render_part_png  # noqa: PLC0415
+
+    model = _slope_2x1(((0, 1),))
+    picture = render_part_png(model.parts[0], model.colors[4])
+    assert picture.startswith(b"\x89PNG")

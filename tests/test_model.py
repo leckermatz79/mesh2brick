@@ -96,7 +96,7 @@ def test_schema_1_files_still_load(sample_model: BrickModel) -> None:
     for step in data["steps"]:
         del step["stable"], step["fragile"], step["section"], step["text"]
     for part in data["parts"]:
-        del part["unit"]
+        del part["unit"], part["studs"]
     old = BrickModel.from_dict(data)
     assert old.mass_g is None
     assert old.buildable is None
@@ -114,7 +114,10 @@ def test_new_fields_round_trip(tmp_path: Path, sample_model: BrickModel) -> None
         buildable=True,
         best_so_far=True,
         steps=(BuildStep(stable=True), BuildStep(stable=False, fragile=True)),
-        parts=(*sample_model.parts[:2], replace(sample_model.parts[2], unit=1)),
+        parts=(
+            *sample_model.parts[:2],
+            replace(sample_model.parts[2], unit=1, studs=((0, 0), (1, 0))),
+        ),
     )
     assert BrickModel.load(model.save(tmp_path / "m.json")) == model
 
