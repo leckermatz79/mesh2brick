@@ -17,9 +17,10 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 6 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
+> **Status: pre-alpha (Phase 7 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
 > and STEP files into an LDraw model, three parts lists and a PDF building instruction,
-> in the model's own colours. See [docs/STATUS.md](docs/STATUS.md).
+> in the model's own colours; optionally Claude adds section titles and step texts.
+> See [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (development)
 
@@ -31,6 +32,7 @@ uv run ldraw download --yes   # once: LDraw parts library (~150 MB download)
 uv run ldraw generate --yes   # once: generate the part/colour modules
 uv run mesh2brick --help
 uv sync --extra step          # optional: STEP import (OpenCASCADE via cascadio, ~70 MB)
+uv sync --extra step --extra llm  # optional: LLM layer (Anthropic SDK, ~2 MB)
 ```
 
 ## Usage
@@ -87,7 +89,38 @@ All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.ya
   them (a part hanging under an overhang together with the part that holds it).
 - **Big models (over 500 parts)** get steps layer by layer without a stability check
   for every intermediate state; the cover says so.
-- Colour names stay the BrickLink/Rebrickable names, so they can be found there.
+- Colour names stay the BrickLink/Rebrickable names, so they can be found there;
+  German booklets add a German name in brackets ("Bright Green (Hellgrün)").
+- **With the LLM layer:** build sections with titles ("Base", "Head", "Left ear") and a
+  short sentence per step that says what it builds ("Put the finished cap on the stem.").
+
+## Optional: step texts and sections by Claude (LLM layer)
+
+With `llm.enabled: true`, mesh2brick asks Claude (Anthropic API) after placing the
+parts to name build sections, to merge steps a builder would do as one, and to write a
+short sentence per step. **mesh2brick checks every proposal** against the model: a merge
+must keep every part held and visible, a text may only mention parts and quantities of
+its own step. Whatever fails is left out, so the instructions are never worse than
+without the LLM layer ([ADR 0013](docs/adr/0013-llm-layer-proposes-mesh2brick-checks.md)).
+
+```sh
+uv sync --extra llm                       # once
+export ANTHROPIC_API_KEY=...              # or: ant auth login
+uv run mesh2brick convert model.stl -o out/ --set llm.enabled=true
+# -> out/model.llm.json: what was accepted, tokens and cost of the run
+
+uv run mesh2brick feedback                # list the runs
+uv run mesh2brick feedback --rate 4 --note "texts a bit long"   # rate the latest run
+uv run mesh2brick feedback --export runs.jsonl                  # for a later fine-tuning
+```
+
+A run costs about $0.06–0.20 for models of 270–1,000 parts with the default
+`claude-sonnet-5-5` (limit `llm.max_cost_usd: 1.0`, see
+[docs/benchmarks.md](docs/benchmarks.md)). Ratings stay on your computer
+(`MESH2BRICK_DATA_DIR`); runs rated 4 or 5 become examples for later runs, and notes
+are passed on as feedback. `llm.tasks` selects `group_steps`, `write_step_text` and
+the opt-in `choose_part` (replacements for parts LEGO does not make in a colour, with
+`parts.availability: report`).
 
 ## Opening the results in other programs
 

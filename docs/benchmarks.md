@@ -283,3 +283,34 @@ The whole `convert` of the owl takes 99 s (voxelize 11 s, place 67 s, PDF 20 s).
 - **PDF size:** 6–7 kB per part on large models; the bunny stays well below the 10 MB
   target. The step pictures are palette PNGs embedded unchanged; reportlab's own embedding
   doubled the size in a test (82 instead of 38 kB per picture).
+
+## LLM layer (Phase 7, 2026-11-07)
+
+`uv run python scripts/benchmark_llm.py tests/fixtures/toadstool.obj@16
+tests/fixtures/sphere_r10.stl@16 tests/fixtures/bunny_lowpoly.stl@32:en` against the
+Anthropic API with the defaults (`claude-sonnet-5-5`, effort `medium`, tasks
+`group_steps` and `write_step_text`). The real test model (Duo, 3MF, 32 studs) ran locally
+with the same script; it is not in the repository. "Input tokens" counts all input,
+"cached" the part read from the prompt cache (a tenth of the price).
+
+| Model | Lang | Parts | Steps | Merges | Sections | Step texts accepted | Requests | Input tokens (cached) | Output tokens | Cost | LLM time |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| toadstool-16 | de | 374 | 55 | 0 | 6 | 55 of 55 | 4 | 39,035 (28,691) | 2,897 | $0.061 | 21 s |
+| sphere_r10-16 | de | 268 | 48 → 47 | 1 | 8 | 48 of 48 | 4 | 30,055 (20,946) | 2,821 | $0.055 | 21 s |
+| bunny_lowpoly-32 | en | 873 | 125 | 0 | 7 | 125 of 125 | 7 | 110,417 (91,520) | 5,010 | $0.116 | 37 s |
+| Duo (3MF, local) | de | 1,025 | 153 | 0 | 5 | 153 of 153 | 5 | 106,508 (62,082) | 7,798 | $0.201 | 57 s |
+
+- **Everything Claude answered passed mesh2brick's checks** in these runs (no task fell
+  back). In development runs, the checks did reject merges; Claude used `stability_check`
+  before answering and proposed only merges it had seen accepted.
+- **Merges are rare:** the deterministic pass (ADR 0012) already merged the small steps,
+  and most remaining neighbours cover each other's parts. The value is in the sections
+  ("Stiel", "Hut unten", "Hut aufsetzen", "Weiße Punkte"; "Base", "Head", "Ear") and texts.
+- **What made texts better (measured on the toadstool, same model):** telling Claude what
+  each step's parts sit on ("sits on sub-assembly A") fixed wrong places ("behind the stem"
+  for parts on top of the cap), and asking for the purpose of a step instead of a parts
+  list made texts shorter. Passing the accepted section titles to the text task made
+  texts use them ("the ear grows taller" instead of "the tower grows"). The first version
+  cost $0.145 for the toadstool; with the model description as its own cache breakpoint it is $0.061.
+- **One way of addressing the builder:** German texts mixed "Wir bauen" and "Setze"; the prompt now asks for direct instructions with "du" in every step.
+- **Duo end to end:** 161 s including the LLM layer (target 5 minutes).

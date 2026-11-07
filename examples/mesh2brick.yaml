@@ -44,10 +44,15 @@ steps:
   keep_symmetry: true
   submodels: true
   sequencing: auto      # auto | thorough | fast | layers (see docs)
-llm:
+llm:                    # optional, needs: uv sync --extra llm + ANTHROPIC_API_KEY
   enabled: false
   model: claude-sonnet-5-5
-  tasks: [group_steps, write_step_text]
+  tasks: [group_steps, write_step_text]   # + choose_part (with parts.availability: report)
+  effort: medium        # low | medium | high | xhigh | max (more effort, more tokens)
+  max_cost_usd: 1.0     # cost limit per run; the run report logs the actual cost
+  max_turns: 8          # requests per task (tool calls and one round of fixes)
+  examples: 6           # example lines from runs rated 4-5 (mesh2brick feedback --rate)
+  feedback: true        # record runs locally and learn from ratings
 output:
   dir: ./out
   formats: [mpd, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # ldr: one flat file
