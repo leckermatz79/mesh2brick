@@ -6,6 +6,13 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-07 - Phase 8: Blender, inspect, v1.0
+
+First complete release: every phase of the plan is done and the v1.0 Definition of Done
+(SPEC §9) is met: a STEP model with `--config` gives `.mpd`, three parts lists and a PDF in
+under 5 minutes for up to 2,000 parts, every fixture is one stable piece, coverage 96 %
+(docs/benchmarks.md, "v1.0 acceptance").
+
 ### Added
 - `.blend` import (ADR 0014): mesh2brick runs the user's Blender headless (factory settings,
   auto-run scripts disabled) and reads the visible objects of the active scene with modifiers
@@ -27,6 +34,10 @@ phases (`v0.<phase>.0`) until 1.0.
 ### Fixed
 - 16-bit vertex colours in glTF (Blender's default) were wrapped modulo 256 by trimesh;
   they are rescaled before trimesh builds the meshes (UPSTREAM #14).
+
+### Changed
+- Version 1.0.0; development status "Production/Stable". Public CLI flags and settings now
+  follow semantic versioning.
 
 ### Removed
 - The "planned for Phase N" placeholder and its exit code 3: every command works now.
