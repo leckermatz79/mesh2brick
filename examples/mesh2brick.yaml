@@ -27,7 +27,7 @@ color:
   palette: common       # common: ~40 current LEGO colours | solid: all with catalogue numbers | all: every LDraw colour
   bands: [1, 2, 14, 25, 4]   # height_bands: colours bottom to top (Blue..Red)
 parts:
-  categories: [brick, plate]   # also: slope (slow with legolization 0.5.0), tile
+  categories: [brick, plate, slope]   # also: tile; [brick, plate] turns slopes off
   include: []           # whitelist of LDraw numbers, e.g. [3001, 3003]; see `mesh2brick catalog list`
   exclude: []           # blacklist, e.g. [3008, 3007]; 3005 and 3024 are always needed
   max_parts: 5000
