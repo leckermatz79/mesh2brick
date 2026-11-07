@@ -6,6 +6,8 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-07 - Roadmap 1: size in centimetres
+
 ### Added
 - Roadmap 1 ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): the size of the
   LEGO model in centimetres. `input.target_height_cm` sets the height (a size in cm means the
