@@ -1,0 +1,94 @@
+# mesh2brick – Roadmap after 1.0
+
+Status: draft by the product owner, 2026-11-07. Lives in the repo root next to SPEC.md.
+SPEC.md stays the source of truth for *how* we work; this file says *what* comes next and in which order.
+Claude Code: treat each numbered item as a candidate issue. Before starting one, write the acceptance
+criteria into the issue, as in Phases 0–8.
+
+## Guiding decisions (from the product owner)
+
+- 2.0 is primarily for the owner's family builds, not for a wide audience. Usability for strangers comes later.
+- Models will actually be built, so cost awareness matters, but "expensive" is decided ad hoc per model.
+- A personal brick inventory is **out of scope** (no inventory exists; a brick sorter would be a separate project).
+  Any inventory feature must stay optional and never block a nicer model that needs missing parts.
+- The fork-or-wait question for legolization is **not decided yet**. It is decided by the first 2.0 item that
+  depends on an unanswered upstream PR: if hbmartin has not responded by then, implement behind the
+  `Placer` protocol ourselves or fork; the owner makes that call when it comes up.
+
+---
+
+## 1.x – make large models work (minor releases, no new brick types)
+
+Goal: whatever size the user asks for, they get a stable model or an honest "best so far" within the time limit.
+
+1. **Size in centimetres as a first-class option.** `input.target_height_cm` (or longest edge) in config and CLI,
+   converted to studs internally; cover page already shows dimensions. Acceptance: Duo at 20, 30 and 40 cm
+   produce the expected stud counts; `inspect` shows the resulting size before conversion.
+2. **Hard time limit across the whole pipeline.** legolization's final optimisation ignores the limit (Duo at
+   48 studs: >1 h). Wrap every backend stage with a deadline; on expiry return the best *stable* model found,
+   mark it on the cover page as in Phase 2. Acceptance: Duo at 48 studs finishes in ≤ 20 min with a stable model
+   or a clear report; the 5-minute default stays for ≤ 2,000 parts.
+3. **Scalability of stability checks.** Large models (>500 parts) currently get layer-order steps without
+   intermediate stability checks. Options to benchmark: incremental check (only the changed region), split
+   into sub-models checked separately, parallel checks. Acceptance: all intermediate states of Duo checked
+   within the limit, or documented why not.
+4. **PDF size for large closed bodies.** Texture cube: 23 MB. Target < 10 MB via image downsampling or vector
+   rendering for simple steps.
+5. **Estimate quality in `inspect`.** Thin large plates are underestimated (castle: 602 estimated, 1,651 actual).
+   Add a plate-aware term; acceptance: 15 of 15 test runs inside the shown range.
+6. **Feedback scale documented** in `--help` and README (1–5 stars, 5 = best).
+7. Housekeeping: trimesh bug report (owner submits), optional release pages for v0.0.0–v0.7.0.
+
+---
+
+## 2.0 – shape fidelity: from voxel stairs to a LEGO model
+
+Goal: organic shapes (Duo's wings, the toadstool cap) look like LEGO designs, not voxel art.
+Metric for every item: surface deviation to the input mesh (and part count) at unchanged stability.
+
+8. **Slopes, fast.** Prerequisite: the HiGHS hang (upstream #88/#89) is fixed or bypassed. Pre-select slope
+   candidates geometrically (outer edges with matching neighbour pattern) so the solver sees few options.
+   Acceptance: bunny with slopes in < 2× the time without slopes; deviation measurably lower.
+9. **Tiles on surfaces meant to be smooth** (tops, bases, eyes). Rule: a top face that the input mesh renders
+   flat and that no part sits on gets a tile instead of a plate.
+10. **Curved parts** (arches, round bricks, round plates) at convex edges. Start with 1×1 round and 2×2 round;
+    extend by benchmark.
+11. **SNOT** (studs sideways) for vertical faces and thin wings. The biggest step: changes the voxel grid
+    assumptions in `voxel/` and needs its own ADR before any code.
+12. **Colour availability during placement** instead of splitting parts afterwards (depends on upstream #90/#91
+    or our own catalogue-aware placer).
+13. **`choose_part` with real content.** Once items 8–11 give alternatives, the LLM task picks by build
+    ergonomics; validated against catalogue and stability as in Phase 7.
+
+---
+
+## 2.x – handling robustness and instructions
+
+14. **Clutch-power heuristic** like Studio's hints (thin walls, cantilevers) in addition to the gravity check;
+    report on the cover page, optionally auto-reinforce.
+15. **Masonry offset.** 41 % of vertical joints run straight through to the next layer. Upstream candidate #11,
+    or our own post-pass behind the `Placer` protocol once we own placement.
+16. **Internal support for large hollow models** (pillars in the cavity, weight reduction).
+17. **Geometric sub-assemblies**: detect symmetry and repeated modules ("build 2×").
+18. **Automatic camera per step** to avoid hidden new parts.
+19. **Cost estimate on the cover page** from BrickLink price data (catalogue already has the mapping).
+
+---
+
+## Later / undecided
+
+- Interactive HTML viewer for instructions.
+- Image-based LLM review: Claude looks at a rendered step page and rates clarity.
+- Fine-tuning export once enough feedback exists.
+- Simple local web UI (explicitly a non-goal in 1.0).
+- Photo-to-mosaic mode (different product, same pipeline).
+- Personal brick inventory as optional whitelist (needs an inventory first – separate project).
+- Public gallery with an owner-designed Fusion model (owner's decision; Duo stays local).
+
+---
+
+## Working mode (unchanged from SPEC §8)
+
+Vibe-coding: Claude Code decides technical questions and documents them as ADRs; the owner answers goal and
+taste questions, at most three per session, each with a default. One PR per item, owner merges, tag per
+release. Upstream first for anything generally useful; local patches are bridges, listed in docs/UPSTREAM.md.
