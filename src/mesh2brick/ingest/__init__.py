@@ -4,7 +4,8 @@
 
 ``load_model(path, settings.input)`` picks a loader by file suffix:
 STL/OBJ/PLY via trimesh, 3MF via our own reader (core, materials, production
-extension, slicer colours), STEP via cascadio (optional ``step`` extra).
+extension, slicer colours), glTF with its own conventions (Y up, metres,
+linear colours) and STEP via cascadio (optional ``step`` extra).
 ``.blend`` (Phase 8) will register here too.
 """
 
@@ -21,6 +22,7 @@ from mesh2brick.ingest.base import (
     register,
     supported_suffixes,
 )
+from mesh2brick.ingest.gltf import GltfLoader
 from mesh2brick.ingest.mesh_formats import TrimeshLoader
 from mesh2brick.ingest.normalize import normalize
 from mesh2brick.ingest.step import StepLoader
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 register(TrimeshLoader())
 register(ThreeMFLoader())
 register(StepLoader())
+register(GltfLoader())
 
 
 def load_model(path: Path, config: InputConfig) -> MeshModel:

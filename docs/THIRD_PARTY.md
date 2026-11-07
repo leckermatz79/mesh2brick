@@ -13,7 +13,7 @@ Versions are the ones locked in `uv.lock` at the time of the last update. Run
 | rebrickable | 1.1.0 (pinned) | GPL-3.0-or-later | BOM parsers used to cross-check our exports in tests; catalogue data comes from Rebrickable's CSV dumps via `scripts/make_id_maps.py` (ADR 0009) |
 | numpy | ≥ 2.5 | BSD-3-Clause (+ bundled 0BSD/MIT/Zlib/CC0) | Arrays |
 | scipy | ≥ 1.18 | BSD-3-Clause | Morphology, optimisation (HiGHS) |
-| trimesh | ≥ 5.2 | MIT | Mesh loading (STL/OBJ/3MF/PLY), voxelization helpers |
+| trimesh | ≥ 5.2 (5.2.0 locked) | MIT | Mesh loading (STL/OBJ/PLY, glTF parsing), mesh repair, voxelization helpers |
 | matplotlib | ≥ 3.11 | PSF-based (matplotlib licence) | PNG previews |
 | pydantic | ≥ 2.14 | MIT | Configuration schema |
 | PyYAML | ≥ 6.0.3 | MIT | Configuration files |
