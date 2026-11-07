@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · **1.0 veröffentlicht** ([v1.0.0](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.0.0), Phasen 0–8 der SPEC fertig) · Nächster Punkt: **Roadmap 1 – Größe in Zentimetern** ([ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
+Stand: 2026-11-07 · **1.0 veröffentlicht** ([v1.0.0](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.0.0), Phasen 0–8 der SPEC fertig) · Nächster Punkt: **Roadmap 1 – Größe in Zentimetern** ([#24](https://github.com/leckermatz79/mesh2brick/issues/24), [ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md)
 
 ## Fazit in zwei Sätzen
@@ -68,17 +68,17 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 
 ## Als Nächstes
 
-Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von dir, 2026-11-07). Jeder Punkt bekommt ein [Issue mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap) und Abnahmekriterien, wie die Phasen.
+Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von dir, 2026-11-07). Die Punkte 1–7 haben je ein [Issue mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap) (#24–#30) mit Abnahmekriterien, wie die Phasen.
 
 **1.x – große Modelle möglich machen** (keine neuen Steinarten):
 
-1. **Roadmap 1 – Größe in Zentimetern als Einstellung** (nächster Punkt). Heute gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm).
-2. Roadmap 2 – harte Zeitgrenze über alle Schritte, sonst „bestes stabiles Modell bis dahin“ (Duo bei 48 Noppen in ≤ 20 min).
-3. Roadmap 3 – Stabilitätsprüfung auch für große Modelle.
-4. Roadmap 4 – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
-5. Roadmap 5 – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
-6. Roadmap 6 – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
-7. Roadmap 7 – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
+1. **Roadmap 1 – Größe in Zentimetern als Einstellung** ([#24](https://github.com/leckermatz79/mesh2brick/issues/24), nächster Punkt). Heute gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm).
+2. Roadmap 2 ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)) – harte Zeitgrenze über alle Schritte, sonst „bestes stabiles Modell bis dahin“ (Duo bei 48 Noppen in ≤ 20 min).
+3. Roadmap 3 ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)) – Stabilitätsprüfung auch für große Modelle.
+4. Roadmap 4 ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)) – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
+5. Roadmap 5 ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)) – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
+6. Roadmap 6 ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)) – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
+7. Roadmap 7 ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
 
 **Danach 2.0 – Formtreue:** Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89 und #90/#91 sowie trimesh #2669 abwarten.
 
@@ -152,6 +152,5 @@ Zurzeit keine. Deine Antworten zu Phase 8 stehen unter „Deine Entscheidungen�
 
 ## Offene Kleinigkeiten
 
-- **Roadmap-Issues 1–7 anlegen und die fertigen Phasen-Issues #8/#9 schließen:** Das Rechtesystem lässt mich keine Issues anlegen oder schließen, auch nicht im eigenen Repo. Das fertige Skript bekommst du im Chat.
-- **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite (Roadmap 7). Befehl für `v0.0.0`:
+- **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite (Roadmap 7, #30). Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
