@@ -322,6 +322,51 @@ def unavailable_parts(
     return frozenset(gone)
 
 
+Piece = tuple[str, int]
+"""(LDraw part, LDraw colour) of one part in a replacement."""
+
+
+def replacement_options(
+    part: str,
+    colour: int,
+    colours: Iterable[int],
+    *,
+    nearest: int = 2,
+    produced: Callable[[str, int], bool | None] = produced_in,
+) -> tuple[tuple[Piece, ...], ...]:
+    """Ways to replace ``part`` in ``colour``, which LEGO does not make.
+
+    First, shorter parts of the same family, width, height and colour, split
+    along the long side (fewest pieces, :func:`choose_split`); then the same
+    part in the ``nearest`` colours of ``colours`` LEGO makes it in (closest
+    by RGB). Every option uses only parts produced in their colour.
+
+    Raises:
+        BackendError: if ``part`` is not placeable.
+    """
+    width, length, height = placement_footprint(part)
+    category = next(p.category for p in placeable_parts() if p.part == part)
+    options: list[tuple[Piece, ...]] = []
+    lengths: dict[int, str] = {}
+    for other in placeable_parts():
+        if other.category != category or other.part == part:
+            continue
+        w, long, h = placement_footprint(other.part)
+        if (w, h) == (width, height) and long < length and produced(other.part, colour):
+            lengths.setdefault(long, other.part)
+    split = choose_split(length, lengths)
+    if split is not None and len(split) > 1:
+        options.append(tuple((lengths[piece], colour) for piece in split))
+    known = available_colors(part) or frozenset()
+    candidates = sorted(set(colours) & known - {colour})
+    if candidates:
+        rgb = color_rgb([colour, *candidates])
+        target = np.array(rgb[colour], dtype=float)
+        candidates.sort(key=lambda c: float(np.linalg.norm(np.array(rgb[c]) - target)))
+        options.extend(((part, c),) for c in candidates[:nearest])
+    return tuple(options)
+
+
 def _rect_dims(part: Any) -> tuple[int, int, int] | None:
     """(width, length, height) of a full-rectangle part, else ``None``."""
     cells = part.occupied_cells

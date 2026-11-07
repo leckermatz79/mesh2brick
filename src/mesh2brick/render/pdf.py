@@ -109,6 +109,9 @@ class PdfOptions:
             (otherwise every picture shows the finished model's frame).
         files: file names of the parts lists for the ordering hint, keyed by
             ``bricklink`` and ``rebrickable``.
+        replacements: suggested replacement per ``(part, colour)`` LEGO does
+            not make, already worded in the booklet language (Phase 7,
+            ``choose_part``).
         date: date printed on the cover (default: today).
         compress: compress page content (tests switch it off to read text).
     """
@@ -119,6 +122,7 @@ class PdfOptions:
     dpi: float = 130.0
     grow: bool = True
     files: Mapping[str, str] = field(default_factory=dict)
+    replacements: Mapping[tuple[str, int], str] = field(default_factory=dict)
     date: dt.date | None = None
     compress: bool = True
 
@@ -404,7 +408,17 @@ class _Booklet:
                 f"{colour_label(m.color, m.color_name, lang)}"
                 for m in absent
             )
-            notes.append((text("not_produced", lang, parts=listed), WARN_FILL))
+            message = text("not_produced", lang, parts=listed)
+            for m in absent:
+                if replacement := self.options.replacements.get((m.part, m.color)):
+                    original = (
+                        f"{part_label(self.examples[(m.part, m.color)], lang, m.name)} "
+                        f"{colour_label(m.color, m.color_name, lang)}"
+                    )
+                    message += " " + text(
+                        "replacement", lang, part=replacement, original=original
+                    )
+            notes.append((message, WARN_FILL))
         if {"bricklink", "rebrickable"} <= set(files):
             shopping = text(
                 "shopping",

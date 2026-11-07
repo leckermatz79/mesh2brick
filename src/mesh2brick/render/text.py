@@ -67,6 +67,10 @@ _TEXT: Final[dict[str, dict[Language, str]]] = {
             "example, by two shorter parts of the same colour: {parts}"
         ),
     },
+    "replacement": {
+        "de": "Vorschlag: {part} statt {original}.",
+        "en": "Suggestion: {part} instead of {original}.",
+    },
     "step": {"de": "Schritt", "en": "Step"},
     "subassembly": {"de": "Baugruppe {name}", "en": "Sub-assembly {name}"},
     "subassembly_build": {
@@ -291,13 +295,32 @@ def part_label(
     English uses Rebrickable's name when known; German (and English without
     a known name) describes family and size, like ``Platte 2 × 4``.
     """
+    return sized_label(
+        part.part, part.category, part_size(part), language, catalogue_name
+    )
+
+
+def sized_label(
+    part: str,
+    category: str,
+    size: tuple[int, int, int],
+    language: Language,
+    catalogue_name: str | None = None,
+) -> str:
+    """Name of a part from its family and ``(short, long, height)`` size.
+
+    English uses Rebrickable's name when known; otherwise the family and the
+    size describe it, like ``Platte 2 × 4`` (heights in bricks when unusual).
+    """
     if language == "en" and catalogue_name:
         return catalogue_name
-    short, long, height = part_size(part)
-    family = _FAMILY.get(part.category)
-    word = family[language] if family else part.part
-    standard = {"brick": 3, "plate": 1, "tile": 1}.get(part.category)
-    size = f"{short} × {long}"
+    short, long, height = size
+    family = _FAMILY.get(category)
+    word = family[language] if family else part
+    standard = {"brick": 3, "plate": 1, "tile": 1}.get(category)
+    label = f"{short} × {long}"
     if standard is not None and height != standard:
-        size += f" × {number(height / 3, language, digits=0 if height % 3 == 0 else 1)}"
-    return f"{word} {size}"
+        label += (
+            f" × {number(height / 3, language, digits=0 if height % 3 == 0 else 1)}"
+        )
+    return f"{word} {label}"
