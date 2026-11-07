@@ -30,7 +30,7 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | 11 | legolization | Bond-aware placement (fewer stacked vertical joints) | On a 1,013-part model, 41 % of vertical joints continue straight through a brick interface. The `bond` strategy (47 %, +18 % parts), `bond_alpha1` and `refine` do not reduce it for `kollsker`. Studio flags clutch-power hints where walls are thin. Staggered joints would make models sturdier to handle. | idea | – |
 | 12 | legolization | Layer-order steps: place hanging parts with their holder, merge tiny steps | In a pure layer order, parts under an overhang are placed before the part that holds them (155 of 1,025 parts on our test model hang in the air for 1–16 steps), and layers with 1–2 parts become steps of their own. mesh2brick's graph-only passes (ADR 0012, `steps/`) fix both in 0.1 s; the same idea would help legolization's `band` fallback. | idea | – |
 | 13 | legolization | `_assign_rotsteps` drops `insertion_fragile` | It rebuilds every main step with a rotation as `BuildStep(index, brick_ids, prefix_stable, prefix_max_score, rotstep)`, so the `insertion_fragile` flag (and any other new field) is lost whenever `rotstep=True` (the default). `dataclasses.replace(step, rotstep=...)` would keep them. Small bug fix with a test. | idea | – |
-| 14 | trimesh | **glTF loader ignores `normalized` on integer `COLOR_0`; 16-bit vertex colours wrap modulo 256** | Blender writes colour attributes as normalised `uint16`. For primitives without a material, `trimesh.exchange.gltf` passes the raw accessor to `Trimesh(vertex_colors=...)`, and `visual.color.to_rgba` ends with `astype(uint8)`: 14146 (linear 0.216 = sRGB 0.5) becomes 66 instead of 55, and every vertex-painted Blender model gets wrong colours. Still on trimesh `main` (checked 2026-11-07), no issue found. The fix belongs in the glTF reader (scale normalised integer accessors to 0..1 floats, as the spec says), not in `to_rgba`, which must keep accepting plain integer lists 0–255. mesh2brick rescales the colours before trimesh builds the meshes (`ingest/gltf.py`, `_exact_vertex_colors`). | draft ready | – (text below) |
+| 14 | trimesh | **glTF loader ignores `normalized` on integer `COLOR_0`; 16-bit vertex colours wrap modulo 256** | Blender writes colour attributes as normalised `uint16`. For primitives without a material, `trimesh.exchange.gltf` passes the raw accessor to `Trimesh(vertex_colors=...)`, and `visual.color.to_rgba` ends with `astype(uint8)`: 14146 (linear 0.216 = sRGB 0.5) becomes 66 instead of 55, and every vertex-painted Blender model gets wrong colours. Still on trimesh `main` (6c158cce22, checked 2026-11-07: the reader never looks at `normalized`), no issue found. The fix belongs in the glTF reader (scale normalised integer accessors to 0..1 floats, as the spec says), not in `to_rgba`, which must keep accepting plain integer lists 0–255. mesh2brick rescales the colours before trimesh builds the meshes (`ingest/gltf.py`, `_exact_vertex_colors`). | approved | – (text below; filed by the product owner) |
 
 ## Draft #2 (as filed in issue #88)
 
@@ -78,22 +78,54 @@ height) works for every part except `3005`, `3024` and, with slopes, `3039`/`304
 ten random subsets per height unit placed correctly and never used excluded parts. The issue
 would mention that it surfaced in a vibe-coding project (like #88).
 
-## Draft #14 (not filed; waiting for the product owner's OK)
+## Draft #14 (approved by the product owner on 2026-11-07; final issue text)
 
-**Title:** glTF: normalized integer `COLOR_0` (e.g. `UNSIGNED_SHORT`) is truncated modulo 256
+**Problem**
 
-**Problem:** for a primitive without a material, `trimesh/exchange/gltf.py` passes the
-`COLOR_0` accessor unchanged as `vertex_colors`. `trimesh.visual.color.to_rgba` only scales
-float input, so `uint16` values end in `astype(np.uint8)` and wrap: `[65535, 14146, 0, 65535]`
-becomes `[255, 66, 0, 255]` (expected `[255, 55, 0, 255]`). Blender's glTF exporter writes
-colour attributes as normalized `UNSIGNED_SHORT` by default, so vertex-painted models from
-Blender load with wrong colours.
+For a glTF primitive without a material, a `COLOR_0` accessor with an integer component type wider than 8 bit and `"normalized": true` is passed unchanged as `vertex_colors` (`trimesh/exchange/gltf/__init__.py`, `kwargs["vertex_colors"] = colors.copy()`). `trimesh.visual.color.to_rgba` only rescales float input, so the `uint16` values reach the final `astype(np.uint8)` and wrap modulo 256: `[65535, 14146, 0, 65535]` becomes `[255, 66, 0, 255]` instead of `[255, 55, 0, 255]`.
 
-**Suggested fix:** when an accessor has `"normalized": true` and an integer component type,
-convert it to float in 0..1 (`values / np.iinfo(dtype).max`), as glTF 2.0 §3.11 specifies
-("Normalized attribute data"). `to_rgba` then scales it correctly. Test: a one-triangle
-`.gltf` with a base64 buffer and a `UNSIGNED_SHORT` `COLOR_0` (as in mesh2brick's
-`tests/test_gltf.py::test_wide_vertex_colours_are_not_wrapped`).
+Blender's glTF exporter writes colour attributes as normalized `UNSIGNED_SHORT` by default, so vertex-painted models exported from Blender load with wrong colours (orange turns into a yellowish orange, mid tones are effectively random).
 
-**Context:** found while adding `.blend` import to mesh2brick (a vibe-coding project), like
-legolization #88/#90.
+**Reproduction** (trimesh 5.2.0, numpy 2.5.4, Python 3.12; the reader on `main` at 6c158cce22 looks the same)
+
+```python
+import base64, json, tempfile
+from pathlib import Path
+
+import numpy as np
+import trimesh
+
+# One triangle with COLOR_0 as normalized UNSIGNED_SHORT (Blender's default export).
+# 14146 / 65535 = 0.2159 -> expected 0.2159 * 255 = 55 as uint8.
+positions = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]], dtype="<f4")
+colors = np.array([[65535, 14146, 0, 65535]] * 3, dtype="<u2")
+blob = positions.tobytes() + colors.tobytes()
+gltf = {
+    "asset": {"version": "2.0"},
+    "scene": 0,
+    "scenes": [{"nodes": [0]}],
+    "nodes": [{"mesh": 0}],
+    "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "COLOR_0": 1}}]}],
+    "buffers": [{"byteLength": len(blob),
+                 "uri": "data:application/octet-stream;base64," + base64.b64encode(blob).decode()}],
+    "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": 36},
+                    {"buffer": 0, "byteOffset": 36, "byteLength": 24}],
+    "accessors": [
+        {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+         "min": [0, 0, 0], "max": [1, 1, 0]},
+        {"bufferView": 1, "componentType": 5123, "normalized": True, "count": 3, "type": "VEC4"},
+    ],
+}
+path = Path(tempfile.mkdtemp()) / "triangle.gltf"
+path.write_text(json.dumps(gltf))
+mesh = next(iter(trimesh.load(path, force="scene").geometry.values()))
+print(mesh.visual.vertex_colors[0])  # [255  66   0 255], expected [255  55   0 255]
+```
+
+**Suggested fix**
+
+When an accessor has `"normalized": true` and an integer component type, convert it to floats in 0..1 (`values / np.iinfo(dtype).max`), as glTF 2.0 specifies for normalized attribute data (§3.11). `to_rgba` then scales the colours correctly. I would not change `to_rgba` itself, since it has to keep accepting plain integer colours 0–255 (e.g. Python lists, which become `int64`). Primitives that also have a material are not affected in the same way: there the raw values end up in `visual.vertex_attributes["color"]`, so callers can still normalise them.
+
+**Context**
+
+Found while adding `.blend` import to [mesh2brick](https://github.com/leckermatz79/mesh2brick), a GPL tool that turns 3D models into LEGO-compatible build instructions; it is developed in a "vibe-coding" setup with Claude Code. mesh2brick currently works around the bug by rescaling the colours in the kwargs from `trimesh.exchange.gltf.load_gltf/load_glb` before building the scene. Happy to turn the fix above into a PR with a test if that helps.
