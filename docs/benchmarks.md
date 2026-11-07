@@ -497,3 +497,69 @@ also in the direct-highspy path legolization uses for step planning (not in mesh
   (about 1 s) before the crossover-free interior point method should keep both; not measured.
 - legolization's `preserve` mode adds few slopes at brick height (4 on 224 parts, 14 on 873):
   it only swaps exact profile matches. More slopes need Roadmap 8's candidate selection.
+
+## Solver order and slopes back on (1.3.0, 2026-11-07)
+
+Issue #34 (ROADMAP item 8, moved up by the product owner). Conditions: small models not noticeably
+slower than in 1.2 (5 s cap per attempt stays); slopes on by default only if every fixture stays
+one stable piece and needs at most twice its time without slopes.
+
+**Attempt order, measured first** (`out/lp-order/one_run.py`, placement and steps in one process,
+1.2 against the candidate orders; same layout means same parts, slopes, steps and verdict):
+
+| Case | 1.2 | simplex 1 s, then IPM | simplex 3 s, then IPM | 3 s, step planning unchanged |
+|---|---:|---:|---:|---:|
+| L-bracket, 32 studs | 22.1 s | **28.0 s** (other steps) | 21.3 s | 21.3 s |
+| torus, 32 studs | 5.3 s | **10.9 s** | 5.3 s | 5.3 s |
+| rocket, bunny 16 (`luo` and `kollsker`) | 7.9 / 7.9 / 1.7 s | same | same | same |
+| bunny 16, `luo`, slopes | 147 s | 34 s | 70 s | 99 s |
+| bunny 32 | 78 s | 45 s | – | – |
+| bunny 32, slopes | 74–99 s | 57 s | 63 s | 63 s |
+| toadstool 32 | 135 s | 88 s | 99 s | 100 s |
+
+Of 89 stability LPs that simplex solved in its first attempt under 1.2, 15 needed more than 1 s,
+3 more than 2 s (longest 2.3 s; two more finished just under the 5 s cap). A 1 s cap therefore
+sends ordinary LPs to the interior point method, which is slower on them and, in legolization's
+step planning, returns more solutions near the stability boundary that get re-solved exactly
+(L-bracket: 19 → 28 LPs, one step more). With 3 s the small models stay exactly as in 1.2. The
+step-planning path needs the new order too (99 s instead of 70 s for the bunny with slopes).
+Chosen: simplex 3 s → interior point without crossover 300 s → simplex without presolve 5 s →
+legolization's last attempt, in both LP paths. Timings on this laptop vary by up to a third on the
+big cases between runs (bunny 32 with slopes under 1.2: 99 s, later 74 s).
+
+**Release run** (`scripts/benchmark_release.py --out out/release-1.3 --local samples/...@32`, then
+the same with `--set "parts.categories=[brick, plate, slope]"`):
+
+| Input | 1.2 | 1.3 | 1.3 with slopes | ratio | slopes placed | stable (1.3 / slopes) |
+|---|---:|---:|---:|---:|---:|---|
+| `bunny_lowpoly.stl` | 71 | 69 | 81 | 1.18 | 14 | yes / yes |
+| `cube_10mm.step` | 232 | 216 | 220 | 1.02 | 0 | yes / yes |
+| `cube_10mm.stl` | 232 | 214 | 222 | 1.04 | 0 | yes / yes |
+| `heart.vox` | 4 | 4 | 4 | 0.98 | 0 | yes / yes |
+| `l_bracket.stl` | 27 | 28 | 30 | 1.09 | 0 | yes / yes |
+| `rocket.blend` | 15 | 16 | 19 | 1.20 | 0 | yes / yes |
+| `sphere_r10.stl` | 109 | 97 | 126 | 1.30 | 46 | yes / yes |
+| `textured_cube.obj` | 246 | 229 | 231 | 1.01 | 0 | yes / yes |
+| `toadstool.obj` | 164 | 132 | 157 | 1.19 | 16 | yes / yes |
+| `torus.stl` | 16 | 17 | 25 | 1.45 | 4 | yes / yes |
+| `two_bodies.step` | 159 | 151 | 156 | 1.03 | 0 | yes / yes |
+| `vertex_colors.ply` | 118 | 108 | 141 | 1.31 | 46 | yes / yes |
+| `castle.step`, `--config` | 202 | 188 | 223 | 1.19 | 4 | yes / yes |
+| Duo (local only) @32 | 95 | 77 | 78 | 1.00 | 0 | yes / yes |
+
+Times in seconds; ratio = with slopes / without (1.3). All files, parts-list totals and strict
+LDraw re-reads pass in both runs; none is cut short.
+
+- **Small models are not slower:** at most +0.7 s (rocket), within run-to-run noise; bigger ones
+  gain 8–32 s (toadstool 164 → 132 s, Duo 95 → 77 s).
+- **Slopes cost at most 1.45x** (torus), 1.0–1.3x elsewhere; the 5-minute default holds (longest
+  ≤ 2,000 parts with slopes: castle 223 s). Both conditions met: slopes are on by default.
+- **Few slopes, and most of them inside:** legolization's `preserve` mode only swaps exact profile
+  matches. Of the 130 slopes on the fixtures, 10 touch the outside (an empty cell connected to the
+  outside next to one of their cells): bunny 4 of 14, toadstool 5 of 16, castle 1 of 4; sphere
+  (46), vertex-colour model (46) and torus (4) have them all on the inner wall of the hollow
+  shell. Slopes on cost little time but change little that a builder sees; placing more visible
+  slopes is the 2.0 part of item 8.
+- **Slopes are drawn as slopes** in previews, step pictures and part tiles (wedge from the stud
+  row to a half-plate lip, as in LDraw's 3039, 3040b and 4286); the PDF of the bunny shows them in
+  the callouts.

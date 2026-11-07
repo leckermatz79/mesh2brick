@@ -1,50 +1,48 @@
 # Projektstatus
 
-Stand: 2026-11-07 · **Roadmap 2 – harte Zeitgrenze fertig** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), Version 1.2.0) · Nächster Punkt: **Löserreihenfolge + Dachsteine wieder an** (ROADMAP Punkt 8, wird 1.3.0), danach Roadmap 3 ([ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
+Stand: 2026-11-07 · **1.3.0 – Löserreihenfolge + Dachsteine wieder an fertig** ([#34](https://github.com/leckermatz79/mesh2brick/issues/34), ROADMAP Punkt 8) · davor 1.2.0 (harte Zeitgrenze, [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.2.0)) · Nächster Punkt: **Roadmap 3 – Stabilitätsprüfung für große Modelle** ([#26](https://github.com/leckermatz79/mesh2brick/issues/26), [ROADMAP.md](../ROADMAP.md))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **Die Zeitgrenze hält jetzt wirklich:** Eine Umwandlung hält `placement.time_limit_s` ein (Standard 5 Minuten); legolization wird notfalls mitten in der Rechnung gestoppt. Ist ein Modell bis dahin nicht fertig optimiert, bekommst du das beste stabile Modell, das bis dahin gefunden wurde, und das Deckblatt sagt das.
-- **Große Modelle gehen:** Duo bei 48 Noppen (2.308 Teile) ist mit 20 Minuten Zeit nach gut 12 Minuten fertig und steht stabil; vorher lief derselbe Fall über eine Stunde und wurde abgebrochen. Mit den Standard-5-Minuten kommt er nach 289 s als ehrlich markierter Zwischenstand.
+- **Dachsteine sind wieder an, und große Modelle rechnen schneller:** Der Löser probiert erst 3 s den Simplex und dann den Innere-Punkte-Weg ohne Crossover. Kleine Modelle brauchen genauso lange wie in 1.2, große bis zu 32 s weniger (Fliegenpilz 164 → 132 s, Duo 95 → 77 s); mit Dachsteinen bleibt jedes Testmodell stabil und braucht höchstens das 1,45-Fache.
+- **Ehrlich dazu:** legolization setzt im heutigen Modus nur wenige Dachsteine, und die meisten liegen innen in der hohlen Wand (von 130 sind 10 von außen sichtbar). Sichtbar mehr Dachsteine bleibt die Arbeit für 2.0.
 
-| Fliegenpilz mit nur 2 Minuten Zeit: legolization wurde während der letzten Optimierung gestoppt, das Modell (1.240 Teile, stabil) ist trotzdem fertig, der gelbe Kasten sagt es |
+| Dachsteine werden jetzt als Dachsteine gezeichnet: die drei Sorten in allen vier Drehungen, darunter ein Callout aus der Anleitung des Hasen |
 |---|
-| ![Deckblatt mit Hinweis zur Zeitgrenze](gallery/roadmap2-time-limit.png) |
+| ![Dachsteine in Vorschau und PDF](gallery/roadmap8-slopes.png) |
 
-## Erledigt (Roadmap 2)
+## Erledigt (1.3.0, ROADMAP Punkt 8)
 
-- **Warum Duo bei 48 Noppen über eine Stunde lief:** Nicht der letzte Optimierungsschritt war schuld, wie vermutet, sondern schon die *erste* Stabilitätsberechnung nach dem Platzieren. Das ist eine große Rechenaufgabe (2.392 Teile), an der der Löser in der Einstellung von legolization stundenlang hängt. In einer anderen Einstellung (ohne den Abschlussschritt „crossover“) ist sie in 49 Sekunden gelöst.
-- **Schnellerer Rechenweg für große Modelle:** mesh2brick probiert diese Einstellung jetzt, bevor es auf die langsame zurückfällt. Damit es nichts verschlechtert, habe ich an fünf Modellen alle 34 Stabilitätsberechnungen auf beiden Wegen gemacht: **34 von 34 Urteilen gleich** („stabil“/„nicht stabil“).
-- **Harte Grenze:** legolization läuft jetzt in einem eigenen Prozess und meldet jeden Zwischenstand. Ist die Zeit um (abzüglich der Zeit, die PDF und Teilelisten brauchen), wird der Prozess beendet, egal wo er gerade rechnet. Genommen wird der beste Zwischenstand: geprüft stabil vor geprüft instabil vor ungeprüft.
-- **Ehrlich markiert:** Auf dem Deckblatt steht dann „Zeitgrenze erreicht: Das ist das beste stabile Modell, das bis dahin gefunden wurde. Mit mehr Rechenzeit käme es meist mit weniger Teilen aus.“ Gab es noch kein stabiles Modell, steht dort „der letzte Zwischenstand“. Die Kommandozeile sagt zusätzlich, nach welchem Schritt und mit wie vielen Teilen.
-- **Keine losen Steine mehr bei Duo:** Duo bei 48 Noppen hatte zuerst genau einen losen 1×2-Stein. Der Grund war ein kleiner Stummel im Modell, der seitlich absteht, ohne etwas darüber oder darunter. LEGO-Steine halten nur über die Noppen, also kann ihn kein Stein halten. Solche Zellen entfernt mesh2brick jetzt beim Voxelisieren, mit Hinweis; in keinem anderen Testmodell gibt es sie (0 von 15 geprüften Läufen). Danach blieb ein einzelner 1×1-Stein unter einem Überhang lose, weil legolization ihn nicht mit dem Nachbarn verbindet. Höchstens drei solche losen Teile nimmt mesh2brick nach dem Platzieren heraus und prüft die Stabilität neu, mit Hinweis; mehr bleiben drin und werden gemeldet.
-- **Mehr Zeit gibst du selbst (deine Entscheidung):** `convert --time 20min` (auch `90s`, `1h`). Die Grenze wächst nie von allein. Dafür sagen `inspect` und der Start von `convert` ab rund 2.000 geschätzten Teilen „expected about 3,905 parts; recommended: --time 20min“ (so bei Duo mit 40 cm).
-- **Kleinigkeiten:** Die KI-Schicht wird übersprungen (mit Hinweis), wenn vor dem Export weniger als 30 s übrig sind. Ist die Zeit schon vor dem Platzieren um, gibt es eine klare Fehlermeldung. Jede Umwandlung braucht etwa 1 s mehr für den Start des zweiten Prozesses.
-- **Abnahme:**
+- **Erst gemessen, wie von dir verlangt:** „Simplex 1 s, dann Innere-Punkte“ machte kleine Modelle spürbar langsamer (L-Winkel +27 %, Torus doppelt so lang), weil 15 von 89 einfachen Rechnungen im Simplex 1–2,3 s brauchen. Mit **3 s** bleiben sie genau so schnell wie in 1.2. Die 5-s-Grenze für den zweiten Simplex-Versuch bleibt. Die neue Reihenfolge gilt in beiden Rechenwegen von legolization, auch beim Planen der Bauschritte.
+- **Deine Bedingungen für „Dachsteine standardmäßig an“ sind erfüllt:** Alle 14 Testmodelle bleiben mit Dachsteinen stabil, aus einem Stück und bestehen alle Prüfungen; die Zeit steigt höchstens auf das 1,45-Fache (Torus), sonst 1,0–1,3. Die 5 Minuten reichen weiter (längster Fall bis 2.000 Teile mit Dachsteinen: Burg 223 s). Ausschalten: `--set "parts.categories=[brick, plate]"`.
+- **Dachsteine sehen in Vorschau und PDF wie Dachsteine aus:** Noppen auf der hohen Reihe, Schräge bis zu einer halben Platte hohen Kante, genau wie die LDraw-Teile 3039, 3040b und 4286 (vorher: Quader ohne Noppen).
+- **Ehrliche Einschränkung:** Der heutige Modus von legolization tauscht nur Stellen, deren Form genau passt. Bei Kugel, PLY-Modell und Torus liegen deshalb alle Dachsteine innen; beim Hasen sind 4 von 14 außen, beim Fliegenpilz 5 von 16, bei der Burg 1 von 4.
+- **Abnahme (Issue #34):**
 
-| Abnahme (Issue #25) | Ergebnis |
+| Kriterium | Ergebnis |
 |---|---|
-| Duo bei 48 Noppen in ≤ 20 min, stabil oder klarer Bericht | **12 min, stabil, aus einem Stück** (2.308 Teile; 1.0: über 1 Stunde, abgebrochen) |
-| 5 Minuten reichen weiter bis 2.000 Teile | **ja**: alle 13 öffentlichen Modelle wie in 1.0 (gleiche Teilezahlen, alle stabil), keins abgeschnitten, längster Fall bis 2.000 Teile 232 s (1.0: 265 s); der Texturwürfel mit 2.280 Teilen braucht 246 s (1.0: 294 s) |
-| Harte Grenze am echten Modell | Duo bei 48 Noppen mit 5 Minuten: legolization nach 198 s gestoppt, fertig nach 289 s |
+| Kleine Modelle nicht spürbar langsamer als 1.2 | **ja**: höchstens +0,7 s (Rakete), im Rauschen; größere 8–32 s schneller |
+| 5-s-Grenze pro Versuch bleibt | **ja** (Simplex ohne Vorverarbeitung 5 s; der erste Simplex-Versuch 3 s) |
+| Dachsteine standardmäßig an: alle stabil, höchstens doppelte Zeit | **ja**: 14 von 14 stabil, höchstens 1,45-fach |
+| Dachsteine in Vorschau und PDF als Dachsteine | **ja** |
+| 5 Minuten reichen bis 2.000 Teile | **ja**: längster Fall 223 s |
 
-## Messwerte 1.2 (in Klammern 1.0)
+## Messwerte 1.3 (in Klammern 1.2)
 
-| Modell | Teile | Zeit | stabil |
-|---|---|---|---|
-| Rakete (`.blend`, 32 Noppen) | 263 (263) | 15 s (14 s) | ja |
-| Hase (32) | 873 (873) | 71 s (73 s) | ja |
-| Fliegenpilz (32) | 1.240 (1.240) | 164 s (174 s) | ja |
-| Kugel (32) | 1.499 (1.499) | 109 s (113 s) | ja |
-| STEP-Burg (32, `--config`) | 1.651 (1.651) | 202 s (239 s) | ja |
-| STEP-Würfel (32) | 1.952 (1.952) | 232 s (265 s) | ja |
-| Texturwürfel (32) | 2.280 (2.280) | 246 s (294 s) | ja |
-| Duo (32, nur lokal) | 1.025 (1.025) | 95 s (100 s) | ja |
-| Duo (48, nur lokal, 5 min) | 2.371 (2.313) | **289 s** (479 s) | nein, abgeschnitten |
-| Duo (48, nur lokal, 20 min) | 2.308 (–) | **733 s** (über 1 Stunde, abgebrochen) | **ja** |
+| Modell | Teile | Zeit ohne Dachsteine | Zeit mit Dachsteinen (Standard) | stabil |
+|---|---|---|---|---|
+| Rakete (`.blend`, 32 Noppen) | 263 | 16 s (15 s) | 19 s | ja |
+| Hase (32) | 873 | 69 s (71 s) | 81 s | ja |
+| Fliegenpilz (32) | 1.240 / 1.239 mit Dachsteinen | 132 s (164 s) | 157 s | ja |
+| Kugel (32) | 1.499 | 97 s (109 s) | 126 s | ja |
+| STEP-Burg (32, `--config`) | 1.651 / 1.657 | 188 s (202 s) | 223 s | ja |
+| STEP-Würfel (32) | 1.952 | 216 s (232 s) | 220 s | ja |
+| Texturwürfel (32) | 2.280 | 229 s (246 s) | 231 s | ja |
+| Duo (32, nur lokal) | 1.025 | 77 s (95 s) | 78 s | ja |
+| Duo (48, nur lokal, 20 min, Stand 1.2) | 2.308 | 733 s | – | ja |
 
-Alle Zahlen: [benchmarks.md](benchmarks.md), Abschnitte „v1.0 acceptance“ und „Hard time limit“.
+Alle Zahlen: [benchmarks.md](benchmarks.md), Abschnitte „Hard time limit“ und „Solver order and slopes back on“.
 
 ## Als Nächstes
 
@@ -54,8 +52,8 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 1. ~~Roadmap 1 – Größe in Zentimetern~~ ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): **fertig**, siehe oben.
 2. ~~Roadmap 2 – harte Zeitgrenze~~ ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)): **fertig**, siehe oben.
-3. **Als Nächstes: Löserreihenfolge + Dachsteine wieder an** (ROADMAP Punkt 8, von dir vorgezogen, wird 1.3.0). Erst messe ich die Reihenfolge „Simplex 1 s, dann Innere-Punkte-Löser ohne Crossover“ (die 5-s-Grenze pro Versuch bleibt). Abnahme: Kleine Modelle werden nicht spürbar langsamer als in 1.2. Dachsteine sind nur dann standardmäßig an, wenn alle Testmodelle stabil bleiben und höchstens die doppelte Zeit brauchen. Dann müssen sie in Vorschau und PDF auch als Dachsteine gezeichnet werden, nicht als Quader. Mehr Dachsteine setzen bleibt in 2.0.
-4. Roadmap 3 ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)) – Stabilitätsprüfung auch für große Modelle: Modelle über 500 Teilen bekommen Schritte Schicht für Schicht ohne Prüfung jedes Zwischenstands. Die schnellere Rechnung aus Punkt 8 hilft hier mit.
+3. ~~Löserreihenfolge + Dachsteine wieder an~~ (ROADMAP Punkt 8, [#34](https://github.com/leckermatz79/mesh2brick/issues/34)): **fertig in 1.3.0**, siehe oben.
+4. **Roadmap 3 – Stabilitätsprüfung auch für große Modelle** ([#26](https://github.com/leckermatz79/mesh2brick/issues/26), nächster Punkt): Modelle über 500 Teilen bekommen Schritte Schicht für Schicht ohne Prüfung jedes Zwischenstands. Die schnellere Rechnung aus Punkt 8 hilft hier mit.
 5. Roadmap 4 ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)) – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
 6. Roadmap 5 ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)) – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
 7. Roadmap 6 ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)) – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
@@ -73,13 +71,12 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | Große Modelle (> 500 Teile) bekommen Schritte Schicht für Schicht, nicht jeder Zwischenstand ist auf Standfestigkeit geprüft. | von dir akzeptiert; das Deckblatt sagt es in einem Satz; Roadmap 3 |
 | Hängen mehrere vorher zusammengesteckte Teile aneinander, wird ein Schritt größer (Kugel bei 32 Noppen: einmal 18 Teile, sonst meist höchstens 10). | selten; eigener Code, falls es stört |
 | Bei kleinen Modellen übernimmt legolization die Reihenfolge. Wo es selbst „braucht Stütze“ meldet, steht im PDF „Halte das Modell fest“. | akzeptiert |
-| Dachsteine (Slopes) erscheinen in den Bildern als Quader. | eigener Code in 1.3.0, falls Dachsteine standardmäßig an gehen (ROADMAP Punkt 8) |
 | „Teile weglassen“ gilt fürs ganze Modell, nicht pro Farbe. | Upstream #9 (nach #8) |
 | 1×1-Stein und 1×1-Platte lassen sich weder weglassen noch aufteilen. Gibt es sie in einer Modellfarbe nicht, meldet die Teileliste das. | selten; akzeptiert |
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Slopes vorerst aus. Der Hänger lässt sich über die Reihenfolge der Lösungsversuche umgehen (gemessen: Hase 147 s → 17,5 s). | 1.3.0 (ROADMAP Punkt 8), wenn die Abnahme passt |
+| Dachsteine sind an, aber legolization setzt nur wenige, und die meisten liegen innen in der hohlen Wand (10 von 130 sichtbar). | eigener Code in 2.0 (ROADMAP Punkt 8, zweiter Teil) |
 | Voxelisieren, PDF und Vorschau werden nicht abgebrochen; für sie hält mesh2brick Zeit frei (20 s + 0,03 s pro Teil, gemessen reichte das überall). Auf einem viel langsameren Rechner kann die Umwandlung die Grenze um einen Teil der PDF-Zeit überschreiten; die Kommandozeile sagt das dann. | akzeptieren |
 | Wird ein Modell an der Zeitgrenze abgeschnitten, hat es meist etwas mehr Teile (die letzte Optimierung spart Teile) oder ist im ungünstigsten Fall nicht auf Stabilität geprüft. Deckblatt und Kommandozeile sagen das. | mehr Zeit geben (`--set placement.time_limit_s=1200`); Upstream-Kandidat #5 |
 | Der schnellere Rechenweg und das Mitlesen der Zwischenstände sind lokale Eingriffe in legolization (UPSTREAM #2 und #5). Ändert legolization diese Stellen, meldet mesh2brick das beim Start. | bei Upstream vorschlagen (#5), wenn #88/#89 Antwort haben |
