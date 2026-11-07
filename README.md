@@ -80,7 +80,8 @@ All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.ya
 ## The building instructions
 
 - **Cover:** picture of the model, number of parts and steps, size in cm, weight,
-  colours, and whether the model stands on its own.
+  colours, whether the model stands on its own, and (with the LLM layer) the build
+  sections with their pages.
 - **Parts list:** one tile per part and colour with a picture (all at one scale),
   quantity, name and LDraw number; a hint if LEGO does not make a part in that colour.
 - **Steps (1–4 per page):** new parts in full colour, earlier ones faded, a call-out

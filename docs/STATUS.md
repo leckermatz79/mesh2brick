@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · Aktuelle Phase: **7 – KI-Schicht: fertig, PR offen** · Nächste: **Phase 8 – Blender, Politur, v1.0**
+Stand: 2026-11-07 · Aktuelle Phase: **7 – KI-Schicht: fertig** ([PR #19](https://github.com/leckermatz79/mesh2brick/pull/19) gemergt, Tag `v0.7.0`; Nachtrag Deckblatt-Übersicht: [PR #20](https://github.com/leckermatz79/mesh2brick/pull/20) offen) · Nächste: **Phase 8 – Blender, Politur, v1.0**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
@@ -11,6 +11,10 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 | Galerie: Fliegenpilz auf Deutsch (Abschnitt „Stiel“, Hut aufsetzen) und Hase auf Englisch (Abschnitt „Ear“), Texte von Claude |
 |---|
 | ![KI-Texte](gallery/phase7-llm-texts.png) |
+
+| Nachtrag (deine Antwort 3): Deckblatt mit Übersicht der Bauabschnitte und Seitenzahlen |
+|---|
+| ![Deckblatt mit Abschnitten](gallery/phase7-cover-sections.png) |
 
 ## Erledigt (Phase 7)
 
@@ -35,12 +39,13 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 | Duo (32 Noppen, de, nur lokal) | 1.025 | 153 | 5 | 153 von 153 | 0,20 $ | 57 s |
 
 - **Bewerten:** `mesh2brick feedback --rate 4 --note "Texte etwas lang"` bewertet den letzten Lauf. Läufe mit 4 oder 5 Punkten werden zu Beispielen für spätere Läufe, Notizen gibt mesh2brick an Claude weiter. `mesh2brick feedback` listet die Läufe, `--export laeufe.jsonl` schreibt sie für ein späteres Fine-Tuning. Alles bleibt auf deinem Rechner.
+- **Nachtrag nach deinen Antworten:** Das Deckblatt listet die Bauabschnitte mit ihren Seitenzahlen (bis 4 Abschnitte in einer Spalte, mehr in zwei). Ohne KI gibt es keine Abschnitte und das Deckblatt bleibt wie bisher.
 - **Kleiner Fehler aus Phase 6 behoben:** Dreistellige Schrittnummern (ab Schritt 100) überlappten den Teile-Kasten.
 - **Abnahme:** `convert` mit KI an und aus liefert beide gültige Ergebnisse (automatischer Test), die Kosten jedes Laufs stehen im Bericht.
 
 ## Als Nächstes
 
-1. **Du:** PR prüfen und mergen, danach Tag `v0.7.0` (Befehle unten unter „Offene Kleinigkeiten“).
+1. **Du:** PR #20 „Abschnitte auf dem Deckblatt“ prüfen und mergen (Befehl unten unter „Offene Kleinigkeiten“).
 2. **Optional, du:** eine Anleitung mit KI erzeugen, ansehen und bewerten. Damit lernt die KI deinen Geschmack:
    `uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set input.target_studs=16 --set llm.enabled=true`
    dann `out/toadstool.pdf` öffnen und z. B. `uv run mesh2brick feedback --rate 4 --note "..."`.
@@ -96,22 +101,17 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 | 2026-11-07 | Schritte pro Seite und Optik der Anleitung? | **2 Schritte pro Seite, Optik bleibt so.** |
 | 2026-11-07 | Teile unter Überhängen: im selben Schritt oder eigener Mini-Bauabschnitt? | **Im selben Schritt** (vorher in der Hand zusammenstecken, gelbes „zuerst“-Feld). |
 | 2026-11-07 | Farbnamen in der deutschen Anleitung? | **Englisch plus deutscher Name in Klammern** („Bright Green (Hellgrün)“). Umgesetzt in Phase 7. |
+| 2026-11-07 | KI-Schicht standardmäßig einschalten? | **Nein**, bleibt aus (einschalten mit `--set llm.enabled=true`). |
+| 2026-11-07 | Anrede in den Schritttexten? | **„du“** („Setze den Hut auf den Stiel.“). |
+| 2026-11-07 | Bauabschnitte auf dem Deckblatt? | **Ja**, als Übersicht mit Seitenzahlen. Umgesetzt im Nachtrag zu Phase 7. |
 | 2026-11-07 | Phase 7: Zugang zur Anthropic-API? | **`ANTHROPIC_API_KEY` ist gesetzt.** Für Entwicklung und Messungen dieser Phase wurden insgesamt etwa 1,05 $ verbraucht. |
 
 ## Fragen an dich
 
-Höchstens drei, jeweils mit Standardannahme. Ohne Antwort gilt die Standardannahme.
-
-1. **KI-Schicht standardmäßig einschalten?** Sie kostet etwa 6–20 Cent pro Modell und braucht einen API-Schlüssel.
-   *Standardannahme:* bleibt aus, einschalten mit `--set llm.enabled=true` oder in `mesh2brick.yaml`.
-2. **Anrede in den Schritttexten:** Jetzt direkte Aufforderungen mit „du“ („Setze den Hut auf den Stiel.“, „Jetzt baust du die Ohren.“). Alternative: unpersönlich („Den Hut auf den Stiel setzen.“).
-   *Standardannahme:* „du“-Form wie jetzt.
-3. **Abschnitte auf dem Deckblatt:** Sollen die Bauabschnitte zusätzlich als kleine Übersicht auf dem Deckblatt stehen (z. B. „Stiel · Hut unten · Hut aufsetzen · Weiße Flecken“, mit Seitenzahlen)?
-   *Standardannahme:* nein, die Titel stehen nur bei ihren Schritten.
+Zurzeit keine. Neue Fragen kommen mit Phase 8.
 
 ## Offene Kleinigkeiten
 
 - **Release-Seiten** auf GitHub fehlen, die Tags existieren. Das Anlegen öffentlicher Seiten blockiert das Rechtesystem. Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
-- **Tag für Phase 7** nach dem Merge:
-  `git switch main && git pull && git tag -a v0.7.0 -m "Phase 7: LLM layer" && git push origin v0.7.0`
+- **Nachtrag mergen:** `gh pr merge 20 --squash --delete-branch`. Kein eigener Tag nötig; der Nachtrag kommt mit `v0.8.0`.

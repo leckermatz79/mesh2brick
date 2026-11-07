@@ -82,7 +82,8 @@ beschrieben.
 ## Die Bauanleitung
 
 - **Deckblatt:** Bild des Modells, Zahl der Teile und Schritte, Größe in cm, Gewicht,
-  Farben und ob das Modell von allein steht.
+  Farben, ob das Modell von allein steht und (mit der KI-Schicht) die Bauabschnitte mit
+  ihren Seitenzahlen.
 - **Teileliste:** eine Kachel pro Teil und Farbe mit Bild (alle im selben Maßstab),
   Anzahl, Name und LDraw-Nummer; ein Hinweis, wenn LEGO ein Teil in der Farbe nicht
   herstellt.
