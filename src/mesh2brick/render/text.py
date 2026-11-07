@@ -5,9 +5,10 @@
 All user-facing text of the PDF lives here, written for builders, not for
 engineers: no stability scores, no solver names. Part names come from
 Rebrickable in English; German names are built from the part's family and
-size (``Stein 2 × 4``). Colour names stay the catalogue names in both
-languages (``Bright Green``), so they can be found in BrickLink and
-Rebrickable shops as written.
+size (``Stein 2 × 4``). Colour names are the catalogue names, so they can be
+found in BrickLink and Rebrickable shops as written; German booklets add a
+German name in brackets (``Bright Green (Hellgrün)``, product-owner decision
+of 2026-11-07).
 """
 
 from __future__ import annotations
@@ -133,6 +134,110 @@ _FAMILY: Final[dict[str, dict[Language, str]]] = {
     "tile": {"de": "Fliese", "en": "Tile"},
     "slope": {"de": "Dachstein", "en": "Slope"},
 }
+
+
+_COLOUR_DE: Final[dict[int, str]] = {
+    # Descriptive German names for the catalogue colours (LDraw codes). Brand
+    # names (Maersk, Fabuland) and oddities stay English only.
+    0: "Schwarz",
+    1: "Blau",
+    2: "Grün",
+    3: "Dunkeltürkis",
+    4: "Rot",
+    5: "Dunkelrosa",
+    6: "Braun",
+    7: "Hellgrau",
+    8: "Dunkelgrau",
+    9: "Blassblau",
+    10: "Hellgrün",
+    11: "Helltürkis",
+    12: "Lachsrot",
+    13: "Rosa",
+    14: "Gelb",
+    15: "Weiß",
+    17: "Blassgrün",
+    18: "Blassgelb",
+    19: "Beige",
+    20: "Hellviolett",
+    22: "Lila",
+    25: "Orange",
+    26: "Magenta",
+    27: "Limettengrün",
+    28: "Dunkelbeige",
+    29: "Hellrosa",
+    30: "Mittellavendel",
+    31: "Lavendel",
+    68: "Pastellorange",
+    70: "Rotbraun",
+    71: "Hellblaugrau",
+    72: "Dunkelblaugrau",
+    73: "Mittelblau",
+    74: "Mittelgrün",
+    78: "Hellnougat",
+    84: "Mittelnougat",
+    85: "Mittelflieder",
+    86: "Hellbraun",
+    89: "Blauviolett",
+    92: "Nougat",
+    100: "Hell-Lachsrot",
+    110: "Violett",
+    112: "Mittelviolett",
+    115: "Mittellimette",
+    118: "Aquablau",
+    120: "Hell-Limettengrün",
+    121: "Hellorange",
+    128: "Dunkelnougat",
+    151: "Sehr helles Blaugrau",
+    191: "Gelborange",
+    212: "Hellblau",
+    216: "Rostrot",
+    220: "Hellflieder",
+    225: "Warmes Gelborange",
+    226: "Hellgelb",
+    232: "Himmelblau",
+    272: "Dunkelblau",
+    288: "Dunkelgrün",
+    308: "Dunkelbraun",
+    320: "Dunkelrot",
+    321: "Dunkelazur",
+    322: "Mittelazur",
+    323: "Hellaqua",
+    326: "Gelbgrün",
+    330: "Olivgrün",
+    335: "Sandrot",
+    351: "Mitteldunkelrosa",
+    353: "Koralle",
+    366: "Erdorange",
+    370: "Mittelbraun",
+    373: "Sandlila",
+    378: "Sandgrün",
+    379: "Sandblau",
+    402: "Rotorange",
+    424: "Ockergelb",
+    430: "Warmrosa",
+    462: "Mittelorange",
+    484: "Dunkelorange",
+    503: "Sehr helles Grau",
+}
+
+
+def colour_label(code: int, name: str, language: Language) -> str:
+    """Colour name for the booklet.
+
+    The catalogue name (``name``, as BrickLink and Rebrickable list it) in
+    both languages; German adds a German name in brackets when one is known
+    and differs (``Bright Green (Hellgrün)``, but ``Orange``).
+    """
+    name = name.replace("_", " ")
+    german = _COLOUR_DE.get(code)
+    if language == "de" and german and german.casefold() != name.casefold():
+        return f"{name} ({german})"
+    return name
+
+
+def german_colour_names() -> dict[int, str]:
+    """The German colour names by LDraw code (a copy, for checks and tests)."""
+    return dict(_COLOUR_DE)
 
 
 def text(key: str, language: Language, **values: object) -> str:

@@ -14,11 +14,14 @@ import pytest
 from PIL import Image
 from tests.helpers import make_brick
 
+from mesh2brick.catalog.rebrickable import catalogue_colors, color_name, common_colors
 from mesh2brick.export.bom import build_bom
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo
 from mesh2brick.render import pdf as pdf_module
 from mesh2brick.render.pdf import PdfOptions, write_instructions
 from mesh2brick.render.text import (
+    colour_label,
+    german_colour_names,
     mass,
     number,
     part_label,
@@ -159,6 +162,28 @@ def test_part_labels() -> None:
     assert part_label(tall, "de").endswith("× 1,3")
     odd = replace(brick, category="special")
     assert part_label(odd, "de") == "3001 2 × 4"
+
+
+def test_colour_labels_add_german_names_in_german() -> None:
+    assert colour_label(10, "Bright Green", "de") == "Bright Green (Hellgrün)"
+    assert colour_label(10, "Bright_Green", "en") == "Bright Green"
+    assert colour_label(25, "Orange", "de") == "Orange"  # same word: no brackets
+    assert colour_label(9999, "Mystery", "de") == "Mystery"
+
+
+def test_every_common_colour_has_a_distinct_german_name() -> None:
+    german = german_colour_names()
+    assert common_colors() <= german.keys()
+    assert german.keys() <= catalogue_colors()
+    assert len(set(german.values())) == len(german)
+    english = {color_name(code).casefold() for code in catalogue_colors()}
+    # a German name never reads like a different catalogue colour
+    clashes = {
+        code: name
+        for code, name in german.items()
+        if name.casefold() in english and name.casefold() != color_name(code).casefold()
+    }
+    assert not clashes
 
 
 def test_subassembly_letters() -> None:

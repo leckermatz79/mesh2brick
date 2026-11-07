@@ -54,6 +54,7 @@ from mesh2brick.render.preview import (
 )
 from mesh2brick.render.text import (
     Language,
+    colour_label,
     mass,
     number,
     part_label,
@@ -306,7 +307,7 @@ class _Booklet:
         c.setFont(FONT, 15)
         c.setFillColor(MUTED)
         c.drawString(box.x, y, text("instructions", lang))
-        facts = _facts(model, lang)
+        facts = _facts(model, lang, box.w - 110)
         notes = _cover_notes(model, lang)
         facts_h = 18 * len(facts) + 10
         notes_h = sum(_note_height(note, box.w) + 8 for note in notes)
@@ -398,7 +399,7 @@ class _Booklet:
             listed = ", ".join(
                 f"{m.quantity}{TIMES} "
                 f"{part_label(self.examples[(m.part, m.color)], lang, m.name)} "
-                f"{m.color_name}"
+                f"{colour_label(m.color, m.color_name, lang)}"
                 for m in absent
             )
             notes.append((text("not_produced", lang, parts=listed), WARN_FILL))
@@ -421,13 +422,23 @@ class _Booklet:
         c.setFont(FONT_BOLD, 11)
         c.drawString(box.x + pad, y, f"{line.quantity}{TIMES}")
         c.setFont(FONT, 7.5)
+        width = box.w - 2 * pad
         name = part_label(self.examples[(line.part, line.color)], self.lang, line.name)
-        for i, chunk in enumerate(simpleSplit(name, FONT, 7.5, box.w - 2 * pad)[:2]):
+        names = simpleSplit(name, FONT, 7.5, width)[:2]
+        for i, chunk in enumerate(names):
             c.drawString(box.x + pad, y - 10 - 9 * i, chunk)
         c.setFillColor(MUTED)
         c.setFont(FONT, 6.5)
-        detail = _fit(f"{line.part} · {line.color_name}", FONT, 6.5, box.w - 2 * pad)
-        c.drawString(box.x + pad, box.y + 3, detail)
+        colour = colour_label(line.color, line.color_name, self.lang)
+        details = simpleSplit(f"{line.part} · {colour}", FONT, 6.5, width)
+        room = 3 - len(names)  # three text lines below the quantity
+        if len(details) > room:
+            details = [
+                *details[: room - 1],
+                _fit(" ".join(details[room - 1 :]), FONT, 6.5, width),
+            ]
+        for i, chunk in enumerate(reversed(details)):
+            c.drawString(box.x + pad, box.y + 3 + 8 * i, chunk)
 
     # ------------------------------------------------------------------ steps
     def step_pages_(self) -> None:
@@ -568,7 +579,8 @@ def _tiles_per_page(box: _Box) -> int:
     return max(1, rows) * _TILE_COLUMNS
 
 
-def _facts(model: BrickModel, lang: Language) -> list[tuple[str, str]]:
+def _facts(model: BrickModel, lang: Language, width: float) -> list[tuple[str, str]]:
+    """Label/value pairs of the cover; values fit into ``width`` points."""
     w, d, h = (v / 10 for v in model.size_mm())
     size = text(
         "size_value", lang, w=number(w, lang), d=number(d, lang), h=number(h, lang)
@@ -581,20 +593,27 @@ def _facts(model: BrickModel, lang: Language) -> list[tuple[str, str]]:
     if model.mass_g is not None:
         weight = text("weight_value", lang, value=mass(model.mass_g, lang))
         facts.append((text("weight", lang), weight))
-    facts.append((text("colours", lang), _colour_summary(model)))
+    facts.append((text("colours", lang), _colour_summary(model, lang, width)))
     verdict = {True: "stable_yes", False: "stable_no", None: "stable_unknown"}
     facts.append((text("stability", lang), text(verdict[model.buildable], lang)))
     return facts
 
 
-def _colour_summary(model: BrickModel) -> str:
+def _colour_summary(model: BrickModel, lang: Language, width: float) -> str:
+    """``3: Red (Rot), White (Weiß), …``: most used colours that fit ``width``."""
     counts = Counter(p.color for p in model.parts)
     names = [
-        model.colors[c].name.replace("_", " ") if c in model.colors else str(c)
+        colour_label(c, model.colors[c].name, lang) if c in model.colors else str(c)
         for c, _ in counts.most_common()
     ]
-    more = ", …" if len(names) > 4 else ""  # noqa: PLR2004
-    return f"{len(names)} ({', '.join(names[:4])}{more})"
+    summary = f"{len(names)}: {names[0]}"
+    for shown, name in enumerate(names[1:], start=1):
+        longer = f"{summary}, {name}"
+        rest = ", …" if shown < len(names) - 1 else ""
+        if pdfmetrics.stringWidth(longer + rest, FONT_BOLD, 11) > width:
+            return summary + ", …"
+        summary = longer
+    return summary
 
 
 def _cover_notes(model: BrickModel, lang: Language) -> list[tuple[str, Color]]:
