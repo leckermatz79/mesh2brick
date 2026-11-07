@@ -114,6 +114,20 @@ def test_subassemblies_units_and_hints_render(tmp_path: Path) -> None:
     assert pages_of(data) == 3
 
 
+@pytest.mark.parametrize("per_page", [1, 2, 4])
+def test_section_titles_and_step_texts_render(
+    tmp_path: Path, sample_model: BrickModel, per_page: int
+) -> None:
+    long_text = "Setze den kleinen Stein mittig auf die beiden großen Steine. " * 3
+    steps = (
+        BuildStep(section="Sockel", text="Lege zwei rote Steine nebeneinander."),
+        BuildStep(section="Turm mit einem sehr langen Titel", text=long_text[:200]),
+    )
+    model = replace(sample_model, steps=steps)
+    data = write(model, tmp_path / "s.pdf", steps_per_page=per_page)
+    assert pages_of(data) == 2 + -(-2 // per_page)
+
+
 def test_png_parsing_falls_back_for_transparency() -> None:
     buffer = io.BytesIO()
     Image.new("RGBA", (4, 4), (255, 0, 0, 128)).save(buffer, format="PNG")

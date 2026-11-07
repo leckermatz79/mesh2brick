@@ -14,7 +14,8 @@ mesh2brick's own layout (ADR 0011), drawn with reportlab on top of the
   parts in full colour and earlier parts faded, and hints in plain words
   (hold the model, put a hanging part together with its holder first).
   Sub-assembly steps sit on a tinted panel; the step that attaches a
-  sub-assembly shows it in the call-out.
+  sub-assembly shows it in the call-out. Steps may carry a short
+  instruction text and start a titled build section (Phase 7).
 
 Text is German or English (:mod:`mesh2brick.render.text`). The DejaVu Sans
 font that ships with matplotlib is embedded, so every viewer shows the text,
@@ -89,6 +90,8 @@ PART_PICTURE_PX: Final = (200, 150)
 UNIT_PICTURE_PX: Final = (240, 180)
 UNIT_ELEVATION: Final = -28.0
 MAX_UNITS_SHOWN: Final = 3
+STEP_TEXT_SIZE: Final = 8.5
+MAX_STEP_TEXT_LINES: Final = 3
 TIMES: Final = chr(0xD7)
 """Multiplication sign for quantities, as in ``3x`` with the proper sign."""
 
@@ -201,10 +204,9 @@ class _StepLayout:
         size = 24 if per_page < 3 else 20  # noqa: PLR2004
         return cls(panels=panels, number_size=size, tile=46)
 
-    def picture(self, panel: _Box, *, hint: bool) -> _Box:
-        """Where the step picture goes inside ``panel``."""
+    def picture(self, panel: _Box, *, bottom: float = 4.0) -> _Box:
+        """Where the step picture goes inside ``panel`` (``bottom`` kept free)."""
         band = self.tile + 26
-        bottom = 26 if hint else 4
         return _Box(panel.x, panel.y + bottom, panel.w, panel.h - band - bottom - 4)
 
 
@@ -443,7 +445,7 @@ class _Booklet:
     # ------------------------------------------------------------------ steps
     def step_pages_(self) -> None:
         layout, model, per_page = self.layout, self.model, self.options.steps_per_page
-        frame = layout.picture(layout.panels[0], hint=False)
+        frame = layout.picture(layout.panels[0])
         width, height = _pixels(frame.w, frame.h, self.options.dpi)
         images = render_step_images(
             model,
@@ -461,17 +463,23 @@ class _Booklet:
         c, lang, layout, model = self.canvas, self.lang, self.layout, self.model
         info = model.steps[step]
         sub = info.submodel
+        labels: list[tuple[str, Color]] = []
         if sub is not None:
             c.setFillColor(SUB_FILL)
             c.roundRect(panel.x, panel.y, panel.w, panel.h, 8, stroke=0, fill=1)
-            c.setFillColor(SUB_INK)
-            c.setFont(FONT_BOLD, 10)
-            label = text("subassembly", lang, name=self.labels[sub])
-            c.drawRightString(panel.x + panel.w - 8, panel.top - 16, label)
+            labels.append((text("subassembly", lang, name=self.labels[sub]), SUB_INK))
         else:
             c.setStrokeColor(RULE)
             c.setLineWidth(0.6)
             c.line(panel.x, panel.y - 7, panel.x + panel.w, panel.y - 7)
+        if info.section is not None:
+            labels.append((_fit(info.section, FONT_BOLD, 10, panel.w / 3), INK))
+        reserve = 6.0
+        c.setFont(FONT_BOLD, 10)
+        for row, (label, ink) in enumerate(labels):
+            c.setFillColor(ink)
+            c.drawRightString(panel.x + panel.w - 8, panel.top - 16 - 14 * row, label)
+            reserve = max(reserve, pdfmetrics.stringWidth(label, FONT_BOLD, 10) + 16)
         c.setFillColor(SUB_INK if sub is not None else INK)
         c.setFont(FONT_BOLD, layout.number_size)
         c.drawString(panel.x + 6, panel.top - layout.number_size - 2, str(step + 1))
@@ -486,15 +494,37 @@ class _Booklet:
             )
             x += width + 8
         if parts := model.parts_in_step(step):
-            right = panel.x + panel.w - (90 if sub is not None else 6)
+            right = panel.x + panel.w - reserve
             x = self.parts_callout(parts, x, panel.top - 4, right)
         if units := _units(model, step):
             self.unit_pictures(units, x + 8, panel)
-        hints = _step_hints(model, step, lang)
-        _draw_png(c, image, layout.picture(panel, hint=bool(hints)), keep_aspect=True)
-        if hints:
+        bottom = 4.0
+        if hints := _step_hints(model, step, lang):
             note = (" ".join(hints), HINT_FILL)
             _note(c, note, _Box(panel.x + 4, panel.y + 2, panel.w - 8, 20), size=8)
+            bottom = 26.0
+        if info.text is not None:
+            bottom = self.step_text(info.text, panel, bottom)
+        _draw_png(c, image, layout.picture(panel, bottom=bottom), keep_aspect=True)
+
+    def step_text(self, message: str, panel: _Box, bottom: float) -> float:
+        """Draw a step's instruction above ``bottom``; return the new bottom."""
+        c, width = self.canvas, panel.w - 16
+        lines = simpleSplit(message, FONT, STEP_TEXT_SIZE, width)
+        if len(lines) > MAX_STEP_TEXT_LINES:
+            rest = " ".join(lines[MAX_STEP_TEXT_LINES - 1 :])
+            lines = [
+                *lines[: MAX_STEP_TEXT_LINES - 1],
+                _fit(rest, FONT, STEP_TEXT_SIZE, width),
+            ]
+        leading = STEP_TEXT_SIZE * 1.3
+        c.setFillColor(INK)
+        c.setFont(FONT, STEP_TEXT_SIZE)
+        y = panel.y + bottom + 3 + leading * (len(lines) - 1)
+        for line in lines:
+            c.drawString(panel.x + 8, y, line)
+            y -= leading
+        return bottom + leading * len(lines) + 6
 
     def parts_callout(
         self, parts: Sequence[PlacedPart], x: float, top: float, right: float
