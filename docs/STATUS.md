@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · **Roadmap 2 – harte Zeitgrenze fertig** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), wird Version 1.2.0) · Nächster Punkt: **deine Entscheidung zur Reihenfolge** (Rechenreihenfolge + Dachsteine oder Roadmap 3 – Stabilitätsprüfung für große Modelle, [#26](https://github.com/leckermatz79/mesh2brick/issues/26)), [ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
+Stand: 2026-11-07 · **Roadmap 2 – harte Zeitgrenze fertig** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), Version 1.2.0) · Nächster Punkt: **Löserreihenfolge + Dachsteine wieder an** (ROADMAP Punkt 8, wird 1.3.0), danach Roadmap 3 ([ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
@@ -54,13 +54,14 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 1. ~~Roadmap 1 – Größe in Zentimetern~~ ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): **fertig**, siehe oben.
 2. ~~Roadmap 2 – harte Zeitgrenze~~ ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)): **fertig**, siehe oben.
-3. **Roadmap 3 – Stabilitätsprüfung auch für große Modelle** ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)): Modelle über 500 Teilen bekommen Schritte Schicht für Schicht ohne Prüfung jedes Zwischenstands. **Vorher vielleicht:** die bessere Rechenreihenfolge und Dachsteine (siehe „Fragen an dich“), die du nach der Slope-Messung entscheidest.
-4. Roadmap 4 ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)) – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
-5. Roadmap 5 ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)) – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
-6. Roadmap 6 ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)) – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
-7. Roadmap 7 ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
+3. **Als Nächstes: Löserreihenfolge + Dachsteine wieder an** (ROADMAP Punkt 8, von dir vorgezogen, wird 1.3.0). Erst messe ich die Reihenfolge „Simplex 1 s, dann Innere-Punkte-Löser ohne Crossover“ (die 5-s-Grenze pro Versuch bleibt). Abnahme: Kleine Modelle werden nicht spürbar langsamer als in 1.2. Dachsteine sind nur dann standardmäßig an, wenn alle Testmodelle stabil bleiben und höchstens die doppelte Zeit brauchen. Dann müssen sie in Vorschau und PDF auch als Dachsteine gezeichnet werden, nicht als Quader. Mehr Dachsteine setzen bleibt in 2.0.
+4. Roadmap 3 ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)) – Stabilitätsprüfung auch für große Modelle: Modelle über 500 Teilen bekommen Schritte Schicht für Schicht ohne Prüfung jedes Zwischenstands. Die schnellere Rechnung aus Punkt 8 hilft hier mit.
+5. Roadmap 4 ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)) – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
+6. Roadmap 5 ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)) – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
+7. Roadmap 6 ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)) – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
+8. Roadmap 7 ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
 
-**Danach 2.0 – Formtreue:** Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89 und #90/#91 sowie trimesh #2669 abwarten.
+**Danach 2.0 – Formtreue:** mehr Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89 und #90/#91 sowie trimesh #2669 abwarten.
 
 ## Bekannte Einschränkungen
 
@@ -72,13 +73,13 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | Große Modelle (> 500 Teile) bekommen Schritte Schicht für Schicht, nicht jeder Zwischenstand ist auf Standfestigkeit geprüft. | von dir akzeptiert; das Deckblatt sagt es in einem Satz; Roadmap 3 |
 | Hängen mehrere vorher zusammengesteckte Teile aneinander, wird ein Schritt größer (Kugel bei 32 Noppen: einmal 18 Teile, sonst meist höchstens 10). | selten; eigener Code, falls es stört |
 | Bei kleinen Modellen übernimmt legolization die Reihenfolge. Wo es selbst „braucht Stütze“ meldet, steht im PDF „Halte das Modell fest“. | akzeptiert |
-| Dachsteine (Slopes) erscheinen in den Bildern als Quader. | eigener Code, wenn Slopes wieder an sind (Roadmap 8) |
+| Dachsteine (Slopes) erscheinen in den Bildern als Quader. | eigener Code in 1.3.0, falls Dachsteine standardmäßig an gehen (ROADMAP Punkt 8) |
 | „Teile weglassen“ gilt fürs ganze Modell, nicht pro Farbe. | Upstream #9 (nach #8) |
 | 1×1-Stein und 1×1-Platte lassen sich weder weglassen noch aufteilen. Gibt es sie in einer Modellfarbe nicht, meldet die Teileliste das. | selten; akzeptiert |
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an (Roadmap 8) |
+| Slopes vorerst aus. Der Hänger lässt sich über die Reihenfolge der Lösungsversuche umgehen (gemessen: Hase 147 s → 17,5 s). | 1.3.0 (ROADMAP Punkt 8), wenn die Abnahme passt |
 | Voxelisieren, PDF und Vorschau werden nicht abgebrochen; für sie hält mesh2brick Zeit frei (20 s + 0,03 s pro Teil, gemessen reichte das überall). Auf einem viel langsameren Rechner kann die Umwandlung die Grenze um einen Teil der PDF-Zeit überschreiten; die Kommandozeile sagt das dann. | akzeptieren |
 | Wird ein Modell an der Zeitgrenze abgeschnitten, hat es meist etwas mehr Teile (die letzte Optimierung spart Teile) oder ist im ungünstigsten Fall nicht auf Stabilität geprüft. Deckblatt und Kommandozeile sagen das. | mehr Zeit geben (`--set placement.time_limit_s=1200`); Upstream-Kandidat #5 |
 | Der schnellere Rechenweg und das Mitlesen der Zwischenstände sind lokale Eingriffe in legolization (UPSTREAM #2 und #5). Ändert legolization diese Stellen, meldet mesh2brick das beim Start. | bei Upstream vorschlagen (#5), wenn #88/#89 Antwort haben |
@@ -131,13 +132,13 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | 2026-11-07 | Eigene kurze Option für die Größe? | **Ja, `--size 30cm`**, versteht auch `300mm` und `40studs`; `--set input.target_cm=30` tippt niemand gern zweimal. Umgesetzt; in der Config heißt der Wert `target_height_cm`, damit klar ist, dass er die Höhe meint. |
 | 2026-11-07 | Große Modelle automatisch länger rechnen lassen? | **Nein, aber ein Hinweis.** Vorhersehbares Verhalten ist wichtiger: 5 Minuten sind 5 Minuten. `inspect` und der Start von `convert` sagen ab rund 2.000 geschätzten Teilen „expected about 3,905 parts; recommended: --time 20min“; du entscheidest. Umgesetzt. |
 | 2026-11-07 | Kurze Option für die Zeit? | **Ja, `--time 20min`** (auch `90s`, `1h`), aus demselben Grund wie `--size`: Was man beim Ausprobieren tippt, verdient eine kurze Option. Umgesetzt. |
-| 2026-11-07 | Schnelleren Rechenweg bei legolization vorschlagen? | **Ja, nach deinem Blick auf den Text.** Er benennt die Ursache statt des Symptoms und ist damit wertvoller als unser Zeitlimit-PR. Kommentar an #89, Verweis in #88. Text liegt bereit (Offene Kleinigkeiten). |
-| 2026-11-07 | Vor Roadmap 3: Ist der Slope-Hänger dasselbe Crossover-Problem? | **Gemessen:** nein, ein Simplex-Problem, aber derselbe Ausweg hilft (Hase mit Dachsteinen 147 s → 17,5 s). Vorschlag zur Reihenfolge unter „Fragen an dich“. |
+| 2026-11-07 | Schnelleren Rechenweg bei legolization vorschlagen? | **Ja, nach deinem Blick auf den Text.** Er benennt die Ursache statt des Symptoms und ist damit wertvoller als unser Zeitlimit-PR. Kommentar an #89, Verweis in #88. **Erledigt** von dir: [Kommentar an #89](https://github.com/hbmartin/legolization/pull/89#issuecomment-6712391855), [Verweis in #88](https://github.com/hbmartin/legolization/issues/88#issuecomment-6712393969). |
+| 2026-11-07 | Vor Roadmap 3: Ist der Slope-Hänger dasselbe Crossover-Problem? | **Gemessen:** nein, ein Simplex-Problem, aber derselbe Ausweg hilft (Hase mit Dachsteinen 147 s → 17,5 s). Vorschlag: Löserreihenfolge zuerst. |
+| 2026-11-07 | Reihenfolge nach der Slope-Messung? | **Erst Löserreihenfolge + Dachsteine wieder an als 1.3.0, dann Roadmap 3.** Vorher „Simplex 1 s, dann Innere-Punkte-Löser“ messen; kleine Modelle dürfen nicht spürbar langsamer werden, die 5-s-Grenze pro Versuch bleibt. Dachsteine nur standardmäßig an, wenn alle Testmodelle stabil sind und höchstens die doppelte Zeit brauchen. ROADMAP Punkt 8 ist in die 1.x-Liste gerückt; mehr Dachsteine setzen bleibt in 2.0. |
 
 ## Fragen an dich
 
-1. **Roadmap-Reihenfolge: Dachsteine (Roadmap 8) vor Roadmap 3?** Deine Vermutung war fast richtig. Der Slope-Hänger ist nicht derselbe Crossover-Schritt, aber dieselbe Heilung wirkt. Bei Dachstein-Layouts bleibt der *Simplex*-Löser hängen; der Innere-Punkte-Löser ohne Crossover schafft dieselben Rechnungen in unter 1 s. Probiert man ihn zuerst, braucht der Hase mit Dachsteinen 17,5 s statt 147 s (ohne Dachsteine: 17 s), bei 32 Noppen 49 s statt 99 s, schneller als heute ganz ohne Dachsteine (53 s). Mein Vorschlag als nächster Punkt: **„Rechenreihenfolge + Dachsteine wieder an“**. Simplex bekommt nur 1 s, damit kleine Modelle nicht langsamer werden (sonst 7,8 → 17 s), danach der schnelle Weg. Dann prüfe ich, ob Dachsteine standardmäßig an sein können: alle Testmodelle stabil, höchstens doppelte Zeit. Danach erst Roadmap 3, die vom schnelleren Rechnen auch profitiert. Achtung: legolization setzt im heutigen Modus nur wenige Dachsteine (4 bei 224 Teilen, 14 bei 873); *mehr* Dachsteine bleiben die eigentliche Arbeit von Roadmap 8. *Standard, wenn du nichts sagst:* so machen (Rechenreihenfolge als nächster Punkt, Dachsteine nur bei sauberer Abnahme standardmäßig an).
-2. **Kommentar für legolization:** Der Text für #89 und der Verweis für #88 stehen in [UPSTREAM.md](UPSTREAM.md), Entwurf #2b (auf Englisch). Wenn er dir passt, führst du die zwei fertigen Befehle aus, die ich dir im Chat gebe. *Standard:* Ohne dein OK geht nichts raus.
+Zurzeit keine. Deine Antworten zu Roadmap 2 und zur Reihenfolge stehen unter „Deine Entscheidungen“.
 
 ## Offene Kleinigkeiten
 
