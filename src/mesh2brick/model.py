@@ -22,7 +22,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 Cell = tuple[int, int, int]
-SCHEMA_VERSION: Final = 1
+SCHEMA_VERSION: Final = 2
+"""Version 2 (Phase 6) added step verdicts, pre-assembly units, mass and the
+buildability verdict; version 1 files still load (the new fields default)."""
+READABLE_SCHEMAS: Final = frozenset({1, SCHEMA_VERSION})
+MM_PER_STUD: Final = 8.0
+MM_PER_PLATE: Final = 3.2
+STUD_HEIGHT_MM: Final = 1.7
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +55,9 @@ class PlacedPart:
         step: 0-based build step the part is placed in.
         category: part family (``brick``, ``plate``, ``slope``, ``tile`` ...).
         backend_key: the backend's own part identifier, for round trips.
+        unit: parts of one step that share a ``unit`` number are put together
+            in the hand first and then placed as one piece (a part that hangs
+            below the part holding it); ``None`` for parts placed on their own.
     """
 
     part: str
@@ -61,6 +70,7 @@ class PlacedPart:
     step: int
     category: str = "brick"
     backend_key: str = ""
+    unit: int | None = None
 
     def __post_init__(self) -> None:
         if not self.cells:
@@ -86,10 +96,16 @@ class BuildStep:
             table, or ``None`` for a step on the main model.
         attaches: name of a finished subassembly this step seats onto the main
             model (such steps place no individual parts).
+        stable: verdict on the model as built after this step: ``True`` it
+            stands on its own, ``False`` it needs a supporting hand until a
+            later step, ``None`` not checked (layer-order steps).
+        fragile: stable, but pressing the new parts on firmly may break it.
     """
 
     submodel: str | None = None
     attaches: str | None = None
+    stable: bool | None = None
+    fragile: bool = False
 
     def __post_init__(self) -> None:
         if self.submodel is not None and self.attaches is not None:
@@ -108,6 +124,11 @@ class BrickModel:
     """Display info for every colour code used by ``parts``."""
     source: str = ""
     """Free-form provenance, e.g. ``legolization 0.5.0, strategy luo, seed 0``."""
+    mass_g: float | None = None
+    """Estimated mass of all parts in grams (``None``: unknown)."""
+    buildable: bool | None = None
+    """Backend verdict on the finished model: stable, one piece, nothing loose
+    (``None``: not checked)."""
 
     def __post_init__(self) -> None:
         if self.parts and not self.steps:
@@ -148,6 +169,19 @@ class BrickModel:
         """Parts placed in the given 0-based step."""
         return tuple(p for p in self.parts if p.step == step)
 
+    def size_mm(self) -> tuple[float, float, float]:
+        """Width, depth and height of the built model in millimetres.
+
+        Width/depth follow the grid ``x``/``y`` axes (8 mm per stud); the
+        height counts plates (3.2 mm) plus the studs on top (1.7 mm).
+        """
+        (x0, y0, z0), (x1, y1, z1) = self.bounds()
+        return (
+            (x1 - x0 + 1) * MM_PER_STUD,
+            (y1 - y0 + 1) * MM_PER_STUD,
+            (z1 - z0 + 1) * MM_PER_PLATE + STUD_HEIGHT_MM,
+        )
+
     def bill_of_materials(self) -> dict[tuple[str, int], int]:
         """Quantity per ``(part, colour)``, sorted by part then colour."""
         counts = Counter((p.part, p.color) for p in self.parts)
@@ -179,6 +213,8 @@ class BrickModel:
             "schema": SCHEMA_VERSION,
             "name": self.name,
             "source": self.source,
+            "mass_g": self.mass_g,
+            "buildable": self.buildable,
             "steps": [asdict(step) for step in self.steps],
             "colors": {str(code): asdict(info) for code, info in self.colors.items()},
             "parts": [
@@ -193,7 +229,7 @@ class BrickModel:
         Raises:
             ValueError: on an unknown schema version or malformed data.
         """
-        if data.get("schema") != SCHEMA_VERSION:
+        if data.get("schema") not in READABLE_SCHEMAS:
             msg = f"unsupported brick model schema {data.get('schema')!r}"
             raise ValueError(msg)
         parts = tuple(
@@ -210,6 +246,10 @@ class BrickModel:
             steps=tuple(BuildStep(**step) for step in data["steps"]),
             colors=colors,
             source=str(data.get("source", "")),
+            mass_g=None if data.get("mass_g") is None else float(data["mass_g"]),
+            buildable=(
+                None if data.get("buildable") is None else bool(data["buildable"])
+            ),
         )
 
     def to_json(self) -> str:
