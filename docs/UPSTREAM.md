@@ -106,14 +106,33 @@ gltf = {
     "scenes": [{"nodes": [0]}],
     "nodes": [{"mesh": 0}],
     "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "COLOR_0": 1}}]}],
-    "buffers": [{"byteLength": len(blob),
-                 "uri": "data:application/octet-stream;base64," + base64.b64encode(blob).decode()}],
-    "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": 36},
-                    {"buffer": 0, "byteOffset": 36, "byteLength": 24}],
+    "buffers": [
+        {
+            "byteLength": len(blob),
+            "uri": "data:application/octet-stream;base64,"
+            + base64.b64encode(blob).decode(),
+        }
+    ],
+    "bufferViews": [
+        {"buffer": 0, "byteOffset": 0, "byteLength": 36},
+        {"buffer": 0, "byteOffset": 36, "byteLength": 24},
+    ],
     "accessors": [
-        {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
-         "min": [0, 0, 0], "max": [1, 1, 0]},
-        {"bufferView": 1, "componentType": 5123, "normalized": True, "count": 3, "type": "VEC4"},
+        {
+            "bufferView": 0,
+            "componentType": 5126,
+            "count": 3,
+            "type": "VEC3",
+            "min": [0, 0, 0],
+            "max": [1, 1, 0],
+        },
+        {
+            "bufferView": 1,
+            "componentType": 5123,
+            "normalized": True,
+            "count": 3,
+            "type": "VEC4",
+        },
     ],
 }
 path = Path(tempfile.mkdtemp()) / "triangle.gltf"
