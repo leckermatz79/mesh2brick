@@ -6,7 +6,7 @@
 # (e.g. --set placement.seed=3 or --set parts.categories=[brick,plate]).
 
 input:
-  up_axis: z            # x|y|z, optionally negative, e.g. -y
+  up_axis: z            # x|y|z, optionally negative, e.g. -y (glTF/.blend: keep z)
   auto_orient: false
   scale_mode: studs     # studs: longest axis = target_studs | mm: use mm_per_stud
   target_studs: 32      # longest model axis in studs (~26 cm; 48 = ~38 cm)

@@ -354,7 +354,8 @@ with `--config examples/mesh2brick.yaml`, the literal SPEC §9 command. "Estimat
   1,952–2,280 parts) take 265–294 s, so a slower laptop may need more than 5 minutes for
   them. Their PDFs are 20–23 MB (274–327 steps).
 - **Beyond the target:** Duo at 48 studs has 2,313 parts, takes 479 s (legolization's final
-  remerge cannot be bounded, UPSTREAM #5) and is **not** stable within the time limit.
+  remerge cannot be bounded, UPSTREAM #5) and is **not** stable within the time limit. With
+  `placement.time_limit_s=1200` the run had not finished after 63 minutes and was stopped.
 - `.blend` costs about 1 s for Blender itself (`rocket.blend`: 14 s in total).
 - `mesh2brick inspect` takes 2.5 s for the rocket and 15 s for Duo (2.1 million triangles:
   3MF reading and voxelization; the z-buffer picture of all triangles takes about 3 s).

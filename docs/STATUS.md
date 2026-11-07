@@ -1,56 +1,77 @@
 # Projektstatus
 
-Stand: 2026-11-07 · Aktuelle Phase: **7 – KI-Schicht: fertig** ([PR #19](https://github.com/leckermatz79/mesh2brick/pull/19) gemergt, Tag `v0.7.0`; Nachtrag Deckblatt-Übersicht: [PR #20](https://github.com/leckermatz79/mesh2brick/pull/20) offen) · Nächste: **Phase 8 – Blender, Politur, v1.0**
-Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
+Stand: 2026-11-07 · Aktuelle Phase: **8 – Blender, Politur, v1.0: fertig** (PR offen, siehe „Als Nächstes“) · Danach: **Version 1.0.0**; alle Phasen der SPEC sind umgesetzt
+Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md)
 
 ## Fazit in zwei Sätzen
 
-- **Claude hilft bei der Anleitung, wenn du willst:** Mit `--set llm.enabled=true` bekommt das PDF Bauabschnitte mit Titeln („Stiel“, „Hut aufsetzen“, „Weiße Flecken“) und unter jedem Schritt einen kurzen Satz wie „Setze den fertigen Hut auf den Stiel.“ Das kostet pro Modell etwa 6 bis 20 Cent und eine knappe Minute.
-- **Nichts davon wird ungeprüft übernommen:** mesh2brick kontrolliert jeden Vorschlag am Modell und wirft weg, was nicht passt. Ohne KI sieht die Anleitung aus wie bisher, jetzt mit deutschen Farbnamen in Klammern.
+- **Blender-Dateien gehen jetzt direkt:** `mesh2brick convert rakete.blend` startet dein Blender unsichtbar im Hintergrund, nimmt alle sichtbaren Objekte mit ihren Farben und Modifiern und macht daraus in 14 Sekunden eine Rakete aus 263 Steinen, die stabil steht.
+- **Vorher schauen, was herauskommt:** `mesh2brick inspect` zeigt in wenigen Sekunden ein Bild „Modell ↔ Noppen“, die Größe in cm, die LEGO-Farben und ungefähr die Teilezahl. Damit ist der Plan aus der SPEC komplett, und mesh2brick kann als Version 1.0 erscheinen.
 
-| Galerie: Fliegenpilz auf Deutsch (Abschnitt „Stiel“, Hut aufsetzen) und Hase auf Englisch (Abschnitt „Ear“), Texte von Claude |
+| Von Blender zu LEGO: `rocket.blend` wie eingelesen, als Noppen-Gitter, als fertiges Modell |
 |---|
-| ![KI-Texte](gallery/phase7-llm-texts.png) |
+| ![Rakete in drei Stufen](gallery/phase8-blender-rocket.png) |
 
-| Nachtrag (deine Antwort 3): Deckblatt mit Übersicht der Bauabschnitte und Seitenzahlen |
+| Beispielgalerie: alle Beispielmodelle bei Standardgröße (32 Noppen), alle stabil |
 |---|
-| ![Deckblatt mit Abschnitten](gallery/phase7-cover-sections.png) |
+| ![Galerie](gallery/phase8-gallery.png) |
 
-## Erledigt (Phase 7)
+| Raketen-Anleitung: Deckblatt und eine Seite mit Baugruppe |
+|---|
+| ![Raketen-PDF](gallery/phase8-rocket-pdf.png) |
 
-- **Deine drei Antworten aus Phase 6** sind eingetragen (siehe „Deine Entscheidungen“). Umgesetzt: deutsche Farbnamen in Klammern, z. B. „Bright Green (Hellgrün)“, auf Deckblatt, Teileliste und im Hinweis zu nicht hergestellten Teilen. Die Teilelisten-Dateien für BrickLink und Rebrickable bleiben englisch.
-- **KI-Schicht** (ADR 0013), drei Aufgaben:
+## Erledigt (Phase 8)
 
-| Aufgabe | Was Claude macht | Was mesh2brick prüft |
-|---|---|---|
-| Schritte gliedern | Bauabschnitte benennen; Schritte zusammenlegen, die man in einem Zug baut | Zusammenlegen nur von direkt aufeinanderfolgenden Schritten: dabei kann nichts in der Luft hängen. Abgelehnt wird, wenn Baugruppen gemischt würden, mehr als 10 Teile entstünden, Teile verdeckt würden oder eine „Halte fest“-Stelle verschwände. |
-| Schritttexte | Ein Satz pro Schritt, was er baut und wo die Teile hinkommen | Jedes genannte neue Teil muss in dem Schritt vorkommen; jede Zahl muss eine Menge aus dem Schritt sein; höchstens 140 Zeichen. |
-| Ersatzteile (nur auf Wunsch) | Wählt Ersatz für Teile, die LEGO in der Farbe nicht herstellt | Die Auswahl kommt aus dem Katalog: kürzere Teile derselben Farbe oder dasselbe Teil in einer Nachbarfarbe, die LEGO herstellt. |
+- **`.blend`-Dateien** (ADR 0014). mesh2brick ruft dein installiertes Blender auf (gefunden unter `/Applications`, über `PATH` oder `MESH2BRICK_BLENDER`). Blender läuft mit Werkseinstellungen und führt keine in der Datei gespeicherten Skripte aus; die Datei wird nur gelesen. Übernommen werden die **sichtbaren** Objekte der aktiven Szene, mit angewendeten Modifiern; Kurven und Text werden zu Flächen, versteckte Objekte, Kamera und Licht bleiben weg. Die Einheiten der Szene zählen (eine „Millimeter-Szene“ bleibt in Millimetern). Blender braucht etwa 1 Sekunde pro Datei.
+- **glTF-Dateien** (`.glb`, `.gltf`) gehen auch direkt, mit den Regeln des Formats (Y nach oben, Meter, Farben in linearem Licht).
+- **Fehler in trimesh gefunden und umgangen:** Vertexfarben, die Blender standardmäßig mit 16 Bit speichert, kamen falsch an (Orange wurde zu Gelb-Orange). mesh2brick rechnet sie jetzt selbst um. Ein fertiger Fehlerbericht für trimesh liegt in `docs/UPSTREAM.md` (#14, Frage 1 unten).
+- **`mesh2brick inspect`** ersetzt den Platzhalter. Ausgabe für die Rakete (gekürzt):
 
-- **Was nicht passt, fällt weg.** Claude bekommt die Fehler einmal zurück und darf nachbessern; der Rest bleibt wie ohne KI. Ein API-Fehler, eine Ablehnung oder das Kostenlimit beenden nur die betroffene Aufgabe.
-- **Claude darf nachschauen:** im Teilekatalog, ob ein Zusammenlegen erlaubt wäre (mit derselben Prüfung, die später entscheidet), und Schrittbilder ansehen. Pro Schritt bekommt es außerdem gesagt, worauf die neuen Teile sitzen („auf Baugruppe A“). Das hat falsche Ortsangaben beseitigt.
-- **Kosten werden mitgeschrieben:** in `out/<name>.llm.json` (was übernommen wurde, Tokens, Kosten), auf der Konsole und im Bewertungsspeicher. Standardgrenze 1 $ pro Lauf.
+```
+rocket.blend: 578 triangles, 5 part(s) (Fins, Nozzle, Window, Nose, Body)
+  size in the file: 52.0 x 52.0 x 100.0 mm, closed
+  colours in the file: part/material colours on 100 % of the surface
+  grid: 17 x 17 studs x 26 bricks, 1,012 filled cells
+  LEGO size: 13.6 x 13.6 x 25.0 cm
+  LEGO colours: White 66 %, Red 27 %, Dark Bluish Grey 6 %, Blue 2 %
+  rough estimate: about 291 parts (202-448); `convert` gives the exact count
+```
 
-| Modell | Teile | Schritte | Abschnitte | Texte übernommen | Kosten | Zeit KI |
-|---|---|---|---|---|---|---|
-| Fliegenpilz (16 Noppen, de) | 374 | 55 | 6 | 55 von 55 | 0,06 $ | 21 s |
-| Kugel (16 Noppen, de) | 268 | 47 (1 zusammengelegt) | 8 | 48 von 48 | 0,06 $ | 21 s |
-| Hase (32 Noppen, en) | 873 | 125 | 7 | 125 von 125 | 0,12 $ | 37 s |
-| Duo (32 Noppen, de, nur lokal) | 1.025 | 153 | 5 | 153 von 153 | 0,20 $ | 57 s |
+- Das Bild dazu zeigt links das Modell, wie mesh2brick es einliest, rechts die Noppen-Voxel, beide aus demselben Blickwinkel. Dafür gibt es einen kleinen eigenen Renderer, der auch Modelle mit 2 Millionen Dreiecken (Duo) in wenigen Sekunden sauber zeichnet.
+- **Teileschätzung:** mesh2brick füllt das Gitter probeweise mit den größten passenden Steinen und rechnet mit der gemessenen Abweichung hoch. Bei 14 von 15 Testläufen lag die echte Teilezahl im angezeigten Bereich. Ausnahme: dünne, große Bodenplatten, die legolization aus vielen Platten baut (Burghof: 1.651 statt geschätzt 602).
+- **Testmodell `rocket.blend`** (selbst gebaut, frei verwendbar): Rumpf, Spitze, Fenster, Düse mit Farben; die vier Flossen entstehen aus einer Flosse über einen Modifier; ein verstecktes Hilfsobjekt darf nicht mitkommen.
+- **Beispielgalerie** [gallery/README.md](gallery/README.md): jedes Beispielmodell wie eingelesen, als Voxel und als Steine, mit Teilezahl und Zeit.
+- **Doku** auf Deutsch und Englisch ergänzt (Blender, glTF, inspect, Galerie).
 
-- **Bewerten:** `mesh2brick feedback --rate 4 --note "Texte etwas lang"` bewertet den letzten Lauf. Läufe mit 4 oder 5 Punkten werden zu Beispielen für spätere Läufe, Notizen gibt mesh2brick an Claude weiter. `mesh2brick feedback` listet die Läufe, `--export laeufe.jsonl` schreibt sie für ein späteres Fine-Tuning. Alles bleibt auf deinem Rechner.
-- **Nachtrag nach deinen Antworten:** Das Deckblatt listet die Bauabschnitte mit ihren Seitenzahlen (bis 4 Abschnitte in einer Spalte, mehr in zwei). Ohne KI gibt es keine Abschnitte und das Deckblatt bleibt wie bisher.
-- **Kleiner Fehler aus Phase 6 behoben:** Dreistellige Schrittnummern (ab Schritt 100) überlappten den Teile-Kasten.
-- **Abnahme:** `convert` mit KI an und aus liefert beide gültige Ergebnisse (automatischer Test), die Kosten jedes Laufs stehen im Bericht.
+## v1.0-Abnahme (Definition of Done aus der SPEC)
+
+| Anforderung | Ergebnis |
+|---|---|
+| `convert model.step --config mesh2brick.yaml` liefert `.mpd`, drei Teilelisten und PDF in < 5 min für ≤ 2.000 Teile | **Erfüllt:** STEP-Burg mit `--config examples/mesh2brick.yaml` 1.651 Teile in 239 s; STEP-Würfel 1.952 Teile in 265 s |
+| Alle Beispielmodelle zusammenhängend und stabil, Dateien fehlerfrei | **Erfüllt:** alle 12 Beispielmodelle (und die Burg) stabil, aus einem Stück; Teileliste = Teilezahl = Teile in der LDraw-Datei (strenges Wieder-Einlesen). Studio-Prüfung durch dich: Duo, Phase 5 |
+| Testabdeckung ≥ 80 %, CI grün | **Erfüllt:** 96 %, 636 Tests (CI siehe PR) |
+| Doku Deutsch/Englisch, Lizenz- und Upstream-Übersicht aktuell | **Erfüllt:** README/README.de, THIRD_PARTY, UPSTREAM (#14 neu) |
+
+| Modell | Teile | Zeit | stabil |
+|---|---|---|---|
+| Rakete (`.blend`, 32 Noppen) | 263 | 14 s | ja |
+| Hase (32) | 873 | 73 s | ja |
+| Fliegenpilz (32) | 1.240 | 174 s | ja |
+| Kugel (32) | 1.499 | 113 s | ja |
+| STEP-Burg (32, `--config`) | 1.651 | 239 s | ja |
+| STEP-Würfel (32) | 1.952 | 265 s | ja |
+| Texturwürfel (32) | 2.280 | 294 s | ja |
+| Duo (32, nur lokal) | 1.025 | 100 s | ja |
+| Duo (48, nur lokal) | 2.313 | 479 s | **nein** |
+
+Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt „v1.0 acceptance“.
 
 ## Als Nächstes
 
-1. **Du:** PR #20 „Abschnitte auf dem Deckblatt“ prüfen und mergen (Befehl unten unter „Offene Kleinigkeiten“).
-2. **Optional, du:** eine Anleitung mit KI erzeugen, ansehen und bewerten. Damit lernt die KI deinen Geschmack:
-   `uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set input.target_studs=16 --set llm.enabled=true`
-   dann `out/toadstool.pdf` öffnen und z. B. `uv run mesh2brick feedback --rate 4 --note "..."`.
-3. **Phase 8:** `.blend`-Dateien einlesen, `mesh2brick inspect` mit Vorschaubild, Doku und Beispielgalerie vervollständigen, `v1.0.0`.
-4. Upstream: Antworten auf #88/#89 und #90/#91 abwarten.
+1. **Du:** den Phase-8-PR prüfen und mergen, danach Tag `v1.0.0` und (falls gewünscht) die Release-Seite anlegen. Die Befehle stehen unten unter „Offene Kleinigkeiten“.
+2. **Du:** die drei Fragen unten beantworten (wenn nicht, gelten die Standardannahmen).
+3. **Optional, du:** ein eigenes Blender-Modell ausprobieren: `uv run mesh2brick inspect modell.blend -o out/`, dann `out/modell.inspect.png` ansehen und mit `convert` umwandeln.
+4. Upstream: Antworten auf legolization #88/#89 und #90/#91 abwarten; trimesh #14 nach deiner Freigabe.
 
 ## Bekannte Einschränkungen
 
@@ -70,6 +91,11 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
 | Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. | Upstream-Kandidat #5 |
 | Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an |
+| Duo bei 48 Noppen: 2.313 Teile, 8 Minuten, nicht stabil. Mit 20 statt 5 Minuten Zeitgrenze war der Lauf nach über einer Stunde noch nicht fertig (abgebrochen): Der letzte Optimierungsschritt in legolization hält sich an keine Zeitgrenze. 48 Noppen liegen über der 2.000-Teile-Grenze der SPEC. | Upstream-Kandidat #5; 48 Noppen erst danach angehen (Frage 2) |
+| Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen 4,5–5 Minuten; auf einem langsameren Laptop kann es länger dauern. Ihre PDFs sind 20–23 MB groß. | akzeptieren; Standard bleibt 32 Noppen |
+| Die Teileschätzung von `inspect` ist grob (Bereich etwa Faktor 2) und liegt bei dünnen, großen Platten zu niedrig. | akzeptieren; `convert` gibt die genaue Zahl |
+| `.blend`: Blender muss installiert sein. Die Tests mit echtem Blender laufen nur hier auf dem Mac; die automatischen Tests auf GitHub nutzen einen Blender-Ersatz. Verknüpfte Bibliotheken müssen vom Ordner der Datei aus erreichbar sein. | akzeptieren |
+| glTF mit Draco-Kompression kann trimesh nicht lesen. | bei Bedarf; in Blender ohne Kompression exportieren |
 
 ## Umgebung (gut zu wissen)
 
@@ -78,6 +104,8 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 - STEP braucht einmalig `uv sync --extra step`, die KI-Schicht `uv sync --extra llm` (beides zusammen: `uv sync --extra step --extra llm`) und `ANTHROPIC_API_KEY`.
 - Der Bewertungsspeicher liegt in `~/Library/Application Support/mesh2brick/feedback.sqlite3` (anderer Ordner mit `MESH2BRICK_DATA_DIR`).
 - Die Galeriebilder der PDF-Seiten entstehen mit `pdftoppm` (Homebrew-Paket poppler).
+- Blender 4.0.1 liegt unter `/Applications/Blender.app` und wird automatisch gefunden. Ein anderes Blender: `MESH2BRICK_BLENDER=/pfad/zu/blender`.
+- Galerie und Abnahme neu erzeugen: `uv run python scripts/benchmark_release.py --out out/release` (dauert etwa 30 Minuten), dann `uv run python scripts/make_gallery.py --results out/release`.
 
 ## Deine Entscheidungen
 
@@ -108,10 +136,16 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 
 ## Fragen an dich
 
-Zurzeit keine. Neue Fragen kommen mit Phase 8.
+1. **Fehlerbericht an trimesh einreichen?** trimesh (die Bibliothek, die mesh2brick zum Lesen von Meshes nutzt) liest Blenders 16-Bit-Vertexfarben falsch. mesh2brick umgeht das schon, aber andere Nutzer haben denselben Fehler. Der Text liegt fertig in `docs/UPSTREAM.md` (#14), mit Hinweis auf das Vibe-Coding-Projekt wie bei #88/#90. **Standard: Ja, einreichen** (du reichst ihn mit dem Befehl unter „Offene Kleinigkeiten“ ein; das Rechtesystem lässt mich keine Issues bei fremden Projekten anlegen).
+2. **Was ist dir nach 1.0 am wichtigsten?** (a) rundere Formen durch Dachsteine (hängt an legolization #88/#89), (b) weniger Teile durch größere Platten (Upstream #10), (c) größere Modelle mit 48 Noppen stabil bekommen, (d) etwas anderes. **Standard: (a)**, sobald legolization reagiert; bis dahin nur Fehlerbehebungen.
+3. **Darf ein eigenes Modell von dir in die öffentliche Galerie?** Zurzeit zeigt sie nur selbst erzeugte Testmodelle (Duo bleibt privat). Ein echtes Fusion-360- oder Blender-Modell, das du freigibst, würde zeigen, was mesh2brick im Alltag kann. **Standard: Nein**, die Galerie bleibt bei den Testmodellen.
 
 ## Offene Kleinigkeiten
 
-- **Release-Seiten** auf GitHub fehlen, die Tags existieren. Das Anlegen öffentlicher Seiten blockiert das Rechtesystem. Befehl für `v0.0.0`:
+- **Phase-8-PR mergen:** `gh pr merge <Nummer> --squash --delete-branch` (Nummer siehe PR-Link oben).
+- **Tag und Release `v1.0.0`** nach dem Merge:
+  `git checkout main && git pull && git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0`
+  `awk '/^## \[1.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v1.0.0 --title "v1.0.0 – Blender, inspect, gallery" --notes-file -`
+- **Ältere Release-Seiten** fehlen weiterhin (die Tags existieren). Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
-- **Nachtrag mergen:** `gh pr merge 20 --squash --delete-branch`. Kein eigener Tag nötig; der Nachtrag kommt mit `v0.8.0`.
+- **trimesh-Fehlerbericht (#14), falls du zustimmst:** `gh issue create --repo mikedh/trimesh --title "glTF: normalized integer COLOR_0 (e.g. UNSIGNED_SHORT) is truncated modulo 256" --body-file <Text aus docs/UPSTREAM.md, Abschnitt "Draft #14">`
