@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     from mesh2brick.config import Settings
@@ -107,6 +108,15 @@ class StepSequencer(Protocol):
 
     def sequence(self, placement: Placement, settings: Settings) -> Placement:
         """Return ``placement`` with freshly computed build steps."""
+        ...
+
+    def merge_steps(
+        self, placement: Placement, ranges: Sequence[tuple[int, int]]
+    ) -> Placement:
+        """Return ``placement`` with each run of steps in ``ranges`` merged.
+
+        Ranges are 0-based and inclusive (see :mod:`mesh2brick.steps.regroup`).
+        """
         ...
 
 

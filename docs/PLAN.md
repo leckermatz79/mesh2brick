@@ -1,4 +1,4 @@
-# Umsetzungsplan Phase 0–6
+# Umsetzungsplan Phase 0–7
 
 Stand: 2026-11-01 · Grundlage: `SPEC.md` · Fortschritt: `docs/STATUS.md`
 
@@ -115,6 +115,18 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Eigene Messung: In Schicht-Reihenfolge hingen Teile unter Überhängen in der Luft. Sie werden jetzt mit dem Teil zusammen eingebaut, das sie hält („zuerst zusammenstecken“).
 - [x] Benchmark (`scripts/benchmark_instructions.py`, docs/benchmarks.md) und Galerie.
 - **Abnahme:** PDF < 10 MB für den Hasen (5,5 MB bei 32 Noppen); visuelle Prüfung dokumentiert (STATUS, Galerie).
+
+## Phase 7 – KI-Schicht
+
+- [x] Anthropic-Client mit Werkzeugen (`catalog_lookup`, `stability_check`, `render_preview`), eine Unterhaltung pro Aufgabe, Antworten als festes JSON-Format, gestreamt, mit Prompt-Cache (ADR 0013).
+- [x] `group_steps`: aufeinanderfolgende Schritte zusammenlegen (nur so, dass keine Reihenfolge sich ändert, nichts hängt, nichts verdeckt wird, keine „Halte fest“-Stelle verschwindet) und Bauabschnitte benennen; das Backend übernimmt die Zusammenlegung, damit `.mpd` und PDF dieselben Schritte haben.
+- [x] `write_step_text`: ein Satz pro Schritt; jedes genannte neue Teil und jede Zahl muss zum Schritt passen.
+- [x] `choose_part` (optional, nur bei `parts.availability: report`): Ersatz aus Optionen, die mesh2brick aus dem Katalog berechnet.
+- [x] Jede Antwort wird geprüft; was nicht passt, fällt weg, sonst bleibt das Ergebnis ohne KI. Fehler, Ablehnung und Kostenlimit beenden nur die betroffene Aufgabe.
+- [x] Bewertungsspeicher (SQLite), `mesh2brick feedback --rate 4 --note "..."`, Beispiele aus gut bewerteten Läufen, Export als JSON Lines.
+- [x] Kosten pro Lauf in `<name>.llm.json`, im Bewertungsspeicher und auf der Konsole; Benchmark an Fixtures und Duo (docs/benchmarks.md).
+- [x] Deutsche Farbnamen in Klammern (PO-Antwort zu Frage 3 aus Phase 6).
+- **Abnahme:** `convert` mit `llm.enabled` true/false liefert beide gültige Ausgaben (Test `test_convert_with_and_without_llm`); Kosten pro Lauf geloggt.
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)
 

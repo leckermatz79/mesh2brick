@@ -151,6 +151,11 @@ llm:
   enabled: false
   model: claude-sonnet-5-5
   tasks: [group_steps, write_step_text]
+  effort: medium        # 2026-11-07 (Phase 7, ADR 0013): low|medium|high|xhigh|max
+  max_cost_usd: 1.0     # 2026-11-07: Kostengrenze pro Lauf; Kosten stehen in <name>.llm.json
+  max_turns: 8          # 2026-11-07: Anfragen pro Aufgabe
+  examples: 6           # 2026-11-07: Beispielzeilen aus gut bewerteten Läufen (Few-Shot)
+  feedback: true        # 2026-11-07: Läufe lokal speichern und aus Bewertungen lernen
 output:
   dir: ./out
   formats: [mpd, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # bom_rebrickable ergänzt (2026-11-01), damit convert die drei BOM-Formate aus Phase 2 liefert; mpd statt ldr (2026-11-07, Phase 6, ADR 0012): Unterbaugruppen bleiben MPD-Untermodelle, ldr bleibt wählbar

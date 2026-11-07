@@ -35,7 +35,7 @@ All are GPL-3.0-compatible.
 | Extra | Package | Licence | Purpose |
 |---|---|---|---|
 | `step` | cascadio 0.1.1 (pinned; bundles Open CASCADE Technology) | MIT (OCCT: LGPL-2.1-only with exception) | STEP import and tessellation (ADR 0007). Wheel 22–28 MB, installed ~70 MB. |
-| `llm` | anthropic ≥ 2.3 | MIT | Optional LLM layer (Phase 7) |
+| `llm` | anthropic ≥ 2.3 (2.3.0 locked) | Apache-2.0 | Optional LLM layer (Phase 7, ADR 0013). Pulls in jiter (MIT), docstring-parser (MIT), sniffio (MIT OR Apache-2.0) and opentelemetry-api (Apache-2.0); httpx2 was already installed. About 2 MB. |
 | `blender` | – (external Blender binary, GPL-2.0-or-later, run as a separate process) | – | `.blend` import (Phase 8) |
 
 ## Development tools (dependency group `dev`)

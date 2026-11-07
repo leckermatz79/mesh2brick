@@ -39,6 +39,13 @@ if TYPE_CHECKING:
 
 MAX_HIDDEN_SHARE: Final = 0.5
 """Largest share of an earlier part's columns a merged later step may cover."""
+STEP_SPREAD: Final = 3
+"""How many parts a step may exceed ``steps.parts_per_step`` by."""
+
+
+def largest_step(parts_per_step: int) -> int:
+    """Most parts a merged step may have for a ``steps.parts_per_step`` target."""
+    return parts_per_step + STEP_SPREAD
 
 
 def merge_small_steps(

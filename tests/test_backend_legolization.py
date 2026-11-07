@@ -443,3 +443,30 @@ def test_ldraw_specs_match_legolization_cells() -> None:
         assert spec.category == placeable.category, placeable.part
     with pytest.raises(BackendError, match="not placeable"):
         placement_footprint("3062b")
+
+
+# ------------------------------------------------------------ merging steps (Phase 7)
+def test_merge_steps_follows_model_and_ldraw(
+    backend: LegolizationBackend, heart_placement: Placement, tmp_path: Path
+) -> None:
+    model = heart_placement.model
+    main = [
+        i
+        for i, s in enumerate(model.steps)
+        if s.submodel is None and s.attaches is None
+    ]
+    first = next(i for i in main if i + 1 in main)
+    merged = backend.merge_steps(heart_placement, [(first, first + 1)])
+    new = merged.model
+    assert new.step_count == model.step_count - 1
+    expected = len(model.parts_in_step(first)) + len(model.parts_in_step(first + 1))
+    assert len(new.parts_in_step(first)) == expected
+    assert sorted((p.part, p.cells) for p in new.parts) == sorted(
+        (p.part, p.cells) for p in model.parts
+    )
+    assert new.steps[first].stable == model.steps[first + 1].stable
+    text = backend.write_ldraw(merged, tmp_path / "merged.ldr").read_text()
+    assert text.count("0 STEP") == new.main_step_count == model.main_step_count - 1
+    assert backend.merge_steps(heart_placement, []) is heart_placement
+    with pytest.raises(BackendError, match="cannot merge"):
+        backend.merge_steps(heart_placement, [(0, model.step_count)])

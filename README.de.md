@@ -18,9 +18,10 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 6 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
+> **Stand: Vorab-Version (Phase 7 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
 > 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
-> des Modells. Details stehen in [docs/STATUS.md](docs/STATUS.md).
+> des Modells; auf Wunsch ergänzt Claude Abschnittstitel und Schritttexte. Details stehen
+> in [docs/STATUS.md](docs/STATUS.md).
 
 ## Installation (Entwicklung)
 
@@ -32,6 +33,7 @@ uv run ldraw download --yes   # einmalig: LDraw-Teilebibliothek (~150 MB)
 uv run ldraw generate --yes   # einmalig: Teile-/Farbmodule erzeugen
 uv run mesh2brick --help
 uv sync --extra step          # optional: STEP-Import (OpenCASCADE über cascadio, ~70 MB)
+uv sync --extra step --extra llm  # optional: KI-Schicht (Anthropic-SDK, ca. 2 MB)
 ```
 
 ## Benutzung
@@ -91,7 +93,39 @@ beschrieben.
 - **Große Modelle (über 500 Teile)** bekommen Schritte Schicht für Schicht, ohne dass
   jeder Zwischenstand auf Standfestigkeit geprüft ist; das steht auf dem Deckblatt.
 - Farbnamen bleiben wie bei BrickLink und Rebrickable (englisch), damit man sie dort
-  findet.
+  findet; dahinter steht in Klammern ein deutscher Name („Bright Green (Hellgrün)“).
+- **Mit der KI-Schicht:** Bauabschnitte mit Titeln („Sockel“, „Kopf“, „Linkes Ohr“) und
+  ein kurzer Satz pro Schritt, der sagt, was gebaut wird („Setze den fertigen Hut oben
+  auf den weißen Stiel.“).
+
+## Optional: Schritttexte und Abschnitte von Claude (KI-Schicht)
+
+Mit `llm.enabled: true` fragt mesh2brick nach dem Platzieren Claude (Anthropic-API): Es
+soll Bauabschnitte benennen, Schritte zusammenlegen, die man ohnehin in einem Zug baut,
+und pro Schritt einen kurzen Satz schreiben. **mesh2brick prüft jeden Vorschlag** am
+Modell: Ein zusammengelegter Schritt muss jedes Teil gehalten und sichtbar lassen, ein
+Text darf nur Teile und Mengen seines eigenen Schritts nennen. Was die Prüfung nicht
+besteht, fällt weg; die Anleitung wird also nie schlechter als ohne KI
+([ADR 0013](docs/adr/0013-llm-layer-proposes-mesh2brick-checks.md)).
+
+```sh
+uv sync --extra llm                       # einmalig
+export ANTHROPIC_API_KEY=...              # oder: ant auth login
+uv run mesh2brick convert modell.stl -o out/ --set llm.enabled=true
+# -> out/modell.llm.json: was übernommen wurde, Tokens und Kosten des Laufs
+
+uv run mesh2brick feedback                # Läufe auflisten
+uv run mesh2brick feedback --rate 4 --note "Texte etwas lang"   # letzten Lauf bewerten
+uv run mesh2brick feedback --export laeufe.jsonl                # für späteres Fine-Tuning
+```
+
+Ein Lauf kostet bei Modellen mit 270–1.000 Teilen etwa 0,06–0,20 $ mit dem
+voreingestellten `claude-sonnet-5-5` (Grenze `llm.max_cost_usd: 1.0`, siehe
+[docs/benchmarks.md](docs/benchmarks.md)). Bewertungen bleiben auf deinem Rechner
+(`MESH2BRICK_DATA_DIR`); Läufe mit 4 oder 5 Punkten werden zu Beispielen für spätere
+Läufe, Notizen werden als Rückmeldung weitergegeben. `llm.tasks` wählt `group_steps`,
+`write_step_text` und das optionale `choose_part` (Ersatz für Teile, die LEGO in einer
+Farbe nicht herstellt, bei `parts.availability: report`).
 
 ## Ergebnisse in anderen Programmen öffnen
 

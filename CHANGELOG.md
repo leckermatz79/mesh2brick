@@ -6,6 +6,33 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-07 - Phase 7: LLM layer
+
+### Added
+- Optional LLM layer (`mesh2brick.agent`, extra `llm`, ADR 0013): with `llm.enabled`,
+  Claude names build sections, may merge runs of consecutive steps, and writes one short
+  sentence per step in the booklet language. mesh2brick checks every proposal against the
+  model (merges keep every part held and visible and hide no moment that needs a hand;
+  texts mention only parts and quantities of their own step) and falls back to the result
+  without the layer for anything that fails, for refusals, API errors and the cost limit.
+- Tools Claude may call: `catalog_lookup`, `stability_check`, `render_preview`.
+- `choose_part` (opt-in, with `parts.availability: report`): picks a replacement among
+  catalogue-checked options for parts LEGO does not make in their colour; the PDF's parts
+  notes show it.
+- `<name>.llm.json`: tasks, accepted output, tokens and cost of every run.
+- Local feedback store (SQLite) and `mesh2brick feedback`: list runs, `--rate 1-5 --note`,
+  `--export` as JSON lines; runs rated 4–5 become few-shot examples, notes are passed on.
+- New settings `llm.effort`, `llm.max_cost_usd`, `llm.max_turns`, `llm.examples`,
+  `llm.feedback`.
+- German booklets show a German colour name in brackets ("Bright Green (Hellgrün)").
+- `BrickModel` schema 3: per-step `section` and `text`; the PDF shows both.
+- `steps/regroup.py` (merge runs of steps safely) and `merge_steps` in the backend.
+- `scripts/benchmark_llm.py`; real models cost $0.06–0.20 per run (docs/benchmarks.md).
+
+### Fixed
+- Step numbers with three digits no longer overlap the parts call-out.
+- `docs/THIRD_PARTY.md` listed the Anthropic SDK as MIT; it is Apache-2.0.
+
 ## [0.6.0] - 2026-11-07 - Phase 6: instruction quality
 
 ### Added

@@ -76,9 +76,15 @@ from mesh2brick.catalog.whitelist import (
 )
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.place.split import choose_split
-from mesh2brick.steps.balance import merge_small_steps, split_large_steps
+from mesh2brick.steps.balance import (
+    STEP_SPREAD,
+    largest_step,
+    merge_small_steps,
+    split_large_steps,
+)
 from mesh2brick.steps.hanging import attach_hanging
 from mesh2brick.steps.plan import PlanStep
+from mesh2brick.steps.regroup import merge_ranges
 from mesh2brick.steps.structure import Structure
 from mesh2brick.voxel.grid import EMPTY, VoxelGrid
 
@@ -116,7 +122,6 @@ _MANAGED_FIELDS: Final = frozenset(
         "progress",
     }
 )
-_DEFAULT_STEP_SPREAD: Final = 3
 AUTO_THOROUGH_MAX_PARTS: Final = 500
 """``steps.sequencing: auto`` uses stability-checked steps up to this size."""
 PLACE_BUDGET_SHARE: Final = 0.25
@@ -315,6 +320,51 @@ def unavailable_parts(
         if gone & group and "slope" in settings.parts.categories:
             gone |= group
     return frozenset(gone)
+
+
+Piece = tuple[str, int]
+"""(LDraw part, LDraw colour) of one part in a replacement."""
+
+
+def replacement_options(
+    part: str,
+    colour: int,
+    colours: Iterable[int],
+    *,
+    nearest: int = 2,
+    produced: Callable[[str, int], bool | None] = produced_in,
+) -> tuple[tuple[Piece, ...], ...]:
+    """Ways to replace ``part`` in ``colour``, which LEGO does not make.
+
+    First, shorter parts of the same family, width, height and colour, split
+    along the long side (fewest pieces, :func:`choose_split`); then the same
+    part in the ``nearest`` colours of ``colours`` LEGO makes it in (closest
+    by RGB). Every option uses only parts produced in their colour.
+
+    Raises:
+        BackendError: if ``part`` is not placeable.
+    """
+    width, length, height = placement_footprint(part)
+    category = next(p.category for p in placeable_parts() if p.part == part)
+    options: list[tuple[Piece, ...]] = []
+    lengths: dict[int, str] = {}
+    for other in placeable_parts():
+        if other.category != category or other.part == part:
+            continue
+        w, long, h = placement_footprint(other.part)
+        if (w, h) == (width, height) and long < length and produced(other.part, colour):
+            lengths.setdefault(long, other.part)
+    split = choose_split(length, lengths)
+    if split is not None and len(split) > 1:
+        options.append(tuple((lengths[piece], colour) for piece in split))
+    known = available_colors(part) or frozenset()
+    candidates = sorted(set(colours) & known - {colour})
+    if candidates:
+        rgb = color_rgb([colour, *candidates])
+        target = np.array(rgb[colour], dtype=float)
+        candidates.sort(key=lambda c: float(np.linalg.norm(np.array(rgb[c]) - target)))
+        options.extend(((part, c),) for c in candidates[:nearest])
+    return tuple(options)
 
 
 def _rect_dims(part: Any) -> tuple[int, int, int] | None:
@@ -738,6 +788,46 @@ class LegolizationBackend:
             native=_Native(layout=native.layout, plan=plan, units=units),
         )
 
+    def merge_steps(
+        self, placement: Placement, ranges: Sequence[tuple[int, int]]
+    ) -> Placement:
+        """Build each run of consecutive steps in ``ranges`` as one step.
+
+        ``ranges`` are 0-based, inclusive and checked by the caller with
+        :func:`mesh2brick.steps.regroup.merge_problems`. The LDraw export and
+        the model both follow the merged plan; verdicts carry over.
+
+        Raises:
+            BackendError: for invalid ranges or a placement without a plan.
+        """
+        native = _native_of(placement)
+        if native.plan is None:
+            msg = "this placement has no step plan to merge"
+            raise BackendError(msg)
+        if not ranges:
+            return placement
+        steps = _plan_steps(native.plan, native.units)
+        try:
+            merged = merge_ranges(steps, ranges)
+        except ValueError as error:
+            raise BackendError(f"cannot merge steps: {error}") from error
+        plan = _rebuild_plan(native.layout, native.plan, merged)
+        units = _unit_numbers(merged)
+        model = to_brick_model(
+            native.layout,
+            plan,
+            name=placement.model.name,
+            source=placement.model.source,
+            checked=native.checked,
+            units=units,
+            buildable=placement.model.buildable,
+        )
+        return replace(
+            placement,
+            model=model,
+            native=dataclasses.replace(native, plan=plan, units=units),
+        )
+
     # ------------------------------------------------------------ Exporter
     def verify_ldraw(self, path: Path) -> int:
         """Re-read an LDraw file strictly and return its part count.
@@ -807,8 +897,8 @@ class LegolizationBackend:
             # itself so their cost can be bounded (see _plan).
             mode="layer",
             target_step_size=steps.parts_per_step,
-            max_step_size=steps.parts_per_step + _DEFAULT_STEP_SPREAD,
-            min_step_size=min(_DEFAULT_STEP_SPREAD, steps.parts_per_step),
+            max_step_size=largest_step(steps.parts_per_step),
+            min_step_size=min(STEP_SPREAD, steps.parts_per_step),
             subassemblies=steps.submodels and steps.sequencing != "layers",
             beam_width=1 if steps.sequencing == "fast" else 4,
             fallback="band" if steps.sequencing == "fast" else "disassembly",
@@ -952,7 +1042,7 @@ def refine_plan(
     )
     notes: list[str] = []
     target = steps.parts_per_step
-    largest = target + _DEFAULT_STEP_SPREAD
+    largest = largest_step(target)
     if not checked:
         hanging = attach_hanging(rewritten, structure)
         rewritten = split_large_steps(
@@ -973,13 +1063,39 @@ def refine_plan(
     rewritten = merge_small_steps(
         rewritten, structure, min_size=(target + 1) // 2, max_size=largest
     )
-    units = {
+    return _rebuild_plan(layout, plan, rewritten), _unit_numbers(rewritten), notes
+
+
+def _unit_numbers(steps: Sequence[PlanStep]) -> dict[int, int]:
+    """Brick id -> pre-assembly unit number (1, 2, ... within its step)."""
+    return {
         part: number
-        for step in rewritten
+        for step in steps
         for number, group in enumerate(step.units, start=1)
         for part in group
     }
-    return _rebuild_plan(layout, plan, rewritten), units, notes
+
+
+def _plan_steps(
+    plan: InstructionPlan, units: Mapping[int, int]
+) -> tuple[PlanStep, ...]:
+    """A legolization plan as :class:`PlanStep` tuples, units included."""
+    result = []
+    for index, step in enumerate(plan.steps):
+        groups: dict[int, list[int]] = {}
+        for brick_id in step.brick_ids:
+            if brick_id in units:
+                groups.setdefault(units[brick_id], []).append(brick_id)
+        result.append(
+            PlanStep(
+                parts=step.brick_ids,
+                submodel=step.submodel,
+                attaches=step.attaches,
+                origin=(index,),
+                units=tuple(tuple(groups[n]) for n in sorted(groups)),
+            )
+        )
+    return tuple(result)
 
 
 def _rebuild_plan(

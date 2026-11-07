@@ -94,7 +94,7 @@ def test_schema_1_files_still_load(sample_model: BrickModel) -> None:
     for key in ("mass_g", "buildable"):
         del data[key]
     for step in data["steps"]:
-        del step["stable"], step["fragile"]
+        del step["stable"], step["fragile"], step["section"], step["text"]
     for part in data["parts"]:
         del part["unit"]
     old = BrickModel.from_dict(data)
@@ -115,6 +115,30 @@ def test_new_fields_round_trip(tmp_path: Path, sample_model: BrickModel) -> None
         parts=(*sample_model.parts[:2], replace(sample_model.parts[2], unit=1)),
     )
     assert BrickModel.load(model.save(tmp_path / "m.json")) == model
+
+
+def test_section_titles_and_step_texts(
+    tmp_path: Path, sample_model: BrickModel
+) -> None:
+    from dataclasses import replace  # noqa: PLC0415
+
+    steps = (
+        BuildStep(section="Sockel", text="Lege zwei Steine nebeneinander."),
+        BuildStep(),
+    )
+    model = replace(sample_model, steps=steps)
+    assert BrickModel.load(model.save(tmp_path / "m.json")) == model
+    data = model.to_dict()
+    data["schema"] = 2
+    for step in data["steps"]:
+        del step["section"], step["text"]
+    assert all(
+        s.section is None and s.text is None for s in BrickModel.from_dict(data).steps
+    )
+    with pytest.raises(ValueError, match="section must have"):
+        BuildStep(section="  ")
+    with pytest.raises(ValueError, match="text must have"):
+        BuildStep(text="x" * 201)
 
 
 def test_size_in_millimetres(sample_model: BrickModel) -> None:

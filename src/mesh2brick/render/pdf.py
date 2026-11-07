@@ -14,7 +14,8 @@ mesh2brick's own layout (ADR 0011), drawn with reportlab on top of the
   parts in full colour and earlier parts faded, and hints in plain words
   (hold the model, put a hanging part together with its holder first).
   Sub-assembly steps sit on a tinted panel; the step that attaches a
-  sub-assembly shows it in the call-out.
+  sub-assembly shows it in the call-out. Steps may carry a short
+  instruction text and start a titled build section (Phase 7).
 
 Text is German or English (:mod:`mesh2brick.render.text`). The DejaVu Sans
 font that ships with matplotlib is embedded, so every viewer shows the text,
@@ -54,6 +55,7 @@ from mesh2brick.render.preview import (
 )
 from mesh2brick.render.text import (
     Language,
+    colour_label,
     mass,
     number,
     part_label,
@@ -88,6 +90,9 @@ PART_PICTURE_PX: Final = (200, 150)
 UNIT_PICTURE_PX: Final = (240, 180)
 UNIT_ELEVATION: Final = -28.0
 MAX_UNITS_SHOWN: Final = 3
+SECTION_SIZE: Final = 12.0
+STEP_TEXT_SIZE: Final = 8.5
+MAX_STEP_TEXT_LINES: Final = 3
 TIMES: Final = chr(0xD7)
 """Multiplication sign for quantities, as in ``3x`` with the proper sign."""
 
@@ -105,6 +110,9 @@ class PdfOptions:
             (otherwise every picture shows the finished model's frame).
         files: file names of the parts lists for the ordering hint, keyed by
             ``bricklink`` and ``rebrickable``.
+        replacements: suggested replacement per ``(part, colour)`` LEGO does
+            not make, already worded in the booklet language (Phase 7,
+            ``choose_part``).
         date: date printed on the cover (default: today).
         compress: compress page content (tests switch it off to read text).
     """
@@ -115,6 +123,7 @@ class PdfOptions:
     dpi: float = 130.0
     grow: bool = True
     files: Mapping[str, str] = field(default_factory=dict)
+    replacements: Mapping[tuple[str, int], str] = field(default_factory=dict)
     date: dt.date | None = None
     compress: bool = True
 
@@ -200,10 +209,9 @@ class _StepLayout:
         size = 24 if per_page < 3 else 20  # noqa: PLR2004
         return cls(panels=panels, number_size=size, tile=46)
 
-    def picture(self, panel: _Box, *, hint: bool) -> _Box:
-        """Where the step picture goes inside ``panel``."""
+    def picture(self, panel: _Box, *, bottom: float = 4.0) -> _Box:
+        """Where the step picture goes inside ``panel`` (``bottom`` kept free)."""
         band = self.tile + 26
-        bottom = 26 if hint else 4
         return _Box(panel.x, panel.y + bottom, panel.w, panel.h - band - bottom - 4)
 
 
@@ -306,7 +314,7 @@ class _Booklet:
         c.setFont(FONT, 15)
         c.setFillColor(MUTED)
         c.drawString(box.x, y, text("instructions", lang))
-        facts = _facts(model, lang)
+        facts = _facts(model, lang, box.w - 110)
         notes = _cover_notes(model, lang)
         facts_h = 18 * len(facts) + 10
         notes_h = sum(_note_height(note, box.w) + 8 for note in notes)
@@ -398,10 +406,20 @@ class _Booklet:
             listed = ", ".join(
                 f"{m.quantity}{TIMES} "
                 f"{part_label(self.examples[(m.part, m.color)], lang, m.name)} "
-                f"{m.color_name}"
+                f"{colour_label(m.color, m.color_name, lang)}"
                 for m in absent
             )
-            notes.append((text("not_produced", lang, parts=listed), WARN_FILL))
+            message = text("not_produced", lang, parts=listed)
+            for m in absent:
+                if replacement := self.options.replacements.get((m.part, m.color)):
+                    original = (
+                        f"{part_label(self.examples[(m.part, m.color)], lang, m.name)} "
+                        f"{colour_label(m.color, m.color_name, lang)}"
+                    )
+                    message += " " + text(
+                        "replacement", lang, part=replacement, original=original
+                    )
+            notes.append((message, WARN_FILL))
         if {"bricklink", "rebrickable"} <= set(files):
             shopping = text(
                 "shopping",
@@ -421,18 +439,28 @@ class _Booklet:
         c.setFont(FONT_BOLD, 11)
         c.drawString(box.x + pad, y, f"{line.quantity}{TIMES}")
         c.setFont(FONT, 7.5)
+        width = box.w - 2 * pad
         name = part_label(self.examples[(line.part, line.color)], self.lang, line.name)
-        for i, chunk in enumerate(simpleSplit(name, FONT, 7.5, box.w - 2 * pad)[:2]):
+        names = simpleSplit(name, FONT, 7.5, width)[:2]
+        for i, chunk in enumerate(names):
             c.drawString(box.x + pad, y - 10 - 9 * i, chunk)
         c.setFillColor(MUTED)
         c.setFont(FONT, 6.5)
-        detail = _fit(f"{line.part} · {line.color_name}", FONT, 6.5, box.w - 2 * pad)
-        c.drawString(box.x + pad, box.y + 3, detail)
+        colour = colour_label(line.color, line.color_name, self.lang)
+        details = simpleSplit(f"{line.part} · {colour}", FONT, 6.5, width)
+        room = 3 - len(names)  # three text lines below the quantity
+        if len(details) > room:
+            details = [
+                *details[: room - 1],
+                _fit(" ".join(details[room - 1 :]), FONT, 6.5, width),
+            ]
+        for i, chunk in enumerate(reversed(details)):
+            c.drawString(box.x + pad, box.y + 3 + 8 * i, chunk)
 
     # ------------------------------------------------------------------ steps
     def step_pages_(self) -> None:
         layout, model, per_page = self.layout, self.model, self.options.steps_per_page
-        frame = layout.picture(layout.panels[0], hint=False)
+        frame = layout.picture(layout.panels[0])
         width, height = _pixels(frame.w, frame.h, self.options.dpi)
         images = render_step_images(
             model,
@@ -450,21 +478,32 @@ class _Booklet:
         c, lang, layout, model = self.canvas, self.lang, self.layout, self.model
         info = model.steps[step]
         sub = info.submodel
+        labels: list[tuple[str, Color, float]] = []
         if sub is not None:
             c.setFillColor(SUB_FILL)
             c.roundRect(panel.x, panel.y, panel.w, panel.h, 8, stroke=0, fill=1)
-            c.setFillColor(SUB_INK)
-            c.setFont(FONT_BOLD, 10)
-            label = text("subassembly", lang, name=self.labels[sub])
-            c.drawRightString(panel.x + panel.w - 8, panel.top - 16, label)
+            name = text("subassembly", lang, name=self.labels[sub])
+            labels.append((name, SUB_INK, 10))
         else:
             c.setStrokeColor(RULE)
             c.setLineWidth(0.6)
             c.line(panel.x, panel.y - 7, panel.x + panel.w, panel.y - 7)
+        if info.section is not None:
+            title = _fit(info.section, FONT_BOLD, SECTION_SIZE, panel.w / 3)
+            labels.append((title, INK, SECTION_SIZE))
+        reserve, y = 6.0, panel.top - 4
+        for label, ink, size in labels:
+            y -= size + 4
+            c.setFillColor(ink)
+            c.setFont(FONT_BOLD, size)
+            c.drawRightString(panel.x + panel.w - 8, y, label)
+            reserve = max(reserve, pdfmetrics.stringWidth(label, FONT_BOLD, size) + 16)
         c.setFillColor(SUB_INK if sub is not None else INK)
         c.setFont(FONT_BOLD, layout.number_size)
-        c.drawString(panel.x + 6, panel.top - layout.number_size - 2, str(step + 1))
-        x = panel.x + 6 + layout.number_size * 1.6 + 8
+        number_text = str(step + 1)
+        c.drawString(panel.x + 6, panel.top - layout.number_size - 2, number_text)
+        width = pdfmetrics.stringWidth(number_text, FONT_BOLD, layout.number_size)
+        x = panel.x + 6 + max(width, layout.number_size * 1.3) + 10
         if info.attaches is not None:
             width = layout.tile * 2.4
             caption = text("attach", lang, name=self.labels[info.attaches])
@@ -475,15 +514,37 @@ class _Booklet:
             )
             x += width + 8
         if parts := model.parts_in_step(step):
-            right = panel.x + panel.w - (90 if sub is not None else 6)
+            right = panel.x + panel.w - reserve
             x = self.parts_callout(parts, x, panel.top - 4, right)
         if units := _units(model, step):
             self.unit_pictures(units, x + 8, panel)
-        hints = _step_hints(model, step, lang)
-        _draw_png(c, image, layout.picture(panel, hint=bool(hints)), keep_aspect=True)
-        if hints:
+        bottom = 4.0
+        if hints := _step_hints(model, step, lang):
             note = (" ".join(hints), HINT_FILL)
             _note(c, note, _Box(panel.x + 4, panel.y + 2, panel.w - 8, 20), size=8)
+            bottom = 26.0
+        if info.text is not None:
+            bottom = self.step_text(info.text, panel, bottom)
+        _draw_png(c, image, layout.picture(panel, bottom=bottom), keep_aspect=True)
+
+    def step_text(self, message: str, panel: _Box, bottom: float) -> float:
+        """Draw a step's instruction above ``bottom``; return the new bottom."""
+        c, width = self.canvas, panel.w - 16
+        lines = simpleSplit(message, FONT, STEP_TEXT_SIZE, width)
+        if len(lines) > MAX_STEP_TEXT_LINES:
+            rest = " ".join(lines[MAX_STEP_TEXT_LINES - 1 :])
+            lines = [
+                *lines[: MAX_STEP_TEXT_LINES - 1],
+                _fit(rest, FONT, STEP_TEXT_SIZE, width),
+            ]
+        leading = STEP_TEXT_SIZE * 1.3
+        c.setFillColor(INK)
+        c.setFont(FONT, STEP_TEXT_SIZE)
+        y = panel.y + bottom + 3 + leading * (len(lines) - 1)
+        for line in lines:
+            c.drawString(panel.x + 8, y, line)
+            y -= leading
+        return bottom + leading * len(lines) + 6
 
     def parts_callout(
         self, parts: Sequence[PlacedPart], x: float, top: float, right: float
@@ -568,7 +629,8 @@ def _tiles_per_page(box: _Box) -> int:
     return max(1, rows) * _TILE_COLUMNS
 
 
-def _facts(model: BrickModel, lang: Language) -> list[tuple[str, str]]:
+def _facts(model: BrickModel, lang: Language, width: float) -> list[tuple[str, str]]:
+    """Label/value pairs of the cover; values fit into ``width`` points."""
     w, d, h = (v / 10 for v in model.size_mm())
     size = text(
         "size_value", lang, w=number(w, lang), d=number(d, lang), h=number(h, lang)
@@ -581,20 +643,27 @@ def _facts(model: BrickModel, lang: Language) -> list[tuple[str, str]]:
     if model.mass_g is not None:
         weight = text("weight_value", lang, value=mass(model.mass_g, lang))
         facts.append((text("weight", lang), weight))
-    facts.append((text("colours", lang), _colour_summary(model)))
+    facts.append((text("colours", lang), _colour_summary(model, lang, width)))
     verdict = {True: "stable_yes", False: "stable_no", None: "stable_unknown"}
     facts.append((text("stability", lang), text(verdict[model.buildable], lang)))
     return facts
 
 
-def _colour_summary(model: BrickModel) -> str:
+def _colour_summary(model: BrickModel, lang: Language, width: float) -> str:
+    """``3: Red (Rot), White (Weiß), …``: most used colours that fit ``width``."""
     counts = Counter(p.color for p in model.parts)
     names = [
-        model.colors[c].name.replace("_", " ") if c in model.colors else str(c)
+        colour_label(c, model.colors[c].name, lang) if c in model.colors else str(c)
         for c, _ in counts.most_common()
     ]
-    more = ", …" if len(names) > 4 else ""  # noqa: PLR2004
-    return f"{len(names)} ({', '.join(names[:4])}{more})"
+    summary = f"{len(names)}: {names[0]}"
+    for shown, name in enumerate(names[1:], start=1):
+        longer = f"{summary}, {name}"
+        rest = ", …" if shown < len(names) - 1 else ""
+        if pdfmetrics.stringWidth(longer + rest, FONT_BOLD, 11) > width:
+            return summary + ", …"
+        summary = longer
+    return summary
 
 
 def _cover_notes(model: BrickModel, lang: Language) -> list[tuple[str, Color]]:

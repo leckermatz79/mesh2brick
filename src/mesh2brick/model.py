@@ -22,10 +22,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 Cell = tuple[int, int, int]
-SCHEMA_VERSION: Final = 2
+SCHEMA_VERSION: Final = 3
 """Version 2 (Phase 6) added step verdicts, pre-assembly units, mass and the
-buildability verdict; version 1 files still load (the new fields default)."""
-READABLE_SCHEMAS: Final = frozenset({1, SCHEMA_VERSION})
+buildability verdict; version 3 (Phase 7) added section titles and step
+texts. Older files still load (the new fields default)."""
+READABLE_SCHEMAS: Final = frozenset({1, 2, SCHEMA_VERSION})
+MAX_SECTION_CHARS: Final = 40
+MAX_STEP_TEXT_CHARS: Final = 200
 MM_PER_STUD: Final = 8.0
 MM_PER_PLATE: Final = 3.2
 STUD_HEIGHT_MM: Final = 1.7
@@ -100,17 +103,31 @@ class BuildStep:
             stands on its own, ``False`` it needs a supporting hand until a
             later step, ``None`` not checked (layer-order steps).
         fragile: stable, but pressing the new parts on firmly may break it.
+        section: title of a build section that starts with this step (e.g.
+            "Head"), in the language of the instructions; ``None``: the
+            section of the step before continues.
+        text: a short instruction for this step in plain words, in the
+            language of the instructions (``None``: none).
     """
 
     submodel: str | None = None
     attaches: str | None = None
     stable: bool | None = None
     fragile: bool = False
+    section: str | None = None
+    text: str | None = None
 
     def __post_init__(self) -> None:
         if self.submodel is not None and self.attaches is not None:
             msg = "a step cannot both build and attach a subassembly"
             raise ValueError(msg)
+        for label, value, limit in (
+            ("section", self.section, MAX_SECTION_CHARS),
+            ("text", self.text, MAX_STEP_TEXT_CHARS),
+        ):
+            if value is not None and not 0 < len(value.strip()) <= limit:
+                msg = f"step {label} must have 1-{limit} characters, got {value!r}"
+                raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)
