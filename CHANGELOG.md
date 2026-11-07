@@ -6,6 +6,8 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-07 - Solver order and slopes back on
+
 Slopes are back, and big models convert faster (issue #34, ROADMAP item 8 moved up, ADR 0016).
 The stability LPs now try simplex for 3 s and then the interior-point method without crossover.
 Small models take the same time as in 1.2, big ones up to 32 s less; with slopes every fixture
