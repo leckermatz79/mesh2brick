@@ -137,6 +137,47 @@ def test_cli_inspect_without_picture_and_errors(
     )
     assert tiny.exit_code == 1
     assert "no voxels at this size" in tiny.output
+    assert "--size 30cm" in tiny.output
+
+
+def test_cli_inspect_shows_the_size_before_converting(
+    fixtures_dir: Path, tmp_path: Path
+) -> None:
+    """Roadmap 1: `inspect --size 30cm` shows the LEGO size it will get."""
+    result = runner.invoke(
+        app,
+        [
+            "inspect",
+            str(fixtures_dir / "l_bracket.stl"),
+            "-o",
+            str(tmp_path),
+            "--no-preview",
+            "--size",
+            "30cm",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "(height 30 cm -> 31 bricks)" in result.output
+    assert "grid: 28 x 9 studs x 31 bricks" in result.output
+    assert "LEGO size: 22.4 x 7.2 x 29.8 cm" in result.output
+
+
+def test_cli_size_errors_name_the_problem(fixtures_dir: Path, tmp_path: Path) -> None:
+    for command in ("inspect", "voxelize", "convert"):
+        result = runner.invoke(
+            app,
+            [
+                command,
+                str(fixtures_dir / "l_bracket.stl"),
+                "-o",
+                str(tmp_path),
+                "--size",
+                "40",
+            ],
+        )
+        assert result.exit_code == 1, command
+        assert "give a number with a unit, e.g. 30cm" in result.output
+    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.parametrize(

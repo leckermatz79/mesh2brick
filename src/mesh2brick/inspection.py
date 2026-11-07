@@ -24,8 +24,9 @@ from mesh2brick.pipeline import VOXEL_SUFFIXES, palette_for
 from mesh2brick.render.mesh import NEUTRAL_RGB, render_mesh_png, side_by_side
 from mesh2brick.render.preview import PreviewOptions, grid_to_model, render_png
 from mesh2brick.voxel.color import sample_rgb
+from mesh2brick.voxel.grid import LEGO_MM_PER_STUD, lego_cell_height_mm
 from mesh2brick.voxel.io import load_npz
-from mesh2brick.voxel.voxelize import hollow, voxelize
+from mesh2brick.voxel.voxelize import hollow, scale_note, voxelize
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -242,7 +243,8 @@ def inspection_text(
     )
     nx, ny, nz = grid.shape
     unit = "bricks" if grid.height_unit == "brick" else "plates"
-    cell_cm = 0.96 if grid.height_unit == "brick" else 0.32
+    stud_cm = LEGO_MM_PER_STUD / 10
+    cell_cm = lego_cell_height_mm(grid.height_unit) / 10
     lines: list[str] = []
     if model is None:
         lines.append(
@@ -261,15 +263,11 @@ def inspection_text(
     if report is not None:
         lines.append(
             f"  scale: {report.pitch_mm:.2f} mm of model per stud"
-            + (
-                f" (longest axis -> {settings.input.target_studs} studs)"
-                if settings.input.scale_mode == "studs"
-                else ""
-            )
+            + scale_note(settings)
         )
     lines += [
         f"  grid: {nx} x {ny} studs x {nz} {unit}, {grid.filled_count:,} filled cells",
-        f"  LEGO size: {nx * 0.8:.1f} x {ny * 0.8:.1f} x {nz * cell_cm:.1f} cm",
+        f"  LEGO size: {nx * stud_cm:.1f} x {ny * stud_cm:.1f} x {nz * cell_cm:.1f} cm",
     ]
     if report is not None and report.volume_error is not None:
         lines.append(f"  volume vs. mesh: {report.volume_error * 100:+.1f} %")

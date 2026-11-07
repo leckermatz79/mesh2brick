@@ -413,7 +413,7 @@ def _grid(
         say(f"note: {note}")
     warnings.extend(result.warnings)
     if result.grid.filled_count == 0:
-        msg = "voxelization produced no cells; increase input.target_studs"
+        msg = "voxelization produced no cells; make the model bigger (e.g. --size 30cm)"
         raise ValueError(msg)
     return result.grid
 

@@ -13,8 +13,9 @@ Backend-specific knobs are not duplicated here: they go into
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Any, Final, Literal, Self
 
 import yaml
 from pydantic import (
@@ -40,6 +41,9 @@ OutputFormat = Literal[
 LlmTask = Literal["group_steps", "write_step_text", "choose_part"]
 
 DEFAULT_LLM_MODEL = "claude-sonnet-5-5"
+MAX_HEIGHT_CM: Final = 400.0
+"""Upper bound for ``input.target_height_cm`` (about as tall as 512 studs)."""
+_SIZE: Final = re.compile(r"(\d+(?:[.,]\d+)?)\s*(cm|mm|studs?)", re.IGNORECASE)
 
 
 class ConfigError(ValueError):
@@ -56,11 +60,19 @@ class InputConfig(_Section):
     up_axis: Axis = "z"
     auto_orient: bool = False
     scale_mode: Literal["studs", "mm"] = "studs"
+    """``studs``: scale the model to a target size, ``target_height_cm`` if
+    set, else ``target_studs``. ``mm``: keep the file's size (``mm_per_stud``)."""
     target_studs: Annotated[int, Field(gt=0, le=512)] = 32
     """Length of the longest model axis in studs (``scale_mode: studs``).
 
     Default 32 (~26 cm) by product-owner decision of 2026-11-01; SPEC §4 had 48.
     """
+    target_height_cm: Annotated[float, Field(gt=0, le=MAX_HEIGHT_CM)] | None = None
+    """Height of the LEGO model in centimetres; replaces ``target_studs`` when
+    set (Roadmap 1). The height is rounded to the nearest whole brick (or
+    plate), so 30 cm become 31 bricks = 29.8 cm. A size in cm means the height
+    by product-owner decision of 2026-11-07; the longest edge stays reachable
+    through ``target_studs``."""
     mm_per_stud: Annotated[float, Field(gt=0)] = 8.0
     """Model millimetres per stud (``scale_mode: mm``); a real stud pitch is 8 mm."""
     multi_body: Literal["union", "error"] = "union"
@@ -68,6 +80,16 @@ class InputConfig(_Section):
     (overlaps are unioned), ``error`` rejects such files."""
     step_tolerance_mm: Annotated[float, Field(gt=0)] = 0.05
     """Largest distance between a STEP surface and its triangles (mm)."""
+
+    @model_validator(mode="after")
+    def _check_scale(self) -> Self:
+        if self.scale_mode == "mm" and self.target_height_cm is not None:
+            msg = (
+                "target_height_cm needs scale_mode: studs "
+                "(scale_mode: mm keeps the size of the file)"
+            )
+            raise ValueError(msg)
+        return self
 
 
 class VoxelConfig(_Section):
@@ -303,6 +325,42 @@ def parse_override(text: str) -> tuple[tuple[str, ...], Any]:
         msg = f"invalid value in override {text!r}: {error}"
         raise ConfigError(msg) from error
     return path, value
+
+
+def size_overrides(text: str) -> tuple[str, ...]:
+    """Overrides for a model size such as ``30cm``, ``300mm`` or ``40studs``.
+
+    Centimetres and millimetres set the height of the LEGO model
+    (``input.target_height_cm``); studs set the longest axis
+    (``input.target_studs``), as in 1.0. Either way the model is scaled to
+    that size, also when the configuration file says ``scale_mode: mm``.
+
+    Raises:
+        ConfigError: if ``text`` is not a positive number with one of the units.
+    """
+    match = _SIZE.fullmatch(text.strip())
+    if match is None:
+        msg = (
+            f"invalid size {text!r}; give a number with a unit, "
+            "e.g. 30cm, 300mm or 40studs"
+        )
+        raise ConfigError(msg)
+    number = float(match.group(1).replace(",", "."))
+    unit = match.group(2).lower()
+    if number <= 0:
+        msg = f"invalid size {text!r}; the size must be greater than 0"
+        raise ConfigError(msg)
+    if unit.startswith("stud"):
+        if not number.is_integer():
+            msg = f"invalid size {text!r}; studs are counted in whole numbers"
+            raise ConfigError(msg)
+        return (
+            "input.scale_mode=studs",
+            f"input.target_studs={int(number)}",
+            "input.target_height_cm=null",
+        )
+    height_cm = number / 10 if unit == "mm" else number
+    return ("input.scale_mode=studs", f"input.target_height_cm={height_cm!r}")
 
 
 def apply_overrides(

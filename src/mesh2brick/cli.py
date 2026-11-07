@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Annotated, Final, NoReturn
 import typer
 
 from mesh2brick import __version__
-from mesh2brick.config import ConfigError, Settings, load_settings
+from mesh2brick.config import ConfigError, Settings, load_settings, size_overrides
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from mesh2brick.agent.feedback import RunSummary
     from mesh2brick.catalog.listing import CatalogRow
     from mesh2brick.model import BrickModel
+    from mesh2brick.voxel.grid import HeightUnit
     from mesh2brick.voxel.voxelize import VoxelizeReport
 
 _LAYER_PROGRESS: Final = re.compile(r"layer (\d+)/(\d+)\b")
@@ -68,6 +69,17 @@ OutputDirOption = Annotated[
         "-o",
         help="Output directory (overrides output.dir).",
         file_okay=False,
+    ),
+]
+SizeOption = Annotated[
+    str | None,
+    typer.Option(
+        "--size",
+        help=(
+            "Size of the LEGO model: height in cm or mm (30cm, 300mm) or longest "
+            "edge in studs (40studs). Overrides the size settings of --config/--set."
+        ),
+        metavar="SIZE",
     ),
 ]
 
@@ -206,9 +218,10 @@ def convert(
     config: ConfigOption = None,
     overrides: SetOption = None,
     output_dir: OutputDirOption = None,
+    size: SizeOption = None,
 ) -> None:
     """Full pipeline: 3D model -> LDraw, parts lists, PDF instructions."""
-    settings = _settings(config, overrides, output_dir)
+    settings = _settings(config, overrides, output_dir, size)
     from mesh2brick.backends import BackendError  # noqa: PLC0415 - keep --help fast
     from mesh2brick.ingest import IngestError  # noqa: PLC0415
     from mesh2brick.pipeline import convert as run_convert  # noqa: PLC0415
@@ -248,6 +261,7 @@ def voxelize(
     config: ConfigOption = None,
     overrides: SetOption = None,
     output_dir: OutputDirOption = None,
+    size: SizeOption = None,
     preview: Annotated[
         bool, typer.Option(help="Also write a PNG preview of the voxels.")
     ] = True,
@@ -260,7 +274,7 @@ def voxelize(
     ] = False,
 ) -> None:
     """Voxelize a mesh onto the stud grid and write <name>.grid.npz."""
-    settings = _settings(config, overrides, output_dir)
+    settings = _settings(config, overrides, output_dir, size)
     from mesh2brick.backends import BackendError  # noqa: PLC0415
     from mesh2brick.backends.legolization import color_info, color_rgb  # noqa: PLC0415
     from mesh2brick.ingest import IngestError, load_model  # noqa: PLC0415
@@ -504,6 +518,7 @@ def inspect(
     config: ConfigOption = None,
     overrides: SetOption = None,
     output_dir: OutputDirOption = None,
+    size: SizeOption = None,
     preview: Annotated[
         bool,
         typer.Option(help="Also write <name>.inspect.png: model and voxels."),
@@ -512,9 +527,10 @@ def inspect(
     """Check a model before converting: size, colours, voxels, rough part count.
 
     Takes seconds (no brick placement). The picture shows the model as read
-    next to its voxels at the configured size, seen from the same side.
+    next to its voxels at the configured size, seen from the same side. Try
+    sizes with --size (30cm, 40studs) before a long conversion.
     """
-    settings = _settings(config, overrides, output_dir)
+    settings = _settings(config, overrides, output_dir, size)
     from mesh2brick.backends import BackendError  # noqa: PLC0415 - keep --help fast
     from mesh2brick.backends.legolization import color_info  # noqa: PLC0415
     from mesh2brick.ingest import IngestError  # noqa: PLC0415
@@ -537,7 +553,7 @@ def inspect(
         typer.secho(f"  note: {warning}", fg=typer.colors.YELLOW)
     typer.echo(inspection_text(result, settings, colors))
     if not result.grid.filled_count:
-        _fail("no voxels at this size; increase input.target_studs")
+        _fail("no voxels at this size; make the model bigger, e.g. --size 30cm")
     if preview:
         path = settings.output.dir / f"{stem}.inspect.png"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -649,27 +665,29 @@ def voxel_summary(
     triangles: int,
     parts: int,
     report: VoxelizeReport,
-    height_unit: str,
+    height_unit: HeightUnit,
     shell_cells: int,
     settings: Settings,
 ) -> str:
     """Human-readable result of ``voxelize``."""
+    from mesh2brick.voxel.grid import (  # noqa: PLC0415
+        LEGO_MM_PER_STUD,
+        lego_cell_height_mm,
+    )
+    from mesh2brick.voxel.voxelize import scale_note  # noqa: PLC0415
+
     nx, ny, nz = report.shape
-    cell_mm = 9.6 if height_unit == "brick" else 3.2
     unit = "bricks" if height_unit == "brick" else "plates"
+    stud_cm = LEGO_MM_PER_STUD / 10
+    cell_cm = lego_cell_height_mm(height_unit) / 10
     lines = [
         f"{name}: {triangles:,} triangles, {parts} part(s)",
-        f"  scale: {report.pitch_mm:.2f} mm of model per stud"
-        + (
-            f" (longest axis -> {settings.input.target_studs} studs)"
-            if settings.input.scale_mode == "studs"
-            else ""
-        ),
+        f"  scale: {report.pitch_mm:.2f} mm of model per stud" + scale_note(settings),
         (
             f"  grid: {nx} x {ny} studs x {nz} {unit}, {report.filled_cells:,} "
             f"filled cells ({report.method} method, {report.seconds:.1f} s)"
         ),
-        f"  LEGO size: {nx * 0.8:.1f} x {ny * 0.8:.1f} x {nz * cell_mm / 10:.1f} cm",
+        f"  LEGO size: {nx * stud_cm:.1f} x {ny * stud_cm:.1f} x {nz * cell_cm:.1f} cm",
     ]
     if report.volume_error is not None:
         lines.append(f"  volume vs. mesh: {report.volume_error * 100:+.1f} %")
@@ -683,10 +701,15 @@ def voxel_summary(
 
 # --------------------------------------------------------------------------- helpers
 def _settings(
-    config: Path | None, overrides: list[str] | None, output_dir: Path | None
+    config: Path | None,
+    overrides: list[str] | None,
+    output_dir: Path | None,
+    size: str | None = None,
 ) -> Settings:
     extra = [f"output.dir={output_dir}"] if output_dir is not None else []
     try:
+        if size is not None:
+            extra += size_overrides(size)
         return load_settings(config, [*(overrides or []), *extra])
     except ConfigError as error:
         _fail(str(error))
