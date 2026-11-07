@@ -126,6 +126,7 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Bewertungsspeicher (SQLite), `mesh2brick feedback --rate 4 --note "..."`, Beispiele aus gut bewerteten Läufen, Export als JSON Lines.
 - [x] Kosten pro Lauf in `<name>.llm.json`, im Bewertungsspeicher und auf der Konsole; Benchmark an Fixtures und Duo (docs/benchmarks.md).
 - [x] Deutsche Farbnamen in Klammern (PO-Antwort zu Frage 3 aus Phase 6).
+- [x] Nachtrag (PO-Antwort): Übersicht der Bauabschnitte mit Seitenzahlen auf dem Deckblatt.
 - **Abnahme:** `convert` mit `llm.enabled` true/false liefert beide gültige Ausgaben (Test `test_convert_with_and_without_llm`); Kosten pro Lauf geloggt.
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)

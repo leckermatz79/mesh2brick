@@ -6,7 +6,8 @@ mesh2brick's own layout (ADR 0011), drawn with reportlab on top of the
 :class:`~mesh2brick.model.BrickModel`, so it needs no backend:
 
 * **Cover:** picture of the finished model, number of parts and steps, size
-  in centimetres, weight, colours and a plain-language stability verdict.
+  in centimetres, weight, colours, a plain-language stability verdict and,
+  when the steps have build sections (Phase 7), the sections with their pages.
 * **Parts list:** one tile per part and colour with a picture, quantity,
   name and catalogue numbers, grouped by colour.
 * **Steps:** 1-4 steps per page. Each step has a call-out box with a picture
@@ -91,6 +92,9 @@ UNIT_PICTURE_PX: Final = (240, 180)
 UNIT_ELEVATION: Final = -28.0
 MAX_UNITS_SHOWN: Final = 3
 SECTION_SIZE: Final = 12.0
+CONTENTS_LEADING: Final = 15.0
+CONTENTS_ONE_COLUMN: Final = 4
+"""Up to this many sections are listed in one column on the cover, more in two."""
 STEP_TEXT_SIZE: Final = 8.5
 MAX_STEP_TEXT_LINES: Final = 3
 TIMES: Final = chr(0xD7)
@@ -316,9 +320,15 @@ class _Booklet:
         c.drawString(box.x, y, text("instructions", lang))
         facts = _facts(model, lang, box.w - 110)
         notes = _cover_notes(model, lang)
+        sections = section_pages(
+            model, first_page=2 + self.part_pages, per_page=self.options.steps_per_page
+        )
+        columns = 2 if len(sections) > CONTENTS_ONE_COLUMN else 1
+        rows = math.ceil(len(sections) / columns)
         facts_h = 18 * len(facts) + 10
+        contents_h = rows * CONTENTS_LEADING + 6 if sections else 0
         notes_h = sum(_note_height(note, box.w) + 8 for note in notes)
-        bottom = box.y + 36 + notes_h + facts_h
+        bottom = box.y + 36 + notes_h + facts_h + contents_h
         picture = _Box(box.x, bottom, box.w, y - 16 - bottom)
         width, height = _pixels(picture.w, picture.h, self.options.dpi * 1.15)
         png = render_png(
@@ -334,6 +344,9 @@ class _Booklet:
             c.setFont(FONT_BOLD, 11)
             c.drawString(box.x + 110, y, value)
             y -= 18
+        if sections:
+            self.contents(sections, columns, y)
+            y -= contents_h
         y -= 4
         for note in notes:
             note_h = _note_height(note, box.w)
@@ -349,6 +362,27 @@ class _Booklet:
         trademark = simpleSplit(text("trademark", lang), FONT, 7.5, box.w)
         for i, line in enumerate(trademark):
             c.drawString(box.x, box.y + 4 - 9 * i, line)
+
+    def contents(self, sections: list[tuple[str, int]], columns: int, y: float) -> None:
+        """The build sections with their pages, below the cover facts."""
+        c, box, lang = self.canvas, self.content, self.lang
+        c.setFillColor(MUTED)
+        c.setFont(FONT, 11)
+        c.drawString(box.x, y, text("sections", lang))
+        width = (box.w - 110) / columns
+        rows = math.ceil(len(sections) / columns)
+        for index, (title, page) in enumerate(sections):
+            column, row = divmod(index, rows)
+            left = box.x + 110 + column * width
+            line = y - row * CONTENTS_LEADING
+            number = text("page_short", lang, page=page)
+            c.setFont(FONT, 9.5)
+            c.setFillColor(MUTED)
+            c.drawRightString(left + width - 16, line, number)
+            room = width - 24 - pdfmetrics.stringWidth(number, FONT, 9.5)
+            c.setFillColor(INK)
+            c.setFont(FONT_BOLD, 10.5)
+            c.drawString(left, line, _fit(title, FONT_BOLD, 10.5, room))
 
     # ------------------------------------------------------------------ parts
     def parts_page(self, lines: Sequence[BomLine], *, last: bool) -> None:
@@ -647,6 +681,17 @@ def _facts(model: BrickModel, lang: Language, width: float) -> list[tuple[str, s
     verdict = {True: "stable_yes", False: "stable_no", None: "stable_unknown"}
     facts.append((text("stability", lang), text(verdict[model.buildable], lang)))
     return facts
+
+
+def section_pages(
+    model: BrickModel, *, first_page: int, per_page: int
+) -> list[tuple[str, int]]:
+    """``(title, page)`` of every build section (step pages start at ``first_page``)."""
+    return [
+        (step.section, first_page + index // per_page)
+        for index, step in enumerate(model.steps)
+        if step.section is not None
+    ]
 
 
 def _colour_summary(model: BrickModel, lang: Language, width: float) -> str:

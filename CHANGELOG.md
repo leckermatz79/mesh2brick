@@ -6,6 +6,10 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+### Added
+- The PDF cover lists the build sections with their pages (product-owner decision of
+  2026-11-07); booklets without sections look as before.
+
 ## [0.7.0] - 2026-11-07 - Phase 7: LLM layer
 
 ### Added
