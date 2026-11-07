@@ -1,51 +1,49 @@
 # Projektstatus
 
-Stand: 2026-11-07 · **Roadmap 1 – Größe in Zentimetern fertig** ([#24](https://github.com/leckermatz79/mesh2brick/issues/24), wird Version 1.1.0) · Nächster Punkt: **Roadmap 2 – harte Zeitgrenze** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), [ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
+Stand: 2026-11-07 · **Roadmap 2 – harte Zeitgrenze fertig** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), wird Version 1.2.0) · Nächster Punkt: **Roadmap 3 – Stabilitätsprüfung für große Modelle** ([#26](https://github.com/leckermatz79/mesh2brick/issues/26), [ROADMAP.md](../ROADMAP.md), [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **Größe in Zentimetern:** `mesh2brick convert duo.stl --size 30cm` baut Duo 30 cm hoch (genau 29,8 cm, weil es auf ganze Steine rundet); vorher musstest du Noppen umrechnen.
-- **Erst schauen, dann bauen:** `mesh2brick inspect duo.stl --size 40cm` zeigt in Sekunden, wie groß das Modell wird (45,6 × 28,8 × 40,3 cm) und wie viele Teile es ungefähr braucht (rund 3.900), bevor eine lange Umwandlung startet.
+- **Die Zeitgrenze hält jetzt wirklich:** Eine Umwandlung hält `placement.time_limit_s` ein (Standard 5 Minuten); legolization wird notfalls mitten in der Rechnung gestoppt. Ist ein Modell bis dahin nicht fertig optimiert, bekommst du das beste stabile Modell, das bis dahin gefunden wurde, und das Deckblatt sagt das.
+- **Große Modelle gehen:** Duo bei 48 Noppen (2.308 Teile) ist mit 20 Minuten Zeit nach gut 12 Minuten fertig und steht stabil; vorher lief derselbe Fall über eine Stunde und wurde abgebrochen. Mit den Standard-5-Minuten kommt er nach 289 s als ehrlich markierter Zwischenstand.
 
-| Die Rakete mit `--size 20cm`, `30cm` und `40cm`, im gleichen Maßstab |
+| Fliegenpilz mit nur 2 Minuten Zeit: legolization wurde während der letzten Optimierung gestoppt, das Modell (1.240 Teile, stabil) ist trotzdem fertig, der gelbe Kasten sagt es |
 |---|
-| ![Rakete in drei Größen](gallery/roadmap1-size-cm.png) |
+| ![Deckblatt mit Hinweis zur Zeitgrenze](gallery/roadmap2-time-limit.png) |
 
-## Erledigt (Roadmap 1)
+## Erledigt (Roadmap 2)
 
-- **Neue Option `--size`** für `convert`, `voxelize` und `inspect`, wie von dir gewünscht:
-  - `--size 30cm` oder `--size 300mm`: das Modell wird so **hoch** (deine Entscheidung: cm meint die Höhe).
-  - `--size 40studs`: die **längste Kante** wird 40 Noppen lang, wie bisher mit `target_studs`.
-  - `--size` gilt immer, auch wenn eine Config-Datei etwas anderes sagt. Tippfehler wie `--size 40` (ohne Einheit) melden einen klaren Fehler.
-- **In der Config-Datei:** `input.target_height_cm: 30` (ersetzt `target_studs`). Ohne Angabe bleibt alles wie in 1.0 (32 Noppen).
-- **Rundung:** Die Höhe wird auf ganze Steine gerundet, zum nächstgelegenen Wert: 30 cm werden 31 Steine = 29,8 cm (32 Steine wären 30,7 cm). Mit `voxel.height_unit: plate` auf ganze Platten (30 cm → 94 Platten = 30,1 cm).
-- **`inspect` und `voxelize` sagen, woher die Größe kommt:** `scale: 1.61 mm of model per stud (height 30 cm -> 31 bricks)`, darunter wie bisher `LEGO size: 33.6 x 21.6 x 29.8 cm`.
+- **Warum Duo bei 48 Noppen über eine Stunde lief:** Nicht der letzte Optimierungsschritt war schuld, wie vermutet, sondern schon die *erste* Stabilitätsberechnung nach dem Platzieren. Das ist eine große Rechenaufgabe (2.392 Teile), an der der Löser in der Einstellung von legolization stundenlang hängt. In einer anderen Einstellung (ohne den Abschlussschritt „crossover“) ist sie in 49 Sekunden gelöst.
+- **Schnellerer Rechenweg für große Modelle:** mesh2brick probiert diese Einstellung jetzt, bevor es auf die langsame zurückfällt. Damit es nichts verschlechtert, habe ich an fünf Modellen alle 34 Stabilitätsberechnungen auf beiden Wegen gemacht: **34 von 34 Urteilen gleich** („stabil“/„nicht stabil“).
+- **Harte Grenze:** legolization läuft jetzt in einem eigenen Prozess und meldet jeden Zwischenstand. Ist die Zeit um (abzüglich der Zeit, die PDF und Teilelisten brauchen), wird der Prozess beendet, egal wo er gerade rechnet. Genommen wird der beste Zwischenstand: geprüft stabil vor geprüft instabil vor ungeprüft.
+- **Ehrlich markiert:** Auf dem Deckblatt steht dann „Zeitgrenze erreicht: Das ist das beste stabile Modell, das bis dahin gefunden wurde. Mit mehr Rechenzeit käme es meist mit weniger Teilen aus.“ Gab es noch kein stabiles Modell, steht dort „der letzte Zwischenstand“. Die Kommandozeile sagt zusätzlich, nach welchem Schritt und mit wie vielen Teilen.
+- **Keine losen Steine mehr bei Duo:** Duo bei 48 Noppen hatte zuerst genau einen losen 1×2-Stein. Der Grund war ein kleiner Stummel im Modell, der seitlich absteht, ohne etwas darüber oder darunter. LEGO-Steine halten nur über die Noppen, also kann ihn kein Stein halten. Solche Zellen entfernt mesh2brick jetzt beim Voxelisieren, mit Hinweis; in keinem anderen Testmodell gibt es sie (0 von 15 geprüften Läufen). Danach blieb ein einzelner 1×1-Stein unter einem Überhang lose, weil legolization ihn nicht mit dem Nachbarn verbindet. Höchstens drei solche losen Teile nimmt mesh2brick nach dem Platzieren heraus und prüft die Stabilität neu, mit Hinweis; mehr bleiben drin und werden gemeldet.
+- **Kleinigkeiten:** Die KI-Schicht wird übersprungen (mit Hinweis), wenn vor dem Export weniger als 30 s übrig sind. Ist die Zeit schon vor dem Platzieren um, gibt es eine klare Fehlermeldung. Jede Umwandlung braucht etwa 1 s mehr für den Start des zweiten Prozesses.
 - **Abnahme:**
 
-| Duo (nur lokal) | Noppen × Noppen × Steine | LEGO-Größe | grob geschätzt |
-|---|---|---|---|
-| `--size 20cm` | 28 × 18 × 21 | 22,4 × 14,4 × 20,2 cm | ~570 Teile (umgewandelt: 799, 45 s, stabil) |
-| `--size 30cm` | 42 × 27 × 31 | 33,6 × 21,6 × 29,8 cm | ~1.700 Teile |
-| `--size 40cm` | 57 × 36 × 42 | 45,6 × 28,8 × 40,3 cm | ~3.900 Teile |
+| Abnahme (Issue #25) | Ergebnis |
+|---|---|
+| Duo bei 48 Noppen in ≤ 20 min, stabil oder klarer Bericht | **12 min, stabil, aus einem Stück** (2.308 Teile; 1.0: über 1 Stunde, abgebrochen) |
+| 5 Minuten reichen weiter bis 2.000 Teile | **ja**: alle 13 öffentlichen Modelle wie in 1.0 (gleiche Teilezahlen, alle stabil), keins abgeschnitten, längster Fall bis 2.000 Teile 232 s (1.0: 265 s); der Texturwürfel mit 2.280 Teilen braucht 246 s (1.0: 294 s) |
+| Harte Grenze am echten Modell | Duo bei 48 Noppen mit 5 Minuten: legolization nach 198 s gestoppt, fertig nach 289 s |
 
-  Auf GitHub prüft ein Test dasselbe mit dem L-Winkel aus den Testmodellen (20/30/40 cm → 21/31/42 Steine hoch). Die Rakete mit `--size 30cm`: 376 Teile in 31 s, stabil; das Deckblatt zeigt 15,2 × 15,2 × 29,0 cm (mit den Noppen obendrauf).
-
-## Messwerte von 1.0 (Ausgangspunkt für 1.x)
+## Messwerte 1.2 (in Klammern 1.0)
 
 | Modell | Teile | Zeit | stabil |
 |---|---|---|---|
-| Rakete (`.blend`, 32 Noppen) | 263 | 14 s | ja |
-| Hase (32) | 873 | 73 s | ja |
-| Fliegenpilz (32) | 1.240 | 174 s | ja |
-| Kugel (32) | 1.499 | 113 s | ja |
-| STEP-Burg (32, `--config`) | 1.651 | 239 s | ja |
-| STEP-Würfel (32) | 1.952 | 265 s | ja |
-| Texturwürfel (32) | 2.280 | 294 s | ja |
-| Duo (32, nur lokal) | 1.025 | 100 s | ja |
-| Duo (48, nur lokal) | 2.313 | 479 s | **nein** |
+| Rakete (`.blend`, 32 Noppen) | 263 (263) | 15 s (14 s) | ja |
+| Hase (32) | 873 (873) | 71 s (73 s) | ja |
+| Fliegenpilz (32) | 1.240 (1.240) | 164 s (174 s) | ja |
+| Kugel (32) | 1.499 (1.499) | 109 s (113 s) | ja |
+| STEP-Burg (32, `--config`) | 1.651 (1.651) | 202 s (239 s) | ja |
+| STEP-Würfel (32) | 1.952 (1.952) | 232 s (265 s) | ja |
+| Texturwürfel (32) | 2.280 (2.280) | 246 s (294 s) | ja |
+| Duo (32, nur lokal) | 1.025 (1.025) | 95 s (100 s) | ja |
+| Duo (48, nur lokal, 5 min) | 2.371 (2.313) | **289 s** (479 s) | nein, abgeschnitten |
+| Duo (48, nur lokal, 20 min) | 2.308 (–) | **733 s** (über 1 Stunde, abgebrochen) | **ja** |
 
-Alle Zahlen: [benchmarks.md](benchmarks.md), Abschnitte „v1.0 acceptance“ und „Size in centimetres“.
+Alle Zahlen: [benchmarks.md](benchmarks.md), Abschnitte „v1.0 acceptance“ und „Hard time limit“.
 
 ## Als Nächstes
 
@@ -54,8 +52,8 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 **1.x – große Modelle möglich machen** (keine neuen Steinarten):
 
 1. ~~Roadmap 1 – Größe in Zentimetern~~ ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): **fertig**, siehe oben.
-2. **Roadmap 2 – harte Zeitgrenze** ([#25](https://github.com/leckermatz79/mesh2brick/issues/25), nächster Punkt) über alle Schritte, sonst „bestes stabiles Modell bis dahin“ (Duo bei 48 Noppen in ≤ 20 min). Wichtig auch für `--size 40cm`: Duo bräuchte dann rund 3.900 Teile.
-3. Roadmap 3 ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)) – Stabilitätsprüfung auch für große Modelle.
+2. ~~Roadmap 2 – harte Zeitgrenze~~ ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)): **fertig**, siehe oben.
+3. **Roadmap 3 – Stabilitätsprüfung auch für große Modelle** ([#26](https://github.com/leckermatz79/mesh2brick/issues/26), nächster Punkt): Modelle über 500 Teilen bekommen Schritte Schicht für Schicht ohne Prüfung jedes Zwischenstands. Der schnellere Rechenweg aus Roadmap 2 hilft hier wahrscheinlich mit.
 4. Roadmap 4 ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)) – kleinere PDFs bei großen geschlossenen Körpern (Ziel < 10 MB).
 5. Roadmap 5 ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)) – bessere Teileschätzung in `inspect` (15 von 15 im Bereich).
 6. Roadmap 6 ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)) – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
@@ -79,10 +77,11 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Die letzte Optimierung in legolization („remerge“) lässt sich nicht begrenzen. | Upstream-Kandidat #5 |
 | Slopes vorerst aus (legolization-Hänger, Upstream #2 offen). | nach Upstream-Fix wieder an (Roadmap 8) |
-| Duo bei 48 Noppen: 2.313 Teile, 8 Minuten, nicht stabil. Mit 20 statt 5 Minuten Zeitgrenze war der Lauf nach über einer Stunde noch nicht fertig (abgebrochen): Der letzte Optimierungsschritt in legolization hält sich an keine Zeitgrenze. 48 Noppen liegen über der 2.000-Teile-Grenze der SPEC. | Roadmap 2 (Upstream-Kandidat #5) |
-| Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen 4,5–5 Minuten; auf einem langsameren Laptop kann es länger dauern. Ihre PDFs sind 20–23 MB groß. | Standard bleibt 32 Noppen; PDF-Größe: Roadmap 4 |
+| Voxelisieren, PDF und Vorschau werden nicht abgebrochen; für sie hält mesh2brick Zeit frei (20 s + 0,03 s pro Teil, gemessen reichte das überall). Auf einem viel langsameren Rechner kann die Umwandlung die Grenze um einen Teil der PDF-Zeit überschreiten; die Kommandozeile sagt das dann. | akzeptieren |
+| Wird ein Modell an der Zeitgrenze abgeschnitten, hat es meist etwas mehr Teile (die letzte Optimierung spart Teile) oder ist im ungünstigsten Fall nicht auf Stabilität geprüft. Deckblatt und Kommandozeile sagen das. | mehr Zeit geben (`--set placement.time_limit_s=1200`); Upstream-Kandidat #5 |
+| Der schnellere Rechenweg und das Mitlesen der Zwischenstände sind lokale Eingriffe in legolization (UPSTREAM #2 und #5). Ändert legolization diese Stellen, meldet mesh2brick das beim Start. | bei Upstream vorschlagen (#5), wenn #88/#89 Antwort haben |
+| Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen etwa 4 Minuten (232–246 s). Auf einem langsameren Laptop werden sie an der 5-Minuten-Grenze abgeschnitten (bestes stabiles Modell bis dahin), statt länger zu dauern. Ihre PDFs sind 20–23 MB groß. | Standard bleibt 32 Noppen; PDF-Größe: Roadmap 4 |
 | Die Teileschätzung von `inspect` ist grob (Bereich etwa Faktor 2) und liegt bei dünnen, großen Platten zu niedrig. | `convert` gibt die genaue Zahl; Roadmap 5 |
 | Spitze Formen werden mit `--size` etwas niedriger als gewünscht: Eine Spitze, die nicht einmal eine halbe Zelle füllt, fällt weg (dieselbe Regel wie bei allen dünnen Details). Rakete: 38,4 statt 40 cm, ihr fehlen oben 2 Lagen der Nasenspitze. Duo trifft die Höhe auf einen halben Stein genau. `inspect` zeigt die echte Höhe vorher. | akzeptieren; eigener Code (Größe nachregeln), falls es stört |
 | `.blend`: Blender muss installiert sein. Die Tests mit echtem Blender laufen nur hier auf dem Mac; die automatischen Tests auf GitHub nutzen einen Blender-Ersatz. Verknüpfte Bibliotheken müssen vom Ordner der Datei aus erreichbar sein. | akzeptieren |
@@ -132,7 +131,9 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 ## Fragen an dich
 
-Zurzeit keine. Deine Antworten zu Roadmap 1 stehen unter „Deine Entscheidungen“.
+1. **Sollen große Modelle automatisch mehr Zeit bekommen?** Zum Beispiel 5 Minuten bis 2.000 Teile, darüber bis zu 20 Minuten, geschätzt vor dem Platzieren. *Standard, wenn du nichts sagst:* Nein, es bleiben 5 Minuten für alle. Wer mehr will, gibt `--set placement.time_limit_s=1200` an, und das Deckblatt sagt ehrlich, wenn die Zeit nicht gereicht hat.
+2. **Eigene kurze Option für die Zeit, z. B. `--time 20min`?** So wie `--size 30cm`. *Standard:* Nein, `--set placement.time_limit_s=…` reicht vorerst. Neue Kommandozeilen-Optionen frage ich vorher (Arbeitsregel).
+3. **Den schnelleren Rechenweg bei legolization vorschlagen?** Als Kommentar in unserem offenen Draft-PR #89 („auch große LPs brauchen einen Weg ohne crossover“, mit den Messwerten). *Standard:* Ja, aber erst nach deinem OK; ich bereite den Text vor, und du führst den fertigen Befehl aus.
 
 ## Offene Kleinigkeiten
 

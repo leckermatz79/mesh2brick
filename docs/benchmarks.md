@@ -390,3 +390,84 @@ of the request. The rocket loses its top one or two layers: the tip of the nose 
 than half a cell (`voxel.threshold`), the same rule that drops other thin details. `inspect`
 shows the real height before converting. Duo at 40 cm (about 3,900 parts) is beyond the
 5-minute budget; that is Roadmap 2 (hard time limit).
+
+## Hard time limit (Roadmap 2, 2026-11-07)
+
+**Where Duo at 48 studs spent more than an hour.** A run with periodic stack dumps showed the
+time inside the *first* stability check after placement: one LP of 52,476 × 113,101 with about
+1 million non-zeros for 2,392 parts. Captured and solved on its own (Apple M2 Max):
+
+| HiGHS variant | Result |
+|---|---|
+| dual simplex with presolve (legolization's 1st attempt) | not solved in 180 s |
+| dual simplex without presolve (2nd attempt) | not solved in 180 s |
+| primal simplex | not solved in 180 s |
+| interior point **with** crossover (3rd attempt, no time limit) | still running after 19 minutes (stopped) |
+| interior point **without** crossover | **optimal in 48.6 s** |
+
+Local patch #2 therefore tries the interior point method without crossover (300 s limit)
+before legolization's last attempt. To check that it judges stability the same way, every
+stability check of five placements was solved with the old attempt chain *and* without
+crossover, and both force solutions were scored by legolization's own `_score`
+(`compare_ipm.py`, not in the repository):
+
+| Model (32 studs) | Stability checks | Solved by the old IPM with crossover | Same verdict |
+|---|---:|---:|---:|
+| `l_bracket.stl` | 19 | 0 | 19 |
+| `bunny_lowpoly.stl` | 5 | 4 | 5 |
+| `toadstool.obj` | 5 | 5 | 5 |
+| `sphere_r10.stl` | 2 | 2 | 2 |
+| Duo (local only) | 3 | 3 | 3 |
+
+All 34 verdicts agree, including two unstable ones (bunny: 2 parts out of equilibrium in both).
+The objective is the same within the solver tolerance; the per-part drag differs slightly where
+the optimum is not unique (largest score 0.064 instead of 0.070 on the L-bracket). Every check
+above about 800 parts needs the interior point method (both simplex attempts run into their
+5 s limit). Up to 1,500 parts the crossover costs little (the old chain needed 17–33 s per
+check, the new one 16–30 s); at 2,392 parts it is the difference between 49 s and more than an
+hour.
+
+**Release run with the hard limit** (`scripts/benchmark_release.py --out out/release-1.2 --local
+samples/...@32 --local samples/...@48 --local samples/...@48:1200`, same laptop, one conversion
+at a time). Every public input gives exactly the parts of 1.0 and stays one stable piece; none
+is cut short. The time includes about 1 s for starting the placement process.
+
+| Input | Parts (1.0) | Time s (1.0) | place s | PDF s | One stable piece | Cut short |
+|---|---:|---:|---:|---:|---|---|
+| `bunny_lowpoly.stl` | 873 (873) | 71 (73) | 54 | 15 | yes | no |
+| `cube_10mm.step` | 1,952 (1,952) | 232 (265) | 188 | 42 | yes | no |
+| `cube_10mm.stl` | 1,952 (1,952) | 232 (265) | 188 | 42 | yes | no |
+| `heart.vox` | 12 (12) | 4 (3) | 2 | 0 | yes | no |
+| `l_bracket.stl` | 153 (153) | 27 (26) | 23 | 2 | yes | no |
+| `rocket.blend` | 263 (263) | 15 (14) | 10 | 3 | yes | no |
+| `sphere_r10.stl` | 1,499 (1,499) | 109 (113) | 67 | 40 | yes | no |
+| `textured_cube.obj` | 2,280 (2,280) | 246 (294) | 193 | 51 | yes | no |
+| `toadstool.obj` | 1,240 (1,240) | 164 (174) | 134 | 28 | yes | no |
+| `torus.stl` | 552 (552) | 16 (15) | 6 | 9 | yes | no |
+| `two_bodies.step` | 606 (606) | 159 (191) | 148 | 9 | yes | no |
+| `vertex_colors.ply` | 1,519 (1,519) | 118 (124) | 74 | 41 | yes | no |
+| `castle.step` (generated), `--config` | 1,651 (1,651) | 202 (239) | 168 | 32 | yes | no |
+| Duo (local only) @32 | 1,025 (1,025) | 95 (100) | 62 | 20 | yes | no |
+| Duo (local only) @48, 300 s | 2,371 (2,313) | **289** (479) | 198 | 77 | no (one loose part) | **yes**, after placement and repair |
+| Duo (local only) @48, 1,200 s | 2,308 (–) | **733** (> 3,780, stopped) | 645 | 74 | **yes** | no |
+
+- **The 5-minute default holds for ≤ 2,000 parts** with room to spare (largest: the cubes,
+  232 s); even the 2,280-part textured cube finishes in 246 s. The faster stability checks make
+  most inputs a few seconds to 48 s faster.
+- **The hard limit holds:** Duo at 48 studs with the default 300 s stops legolization after
+  198 s (300 s minus voxelization and the export reserve for 2,371 parts) and finishes in 289 s.
+  The cover says "Zeitgrenze erreicht" and, as the run had no stable state yet, "der letzte
+  Zwischenstand".
+- **Export reserve:** `export_reserve_s = 20 s + 0.03 s per part` keeps 51–91 s free for the
+  inputs above 1,000 parts; LDraw, parts lists, PDF and preview needed 20–78 s there (Duo at 48
+  studs: 77 s for 2,371 parts and five colours, the closest case). It stays as it is.
+- **Duo at 48 studs with 1,200 s is one stable piece** after 733 s (2,308 parts): legolization
+  finishes, and the one loose 1 x 1 brick its placement leaves under an overhang is removed
+  and the stability checked again (about 60 s). Acceptance of #25 met.
+- **Duo at 48 studs, earlier runs of this item** (1,200 s): before the voxel fix 608 s, 2,354
+  parts, one loose 1 x 2 brick (the stub of two cells, one of which no part can hold); with the
+  voxel fix but before removing loose parts 691 s, 2,309 parts, one loose 1 x 1 brick under the
+  same overhang. legolization's placement and repair use their 300 s share; the rest is the
+  first stability checks (about 60 s each), the final merge and the PDF.
+- **Toadstool with a 120 s limit** (gallery picture): stopped during the final merge after 63 s,
+  the state after placement and repair has the same 1,240 parts and is stable; 96 s in total.
