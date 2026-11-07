@@ -1,4 +1,4 @@
-# Umsetzungsplan Phase 0–7
+# Umsetzungsplan Phase 0–8
 
 Stand: 2026-11-01 · Grundlage: `SPEC.md` · Fortschritt: `docs/STATUS.md`
 
@@ -128,6 +128,16 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Deutsche Farbnamen in Klammern (PO-Antwort zu Frage 3 aus Phase 6).
 - [x] Nachtrag (PO-Antwort): Übersicht der Bauabschnitte mit Seitenzahlen auf dem Deckblatt.
 - **Abnahme:** `convert` mit `llm.enabled` true/false liefert beide gültige Ausgaben (Test `test_convert_with_and_without_llm`); Kosten pro Lauf geloggt.
+
+## Phase 8 – Blender, Politur, v1.0
+
+- [x] `.blend` über ein Blender im Hintergrund (ADR 0014): Werkseinstellungen, keine in der Datei gespeicherten Skripte, nur sichtbare Objekte der aktiven Szene, Modifier angewendet, Kurven und Text als Meshes, Einheiten der Szene. Blender wird über `MESH2BRICK_BLENDER`, `PATH` oder die üblichen Installationsorte gefunden.
+- [x] glTF (`.glb`/`.gltf`) als eigenes Eingabeformat nach den glTF-Regeln (Y oben, Meter, lineare Farben, Materialfarbe × Vertexfarbe). Fehler in trimesh umgangen (16-Bit-Farben, Upstream-Kandidat #14).
+- [x] `mesh2brick inspect`: Größe, Farbquellen, LEGO-Farben, Hinweise und grobe Teilezahl in Sekunden, dazu ein Bild „Modell wie eingelesen ↔ Voxel" (eigener kleiner Z-Puffer-Renderer).
+- [x] Testmodell `rocket.blend` (CC0, per Skript in Blender gebaut); Tests mit einem Ersatz-Blender laufen überall, Tests mit echtem Blender lokal.
+- [x] v1.0-Abnahme (SPEC §9) mit `scripts/benchmark_release.py`: alle Beispielmodelle, ein STEP-Modell mit `--config examples/mesh2brick.yaml`, Duo lokal bei 32 und 48 Noppen.
+- [x] Beispielgalerie (`scripts/make_gallery.py`, `docs/gallery/README.md`), Doku de/en, `v1.0.0`.
+- **Abnahme:** `.blend` → glTF → Ingest läuft; `inspect` schreibt ein PNG; Galerie und Doku vollständig; Definition of Done (SPEC §9) geprüft.
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)
 

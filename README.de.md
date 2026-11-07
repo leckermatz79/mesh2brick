@@ -2,8 +2,9 @@
 
 **Deutsch** · [English](README.md)
 
-`mesh2brick` übersetzt ein 3D-Modell (STL, OBJ, 3MF, PLY, STEP, später `.blend`) in ein
-**physisch baubares LEGO®-kompatibles Modell** und erzeugt daraus
+`mesh2brick` übersetzt ein 3D-Modell (STL, OBJ, 3MF, PLY, glTF, STEP oder eine
+Blender-Datei `.blend`) in ein **physisch baubares LEGO®-kompatibles Modell** und erzeugt
+daraus
 
 1. eine **LDraw-Datei** (`.ldr`/`.mpd`) mit `0 STEP`-Bauschritten,
 2. eine **Teileliste** als CSV, BrickLink-XML und Rebrickable-CSV,
@@ -18,10 +19,16 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 7 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
-> 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
-> des Modells; auf Wunsch ergänzt Claude Abschnittstitel und Schritttexte. Details stehen
-> in [docs/STATUS.md](docs/STATUS.md).
+> **Stand: 1.0.** Alle acht Phasen des Plans sind fertig. `mesh2brick convert` macht aus
+> STL, OBJ, PLY, 3MF, glTF, STEP und Blender-Dateien ein LDraw-Modell, drei Teilelisten und
+> eine PDF-Bauanleitung, in den Farben des Modells, für Modelle bis 2.000 Teile in unter
+> 5 Minuten auf einem Laptop; auf Wunsch ergänzt Claude Abschnittstitel und Schritttexte.
+> `mesh2brick inspect` zeigt vorher, was aus einem Modell wird. Siehe die
+> [Beispielgalerie](docs/gallery/README.md) und [docs/STATUS.md](docs/STATUS.md).
+
+| Von Blender zu LEGO: `rocket.blend` wie eingelesen, als Voxel, als Steine |
+|---|
+| ![rocket.blend in drei Stufen](docs/gallery/phase8-blender-rocket.png) |
 
 ## Installation (Entwicklung)
 
@@ -36,11 +43,20 @@ uv sync --extra step          # optional: STEP-Import (OpenCASCADE über cascadi
 uv sync --extra step --extra llm  # optional: KI-Schicht (Anthropic-SDK, ca. 2 MB)
 ```
 
+Für `.blend`-Dateien muss [Blender](https://www.blender.org) installiert sein (getestet mit
+4.0); ein Python-Paket kommt nicht hinzu. mesh2brick findet Blender an den üblichen Orten
+oder über `MESH2BRICK_BLENDER=/pfad/zu/blender`.
+
 ## Benutzung
 
 ```sh
+# Erster Blick: Größe, Farben, Voxel und grobe Teilezahl in Sekunden, dazu ein Bild
+# (out/rocket.inspect.png: das Modell wie eingelesen neben seinen Voxeln)
+uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/
+
 # Alles in einem Schritt: LDraw, Teilelisten (CSV, BrickLink-XML, Rebrickable-CSV), PDF
 uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+uv run mesh2brick convert tests/fixtures/rocket.blend -o out/
 
 # Oder Schritt für Schritt:
 # 1. Mesh auf das Noppenraster voxelisieren (längste Achse standardmäßig 32 Noppen)
@@ -78,6 +94,20 @@ uv run mesh2brick render out/heart.bricks.json --step 3
 
 Alle Einstellungen sind in [examples/mesh2brick.yaml](examples/mesh2brick.yaml)
 beschrieben.
+
+## Blender- und glTF-Dateien
+
+- **`.blend`:** mesh2brick startet dein Blender im Hintergrund (Werkseinstellungen, in der
+  Datei gespeicherte Skripte laufen nicht, die Datei wird nur gelesen) und lässt es die
+  **sichtbaren** Objekte der aktiven Szene exportieren, mit angewendeten Modifiern; Kurven
+  und Text werden zu Meshes, versteckte Objekte, Kameras und Lichter bleiben weg
+  ([ADR 0014](docs/adr/0014-blender-import-via-headless-blender-and-gltf.md)). Die Einheiten
+  der Szene zählen: Eine Millimeter-Szene behält mit `input.scale_mode: mm` ihre Größe.
+- **`.glb`/`.gltf`:** werden direkt gelesen, nach den glTF-Regeln (Y nach oben, Meter,
+  Material- und Vertexfarben in linearem Licht). `input.up_axis: z` bleibt; das Drehen von
+  glTFs Y-oben übernimmt mesh2brick selbst.
+- Ohne Blender: das Modell in Blender als `.glb` exportieren (Datei → Exportieren →
+  glTF 2.0) und diese Datei umwandeln.
 
 ## Die Bauanleitung
 
@@ -127,6 +157,11 @@ voreingestellten `claude-sonnet-5-5` (Grenze `llm.max_cost_usd: 1.0`, siehe
 Läufe, Notizen werden als Rückmeldung weitergegeben. `llm.tasks` wählt `group_steps`,
 `write_step_text` und das optionale `choose_part` (Ersatz für Teile, die LEGO in einer
 Farbe nicht herstellt, bei `parts.availability: report`).
+
+## Beispielgalerie
+
+[docs/gallery/README.md](docs/gallery/README.md) zeigt jedes Beispielmodell des Repos wie
+eingelesen, als Voxel und als Steine, mit Teilezahl, Schritten und Zeiten.
 
 ## Ergebnisse in anderen Programmen öffnen
 

@@ -2,8 +2,8 @@
 
 [Deutsch](README.de.md) · **English**
 
-`mesh2brick` turns a 3D model (STL, OBJ, 3MF, PLY, STEP, later `.blend`) into a
-**physically buildable LEGO®-compatible model** and produces
+`mesh2brick` turns a 3D model (STL, OBJ, 3MF, PLY, glTF, STEP or a Blender `.blend` file)
+into a **physically buildable LEGO®-compatible model** and produces
 
 1. an **LDraw file** (`.ldr`/`.mpd`) with `0 STEP` build steps,
 2. a **parts list** as CSV, BrickLink XML and Rebrickable CSV,
@@ -17,10 +17,16 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 7 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
-> and STEP files into an LDraw model, three parts lists and a PDF building instruction,
-> in the model's own colours; optionally Claude adds section titles and step texts.
-> See [docs/STATUS.md](docs/STATUS.md).
+> **Status: 1.0.** All eight phases of the plan are done. `mesh2brick convert` turns STL,
+> OBJ, PLY, 3MF, glTF, STEP and Blender files into an LDraw model, three parts lists and a
+> PDF building instruction, in the model's own colours, for models up to 2,000 parts in
+> under 5 minutes on a laptop; optionally Claude adds section titles and step texts.
+> `mesh2brick inspect` shows beforehand what a model will give. See the
+> [example gallery](docs/gallery/README.md) and [docs/STATUS.md](docs/STATUS.md).
+
+| From Blender to LEGO: `rocket.blend` as read, as voxels, as bricks |
+|---|
+| ![rocket.blend in three stages](docs/gallery/phase8-blender-rocket.png) |
 
 ## Installation (development)
 
@@ -35,11 +41,20 @@ uv sync --extra step          # optional: STEP import (OpenCASCADE via cascadio,
 uv sync --extra step --extra llm  # optional: LLM layer (Anthropic SDK, ~2 MB)
 ```
 
+`.blend` files need an installed [Blender](https://www.blender.org) (tested with 4.0); no
+Python package is added. mesh2brick finds it in the usual places or via
+`MESH2BRICK_BLENDER=/path/to/blender`.
+
 ## Usage
 
 ```sh
+# First look: size, colours, voxels and a rough part count in seconds, plus a picture
+# (out/rocket.inspect.png: the model as read next to its voxels)
+uv run mesh2brick inspect tests/fixtures/rocket.blend -o out/
+
 # Everything in one go: LDraw, parts lists (CSV, BrickLink XML, Rebrickable CSV), PDF
 uv run mesh2brick convert tests/fixtures/bunny_lowpoly.stl -o out/ --set input.target_studs=16
+uv run mesh2brick convert tests/fixtures/rocket.blend -o out/
 
 # Or stage by stage:
 # 1. Voxelize a mesh onto the stud grid (longest axis = 32 studs by default)
@@ -76,6 +91,19 @@ uv run mesh2brick render out/heart.bricks.json --step 3
 ```
 
 All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.yaml).
+
+## Blender and glTF files
+
+- **`.blend`:** mesh2brick starts your Blender in the background (factory settings, scripts
+  stored in the file are not run, the file is only read) and lets it export the **visible**
+  objects of the active scene with modifiers applied; curves and text become meshes, hidden
+  objects, cameras and lights are left out ([ADR 0014](docs/adr/0014-blender-import-via-headless-blender-and-gltf.md)).
+  The scene's units count: a millimetre scene keeps its size with `input.scale_mode: mm`.
+- **`.glb`/`.gltf`:** read directly, with the glTF conventions (Y up, metres, material and
+  vertex colours in linear light). Keep `input.up_axis: z`; mesh2brick turns glTF's Y up
+  itself.
+- Without Blender, export the model from Blender as `.glb` (File → Export → glTF 2.0) and
+  convert that file.
 
 ## The building instructions
 
@@ -122,6 +150,11 @@ A run costs about $0.06–0.20 for models of 270–1,000 parts with the default
 are passed on as feedback. `llm.tasks` selects `group_steps`, `write_step_text` and
 the opt-in `choose_part` (replacements for parts LEGO does not make in a colour, with
 `parts.availability: report`).
+
+## Example gallery
+
+[docs/gallery/README.md](docs/gallery/README.md) shows every example model of the repository
+as read, as voxels and as bricks, with part counts, steps and times.
 
 ## Opening the results in other programs
 

@@ -6,9 +6,41 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-07 - Phase 8: Blender, inspect, v1.0
+
+First complete release: every phase of the plan is done and the v1.0 Definition of Done
+(SPEC §9) is met: a STEP model with `--config` gives `.mpd`, three parts lists and a PDF in
+under 5 minutes for up to 2,000 parts, every fixture is one stable piece, coverage 96 %
+(docs/benchmarks.md, "v1.0 acceptance").
+
 ### Added
+- `.blend` import (ADR 0014): mesh2brick runs the user's Blender headless (factory settings,
+  auto-run scripts disabled) and reads the visible objects of the active scene with modifiers
+  applied, curves and text as meshes, material and vertex colours, in the scene's units.
+  Blender is found via `MESH2BRICK_BLENDER`, `PATH` or the usual install locations.
+- glTF input (`.glb`, `.gltf`) with the spec's conventions: Y up, metres, linear colours,
+  `baseColorFactor` × `COLOR_0`.
+- `mesh2brick inspect`: size in the file and in LEGO, colour sources and the LEGO colours
+  they become, warnings and a rough part count in seconds (no placement), plus
+  `<name>.inspect.png` with the model as read next to its voxels. Replaces the placeholder.
+- `render/mesh.py`: a small numpy z-buffer rasteriser for mesh pictures (exact where parts
+  interpenetrate; 2 million triangles in a few seconds).
+- `tests/fixtures/rocket.blend` (CC0, built by `scripts/make_blend_fixture.py`).
+- `scripts/benchmark_release.py` (v1.0 acceptance, SPEC §9) and `scripts/make_gallery.py`
+  (example gallery in `docs/gallery/README.md`).
 - The PDF cover lists the build sections with their pages (product-owner decision of
   2026-11-07); booklets without sections look as before.
+
+### Fixed
+- 16-bit vertex colours in glTF (Blender's default) were wrapped modulo 256 by trimesh;
+  they are rescaled before trimesh builds the meshes (UPSTREAM #14).
+
+### Changed
+- Version 1.0.0; development status "Production/Stable". Public CLI flags and settings now
+  follow semantic versioning.
+
+### Removed
+- The "planned for Phase N" placeholder and its exit code 3: every command works now.
 
 ## [0.7.0] - 2026-11-07 - Phase 7: LLM layer
 

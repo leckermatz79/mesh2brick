@@ -314,3 +314,57 @@ with the same script; it is not in the repository. "Input tokens" counts all inp
   cost $0.145 for the toadstool; with the model description as its own cache breakpoint it is $0.061.
 - **One way of addressing the builder:** German texts mixed "Wir bauen" and "Setze"; the prompt now asks for direct instructions with "du" in every step.
 - **Duo end to end:** 161 s including the LLM layer (target 5 minutes).
+
+## v1.0 acceptance (Phase 8, 2026-11-07)
+
+`uv run python scripts/benchmark_release.py --out out/release --local samples/...@32
+--local samples/...@48` (SPEC §9). Every input runs through the real command line
+(`python -m mesh2brick convert`) in its own process, one after the other, with the default
+settings (longest axis 32 studs, `.mpd` + three parts lists + PDF); the time is the wall
+clock of the whole process on an Apple M2 Max. Then the script checks every result: all
+five files written, parts-list total = parts = parts in the strictly re-read LDraw file
+("Checks"), and the model is one stable piece. The castle is a STEP file of eleven boxes
+(wall ring, four towers, a keep, a courtyard slab) written by the script; it is converted
+with `--config examples/mesh2brick.yaml`, the literal SPEC §9 command. "Estimate" is what
+`mesh2brick inspect` predicts beforehand; "ratio" is placed parts per part of its quick fill
+(see below).
+
+| Input | Studs | Grid | Parts | Steps | Colours | One stable piece | Checks | PDF MB | Time s | Estimate | Ratio |
+|---|---:|---|---:|---:|---:|---|---|---:|---:|---|---:|
+| `bunny_lowpoly.stl` | 32 | 30x16x26 | 873 | 125 | 1 | yes | yes | 5.5 | 73 | 658 (455–1,012) | 1.73 |
+| `cube_10mm.step` | 32 | 32x32x27 | 1,952 | 274 | 1 | yes | yes | 20.4 | 265 | 2,246 (1,555–3,456) | 1.13 |
+| `cube_10mm.stl` | 32 | 32x32x27 | 1,952 | 274 | 1 | yes | yes | 20.4 | 265 | 2,246 (1,555–3,456) | 1.13 |
+| `heart.vox` | – | 7x2x7 | 12 | 7 | 1 | yes | yes | 0.3 | 3 | 16 (11–24) | 1.00 |
+| `l_bracket.stl` | 32 | 24x8x27 | 153 | 37 | 1 | yes | yes | 1.2 | 26 | 213 (148–328) | 0.93 |
+| `rocket.blend` | 32 | 17x17x26 | 263 | 42 | 4 | yes | yes | 1.2 | 14 | 291 (202–448) | 1.17 |
+| `sphere_r10.stl` | 32 | 32x32x27 | 1,499 | 207 | 1 | yes | yes | 10.1 | 113 | 1,746 (1,209–2,686) | 1.12 |
+| `textured_cube.obj` | 32 | 32x32x27 | 2,280 | 327 | 2 | yes | yes | 23.2 | 294 | 2,246 (1,555–3,456) | 1.32 |
+| `toadstool.obj` | 32 | 31x32x23 | 1,240 | 177 | 2 | yes | yes | 7.5 | 174 | 1,222 (846–1,880) | 1.32 |
+| `torus.stl` | 32 | 32x32x6 | 552 | 74 | 1 | yes | yes | 4.1 | 15 | 515 (356–792) | 1.39 |
+| `two_bodies.step` | 32 | 32x16x13 | 606 | 83 | 2 | yes | yes | 4.2 | 191 | 541 (374–832) | 1.46 |
+| `vertex_colors.ply` | 32 | 32x32x27 | 1,519 | 212 | 4 | yes | yes | 9.9 | 124 | 1,747 (1,210–2,688) | 1.13 |
+| `castle.step` (generated), `--config examples/mesh2brick.yaml` | 32 | 33x33x15 | 1,651 | 233 | 3 | yes | yes | 19.3 | 239 | 602 (417–926) | 3.57 |
+| Duo (3MF, local only) | 32 | 32x19x24 | 1,025 | 153 | 5 | yes | yes | 7.0 | 100 | 757 (524–1,164) | 1.76 |
+| Duo (3MF, local only) @48 | 48 | 48x31x35 | 2,313 | 326 | 5 | **no** | yes | 16.5 | 479 | 2,423 (1,678–3,728) | 1.24 |
+
+- **Definition of Done met:** both STEP inputs (`cube_10mm.step`, 1,952 parts, and the castle
+  with `--config`, 1,651 parts) produce `.mpd`, three parts lists and a PDF in under 5 minutes
+  (265 s and 239 s). All fixtures are one stable piece and pass the checks.
+- **Close to the limit:** closed bodies that fill the whole 32-stud box (the cubes:
+  1,952–2,280 parts) take 265–294 s, so a slower laptop may need more than 5 minutes for
+  them. Their PDFs are 20–23 MB (274–327 steps).
+- **Beyond the target:** Duo at 48 studs has 2,313 parts, takes 479 s (legolization's final
+  remerge cannot be bounded, UPSTREAM #5) and is **not** stable within the time limit. With
+  `placement.time_limit_s=1200` the run had not finished after 63 minutes and was stopped.
+- `.blend` costs about 1 s for Blender itself (`rocket.blend`: 14 s in total).
+- `mesh2brick inspect` takes 2.5 s for the rocket and 15 s for Duo (2.1 million triangles:
+  3MF reading and voxelization; the z-buffer picture of all triangles takes about 3 s).
+
+**Part estimate of `inspect`.** A quick fill puts the largest brick that fits (2 x 8 down to
+1 x 1, both orientations) on every free cell of every layer of the *solid* grid. Placement
+then hollows the model and repairs stability, which adds parts: over the 15 runs above,
+placed parts were 0.93–1.76 times the quick fill (median 1.3), except the castle (3.57),
+whose thin courtyard slab legolization builds from plates (~250 plates per plate layer).
+A first version based on cells of the hollow shell was much worse (0.07–0.42 parts per
+cell, a factor of 6). `inspect` therefore shows 1.3 x the quick fill with the range
+0.9–2.0 x; 14 of the 15 runs fall inside it.

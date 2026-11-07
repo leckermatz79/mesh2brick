@@ -1,6 +1,6 @@
 [project]
 name = "mesh2brick"
-version = "0.7.0"
+version = "1.0.0"
 description = "Turn 3D models (STL, OBJ, 3MF, PLY, STEP) into buildable LEGO-compatible models with LDraw files, parts lists and PDF instructions."
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -9,7 +9,7 @@ authors = [{ name = "Benjamin Bruno" }]
 requires-python = ">=3.12"
 keywords = ["lego", "ldraw", "voxel", "mesh", "stl", "3mf", "step", "instructions"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Operating System :: OS Independent",
@@ -126,6 +126,11 @@ module = ["reportlab", "reportlab.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+# Blender's Python API exists only inside Blender (ingest/blender_export.py).
+module = ["bpy", "bpy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 # Generated at runtime by `ldraw generate`; not importable at type-check time.
 module = ["ldraw.library", "ldraw.library.*"]
 ignore_missing_imports = true
@@ -144,6 +149,7 @@ addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importli
 markers = [
     "ldraw: needs the local LDraw parts library (`uv run ldraw download --yes && uv run ldraw generate --yes`)",
     "slow: takes more than a few seconds",
+    "blender: runs the real Blender (skipped without it unless MESH2BRICK_REQUIRE_BLENDER=1)",
 ]
 filterwarnings = ["error::DeprecationWarning:mesh2brick.*"]
 
