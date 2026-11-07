@@ -7,7 +7,8 @@
 
 1. eine **LDraw-Datei** (`.ldr`/`.mpd`) mit `0 STEP`-Bauschritten,
 2. eine **Teileliste** als CSV, BrickLink-XML und Rebrickable-CSV,
-3. eine **PDF-Bauanleitung** mit den benötigten Teilen pro Schritt.
+3. eine **PDF-Bauanleitung** auf Deutsch oder Englisch: Deckblatt mit Bild und Maßen,
+   Teileliste mit Bildern, Schritte mit Teilebildern und verständlichen Hinweisen.
 
 Das Projekt baut auf dem GPL-Ökosystem rund um
 [legolization](https://github.com/hbmartin/legolization) (Steine platzieren,
@@ -17,7 +18,7 @@ Stabilität, Bauschritte), [pyldraw3](https://github.com/hbmartin/pyldraw3)
 einen größeren Teilekatalog, schönere Anleitungen, eine einheitliche Konfiguration
 und CLI sowie eine optionale KI-Schicht.
 
-> **Stand: Vorab-Version (Phase 5 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
+> **Stand: Vorab-Version (Phase 6 von 8).** `mesh2brick convert` macht aus STL, OBJ, PLY,
 > 3MF und STEP ein LDraw-Modell, drei Teilelisten und eine PDF-Bauanleitung, in den Farben
 > des Modells. Details stehen in [docs/STATUS.md](docs/STATUS.md).
 
@@ -65,6 +66,10 @@ uv run mesh2brick convert modell.stl -o out/ --set "parts.exclude=[3008, 3007]"
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
 uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placement.seed=3
 
+# Anleitung auf Englisch, 4 Schritte pro Seite, flache .ldr statt .mpd
+uv run mesh2brick convert modell.stl -o out/ --set output.language=en \
+    --set output.steps_per_page=4 --set "output.formats=[ldr, bom_csv, pdf]"
+
 # Vorschau eines fertigen Modells, optional bis zu einem Bauschritt
 uv run mesh2brick render out/heart.bricks.json --step 3
 ```
@@ -72,13 +77,30 @@ uv run mesh2brick render out/heart.bricks.json --step 3
 Alle Einstellungen sind in [examples/mesh2brick.yaml](examples/mesh2brick.yaml)
 beschrieben.
 
+## Die Bauanleitung
+
+- **Deckblatt:** Bild des Modells, Zahl der Teile und Schritte, Größe in cm, Gewicht,
+  Farben und ob das Modell von allein steht.
+- **Teileliste:** eine Kachel pro Teil und Farbe mit Bild (alle im selben Maßstab),
+  Anzahl, Name und LDraw-Nummer; ein Hinweis, wenn LEGO ein Teil in der Farbe nicht
+  herstellt.
+- **Schritte (1–4 pro Seite):** neue Teile in voller Farbe, frühere blass, darüber alle
+  neuen Teile als Bilder. Baugruppen werden auf blauem Feld gebaut und dann aufgesetzt.
+  Ein kleines gelbes Feld „zuerst“ zeigt Teile, die man vorher in der Hand
+  zusammensteckt (ein Teil unter einem Überhang zusammen mit dem Teil, das es hält).
+- **Große Modelle (über 500 Teile)** bekommen Schritte Schicht für Schicht, ohne dass
+  jeder Zwischenstand auf Standfestigkeit geprüft ist; das steht auf dem Deckblatt.
+- Farbnamen bleiben wie bei BrickLink und Rebrickable (englisch), damit man sie dort
+  findet.
+
 ## Ergebnisse in anderen Programmen öffnen
 
-- **BrickLink Studio:** die `.ldr`/`.mpd` über **Datei → Öffnen** laden. Unter macOS hing
+- **BrickLink Studio:** die `.mpd` (oder `.ldr`) über **Datei → Öffnen** laden. Unter macOS hing
   Studios **Import** in unserem Test bei jeder Datei (auch bei Studios eigenem Export);
   Datei → Öffnen lädt dieselbe Datei sofort. Eine Duo-Testdatei zeigte in Studio keine
   Überlappungen, keine Duplikate und keine Stabilitätsprobleme.
-- LDraw-Betrachter (LDView, LeoCAD) öffnen die Dateien direkt.
+- LDraw-Betrachter (LDView, LeoCAD) öffnen die Dateien direkt. In der `.mpd` ist jede
+  Baugruppe ein eigenes Untermodell mit eigenen Schritten.
 
 ## Entwicklung
 

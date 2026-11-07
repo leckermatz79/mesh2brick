@@ -50,6 +50,7 @@ llm:
   tasks: [group_steps, write_step_text]
 output:
   dir: ./out
-  formats: [ldr, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # also: mpd
-  language: de          # de | en
+  formats: [mpd, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # ldr: one flat file
+  language: de          # de | en (PDF text)
   page_size: A4         # A4 | letter
+  steps_per_page: 2     # 1-4

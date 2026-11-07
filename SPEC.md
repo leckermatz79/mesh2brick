@@ -51,7 +51,7 @@ Eigener Mehrwert von `mesh2brick` liegt dort, wo diese Werkzeuge nichts bieten: 
 | LEGO-Pipeline | `legolization`, `pyldraw3`, `rebrickable` als reguläre Abhängigkeiten, Versionen gepinnt; Upgrade pro Minor-Release bewusst mit Changelog-Lektüre |
 | Optimierung | nur was legolization nicht abdeckt; `scipy.optimize.linprog` (HiGHS) bevorzugt, keine proprietären Solver (kein Gurobi) |
 | LLM | `anthropic` SDK, Modell per Config, Default `claude-sonnet-5-5` (nicht hartkodieren) |
-| PDF | legolization-PDF als Basis evaluieren; falls unzureichend `reportlab` oder `weasyprint` (ADR) |
+| PDF | legolization-PDF als Basis evaluieren; falls unzureichend `reportlab` oder `weasyprint` (ADR) (2026-11-07: eigenes Layout mit `reportlab`, ADR 0011) |
 | CI | GitHub Actions: lint, type-check, tests auf Linux + macOS, Python 3.12/3.13 |
 | **Lizenz** | **GPL-3.0-or-later** für das gesamte Projekt (ADR 0002). SPDX-Header in jeder Quelldatei. Übernommener oder adaptierter Fremdcode behält Original-Copyright und wird mit Quelle, Lizenz und Commit-Hash im Dateikopf markiert. Alle Abhängigkeiten mit Lizenz in `docs/THIRD_PARTY.md`; nur GPL-kompatible Lizenzen (MIT, BSD, Apache-2.0, LGPL, GPL). |
 | Beiträge | DCO-Sign-off (`git commit -s`), kein CLA |
@@ -153,9 +153,10 @@ llm:
   tasks: [group_steps, write_step_text]
 output:
   dir: ./out
-  formats: [ldr, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # bom_rebrickable ergänzt (2026-11-01), damit convert die drei BOM-Formate aus Phase 2 liefert
+  formats: [mpd, bom_csv, bom_bricklink, bom_rebrickable, pdf]   # bom_rebrickable ergänzt (2026-11-01), damit convert die drei BOM-Formate aus Phase 2 liefert; mpd statt ldr (2026-11-07, Phase 6, ADR 0012): Unterbaugruppen bleiben MPD-Untermodelle, ldr bleibt wählbar
   language: de
   page_size: A4
+  steps_per_page: 2     # 1–4 Schritte pro PDF-Seite (2026-11-07, Phase 6, ADR 0011)
 ```
 
 Jeder Parameter ist per CLI überschreibbar. Ungültige Kombinationen werden beim Laden mit klarer Fehlermeldung abgelehnt. Backend-spezifische Optionen (legolization-Strategien, Presets) werden nicht dupliziert, sondern per `placement.backend_options: {}` durchgereicht und validiert.

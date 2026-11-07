@@ -242,3 +242,44 @@ None of them helps:
 
 Decision (ADR 0010, addendum): no minimum wall thickness and no own offset pass. Bond-aware
 placement is an upstream topic (candidate #11).
+
+## Instructions (Phase 6, 2026-11-07)
+
+`uv run python scripts/benchmark_instructions.py MODEL@STUDS ... --jobs 4`, default settings
+(`kollsker`, hollow, wall 2, 2 steps per page, German). Four runs in parallel, so the
+placement times are a little slower than in a single run. "Before" is the step plan as
+legolization made it, "after" is the plan after mesh2brick's own step passes (ADR 0012).
+Models above 500 parts get layer-order steps without stability checks ("Steps checked: no").
+The real test model (owl, 3MF) is local only, not in the repository.
+
+| Model @ studs | Parts | Steps checked | Sub-assemblies | Steps | Parts per step (min / median / max) | Steps < 3 parts | Hanging parts | Pre-assemblies | PDF pages | PDF size | PDF time | Placement |
+|---|---:|---|---:|---|---|---|---|---:|---:|---:|---:|---:|
+| cube_10mm @ 16 | 136 | yes | 1 | 21 → 20 | 2 / 8 / 9 → 2 / 8 / 9 | 2 → 1 | 0 → 0 | 0 | 12 | 1.1 MB | 2 s | 7 s |
+| sphere_r10 @ 16 | 268 | yes | 4 | 49 → 49 | 1 / 7 / 9 → 1 / 7 / 9 | 4 → 4 | 22 → 22 | 0 | 27 | 1.9 MB | 4 s | 13 s |
+| l_bracket @ 16 | 32 | yes | 1 | 14 → 14 | 2 / 2 / 4 → 2 / 2 / 4 | 10 → 10 | 0 → 0 | 0 | 9 | 0.5 MB | 1 s | 2 s |
+| torus @ 16 | 213 | yes | 5 | 47 → 41 | 1 / 6 / 8 → 1 / 7 / 10 | 7 → 6 | 0 → 0 | 0 | 23 | 1.6 MB | 3 s | 5 s |
+| bunny_lowpoly @ 16 | 74 | yes | 3 | 25 → 20 | 1 / 3 / 10 → 1 / 3 / 10 | 10 → 3 | 2 → 2 | 0 | 12 | 0.8 MB | 1 s | 3 s |
+| toadstool @ 16 | 374 | yes | 1 | 59 → 55 | 1 / 7 / 9 → 4 / 7 / 10 | 1 → 0 | 0 → 0 | 0 | 31 | 2.3 MB | 4 s | 18 s |
+| **bunny_lowpoly @ 32** | 873 | no | 0 | 131 → 125 | 2 / 7 / 9 → 4 / 7 / 14 | 1 → 0 | 138 → 0 | 88 | 65 | **5.5 MB** | 16 s | 85 s |
+| sphere_r10 @ 32 | 1,499 | no | 0 | 219 → 207 | 2 / 7 / 9 → 1 / 7 / 18 | 2 → 2 | 374 → 0 | 250 | 106 | 10.1 MB | 42 s | 72 s |
+| torus @ 32 | 552 | no | 0 | 81 → 74 | 3 / 7 / 9 → 2 / 7 / 13 | 0 → 1 | 94 → 0 | 43 | 39 | 4.1 MB | 9 s | 6 s |
+| owl (local) @ 32 | 1,025 | no | 0 | 164 → 153 | 1 / 7 / 9 → 1 / 7 / 10 | 11 → 4 | 155 → 0 | 105 | 81 | 7.0 MB | 21 s | 80 s |
+
+The whole `convert` of the owl takes 99 s (voxelize 11 s, place 67 s, PDF 20 s).
+
+**Reading:**
+
+- **Hanging parts** (a part with no connection to the table when its step is done) are a
+  layer-order problem: 94–374 per large model before, none after. Each becomes part of a
+  pre-assembly with the part that holds it; none of them was blocked from above. Checked
+  plans keep legolization's own order; their few hanging parts (sphere and bunny at 16
+  studs) are steps legolization marks as "needs a supporting hand", and the PDF says so.
+- **Small steps** drop where a neighbour has room and nothing gets covered (owl 11 → 4,
+  bunny @ 16 10 → 3). They stay where the next layer would hide them: the L-bracket is a
+  2-stud tower that grows by one layer of two parts per step, and the owl's remaining
+  ones are large plates covered by the next step.
+- **Large steps:** pre-assemblies that touch each other cannot be cut apart, so single
+  layer-order steps reach 13–18 parts (sphere @ 32: one step of 18; usually 10 at most).
+- **PDF size:** 6–7 kB per part on large models; the bunny stays well below the 10 MB
+  target. The step pictures are palette PNGs embedded unchanged; reportlab's own embedding
+  doubled the size in a test (82 instead of 38 kB per picture).

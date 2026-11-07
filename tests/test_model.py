@@ -86,3 +86,38 @@ def test_step_metadata_is_validated() -> None:
         BuildStep(submodel="a", attaches="a")
     with pytest.raises(ValueError, match="unknown subassemblies: ghost"):
         BrickModel(name="x", parts=(), steps=(BuildStep(attaches="ghost"),))
+
+
+def test_schema_1_files_still_load(sample_model: BrickModel) -> None:
+    data = sample_model.to_dict()
+    data["schema"] = 1
+    for key in ("mass_g", "buildable"):
+        del data[key]
+    for step in data["steps"]:
+        del step["stable"], step["fragile"]
+    for part in data["parts"]:
+        del part["unit"]
+    old = BrickModel.from_dict(data)
+    assert old.mass_g is None
+    assert old.buildable is None
+    assert all(step.stable is None for step in old.steps)
+    assert all(part.unit is None for part in old.parts)
+
+
+def test_new_fields_round_trip(tmp_path: Path, sample_model: BrickModel) -> None:
+    from dataclasses import replace  # noqa: PLC0415
+
+    model = replace(
+        sample_model,
+        mass_g=12.5,
+        buildable=True,
+        steps=(BuildStep(stable=True), BuildStep(stable=False, fragile=True)),
+        parts=(*sample_model.parts[:2], replace(sample_model.parts[2], unit=1)),
+    )
+    assert BrickModel.load(model.save(tmp_path / "m.json")) == model
+
+
+def test_size_in_millimetres(sample_model: BrickModel) -> None:
+    width, depth, height = sample_model.size_mm()
+    assert (width, depth) == (32.0, 32.0)  # 4 x 4 studs
+    assert height == pytest.approx(6 * 3.2 + 1.7)  # two bricks plus studs

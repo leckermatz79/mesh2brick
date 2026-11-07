@@ -1,4 +1,4 @@
-# Umsetzungsplan Phase 0–5
+# Umsetzungsplan Phase 0–6
 
 Stand: 2026-11-01 · Grundlage: `SPEC.md` · Fortschritt: `docs/STATUS.md`
 
@@ -106,6 +106,15 @@ installiert und ihren Quellcode gelesen. Die wichtigsten Erkenntnisse:
 - [x] Vergleich an Duo (Vorgabe des PO): Einschränken davor gewinnt (1.025 statt 1.049 Teile, 70 statt 130 s, beide stabil, null nicht produzierte Teile).
 - [x] Studio-Check des PO gegen legolizations Stabilitätsurteil gehalten. Mindestwandstärke: nein. Eigenes Versatzmuster: gemessen, kein Hebel wirkt, daher Upstream-Kandidat #11. Messgröße „durchlaufende Fugen“ im Benchmark.
 - **Abnahme:** Benchmark-Tabelle vorhanden; Entscheidung als ADR.
+
+## Phase 6 – Anleitungsqualität
+
+- [x] Eigenes PDF-Layout mit reportlab (ADR 0011), weil legolizations Heft keine der Lücken aus Phase 2 schließen lässt: Deckblatt mit Bild, Teilezahl, Maßen in cm, Gewicht und Stabilitätsurteil; Teileliste mit Bildern im gemeinsamen Maßstab; Schrittseiten mit Teilebildern, blassen Vorschritten, 1–4 Schritten pro Seite; Deutsch und Englisch; eingebettete Schrift; verständliche Hinweise statt Fachjargon.
+- [x] Unterbaugruppen: `.mpd` ist jetzt Standard, jede Baugruppe ein eigenes Untermodell mit eigenen Schritten; im PDF auf blauem Feld mit eigenem „aufsetzen“-Schritt.
+- [x] Studio-Check des PO: gleichmäßigere Schrittgrößen (zu kleine Schritte werden zusammengelegt, zu große geteilt, ADR 0012).
+- [x] Eigene Messung: In Schicht-Reihenfolge hingen Teile unter Überhängen in der Luft. Sie werden jetzt mit dem Teil zusammen eingebaut, das sie hält („zuerst zusammenstecken“).
+- [x] Benchmark (`scripts/benchmark_instructions.py`, docs/benchmarks.md) und Galerie.
+- **Abnahme:** PDF < 10 MB für den Hasen (5,5 MB bei 32 Noppen); visuelle Prüfung dokumentiert (STATUS, Galerie).
 
 ## Vorgabe für Phase 5 (vom PO, 2026-11-01)
 

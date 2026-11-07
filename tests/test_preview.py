@@ -121,3 +121,42 @@ def test_render_step_images_one_png_per_step() -> None:
     assert all(image.startswith(b"\x89PNG") for image in images)
     with Image.open(io.BytesIO(images[0])) as first:
         assert first.mode == "P"  # palette PNG keeps PDFs small
+
+
+def test_part_pictures_share_one_scale(sample_model: BrickModel) -> None:
+    from mesh2brick.render.preview import part_view_size, render_part_png  # noqa: PLC0415
+
+    big, small = sample_model.parts[0], sample_model.parts[2]
+    sizes = [part_view_size(p) for p in (big, small)]
+    reference = (max(s[1] for s in sizes), max(s[3] for s in sizes))
+    color = sample_model.colors[4]
+    options = PreviewOptions(width_px=120, height_px=90)
+    plain = render_part_png(small, color, options)
+    scaled = render_part_png(small, color, options, reference=reference)
+    assert plain.startswith(b"\x89PNG")
+    assert scaled.startswith(b"\x89PNG")
+    assert plain != scaled  # the small part is drawn smaller next to the big one
+
+
+def test_growing_frames_and_sub_backgrounds(sample_model: BrickModel) -> None:
+    from mesh2brick.render.preview import _grown_frame  # noqa: PLC0415
+
+    final = (0.0, 10.0, 0.0, 5.0)
+    first = _grown_frame((4.0, 6.0, 0.0, 1.0), previous=None, final=final, aspect=2.0)
+    assert first[2] == 0.0  # keeps the table at the bottom
+    assert first[1] - first[0] == pytest.approx(2 * (first[3] - first[2]))
+    later = _grown_frame((5.0, 7.0, 0.0, 0.5), previous=first, final=final, aspect=2.0)
+    assert later[1] - later[0] >= first[1] - first[0]  # never shrinks
+    roof = BrickModel(
+        name="r",
+        parts=sample_model.parts,
+        steps=(BuildStep(submodel="top"), BuildStep(attaches="top")),
+        colors=sample_model.colors,
+    )
+    images = render_step_images(
+        roof,
+        PreviewOptions(width_px=80, height_px=60),
+        grow=True,
+        sub_background="#e9f1fb",
+    )
+    assert len(images) == 2

@@ -94,7 +94,7 @@ def test_place_end_to_end(fixtures_dir: Path, tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "buildable: yes" in result.output
-    for name in ("heart.ldr", "heart.bricks.json", "heart.png"):
+    for name in ("heart.mpd", "heart.bricks.json", "heart.png"):
         assert (tmp_path / name).is_file(), name
     model = BrickModel.load(tmp_path / "heart.bricks.json")
     assert model.name == "heart"
@@ -102,7 +102,7 @@ def test_place_end_to_end(fixtures_dir: Path, tmp_path: Path) -> None:
 
 
 @pytest.mark.ldraw
-def test_place_mpd_output(fixtures_dir: Path, tmp_path: Path) -> None:
+def test_place_ldr_output(fixtures_dir: Path, tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
@@ -111,12 +111,12 @@ def test_place_mpd_output(fixtures_dir: Path, tmp_path: Path) -> None:
             "-o",
             str(tmp_path),
             "--set",
-            "output.formats=[mpd]",
+            "output.formats=[ldr]",
             "--no-preview",
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (tmp_path / "heart.mpd").is_file()
+    assert (tmp_path / "heart.ldr").is_file()
     assert not (tmp_path / "heart.png").exists()
 
 
@@ -187,7 +187,7 @@ def test_voxelize_then_place_npz(fixtures_dir: Path, tmp_path: Path) -> None:
         app, ["place", str(tmp_path / "cube_10mm.grid.npz"), "-o", str(tmp_path)]
     )
     assert placed.exit_code == 0, placed.output
-    assert (tmp_path / "cube_10mm.ldr").is_file()
+    assert (tmp_path / "cube_10mm.mpd").is_file()
     assert BrickModel.load(tmp_path / "cube_10mm.bricks.json").name == "cube_10mm"
 
 
@@ -267,7 +267,7 @@ def test_convert_end_to_end(fixtures_dir: Path, tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    for suffix in (".ldr", ".bom.csv", ".bricklink.xml", ".rebrickable.csv", ".pdf"):
+    for suffix in (".mpd", ".bom.csv", ".bricklink.xml", ".rebrickable.csv", ".pdf"):
         assert (tmp_path / f"l_bracket{suffix}").is_file(), suffix
     assert "parts list total" in result.output
     assert "time:" in result.output

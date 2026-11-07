@@ -7,7 +7,8 @@
 
 1. an **LDraw file** (`.ldr`/`.mpd`) with `0 STEP` build steps,
 2. a **parts list** as CSV, BrickLink XML and Rebrickable CSV,
-3. a **PDF building instruction** with per-step part callouts.
+3. a **PDF building instruction** in German or English: cover with picture and size,
+   parts list with pictures, steps with part call-outs and plain-language hints.
 
 It builds on the GPL ecosystem around
 [legolization](https://github.com/hbmartin/legolization) (brick placement,
@@ -16,7 +17,7 @@ stability physics, build steps), [pyldraw3](https://github.com/hbmartin/pyldraw3
 (offline catalogue). mesh2brick adds mesh/CAD import, colour transfer, a wider part
 catalogue, nicer instructions, one configuration file/CLI, and an optional LLM layer.
 
-> **Status: pre-alpha (Phase 5 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
+> **Status: pre-alpha (Phase 6 of 8).** `mesh2brick convert` turns STL, OBJ, PLY, 3MF
 > and STEP files into an LDraw model, three parts lists and a PDF building instruction,
 > in the model's own colours. See [docs/STATUS.md](docs/STATUS.md).
 
@@ -64,19 +65,38 @@ uv run mesh2brick convert model.stl -o out/ --set "parts.exclude=[3008, 3007]"
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3
 
+# Instructions in English, 4 steps per page, flat .ldr instead of .mpd
+uv run mesh2brick convert model.stl -o out/ --set output.language=en \
+    --set output.steps_per_page=4 --set "output.formats=[ldr, bom_csv, pdf]"
+
 # Render a preview of a placed model, optionally up to a build step
 uv run mesh2brick render out/heart.bricks.json --step 3
 ```
 
 All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.yaml).
 
+## The building instructions
+
+- **Cover:** picture of the model, number of parts and steps, size in cm, weight,
+  colours, and whether the model stands on its own.
+- **Parts list:** one tile per part and colour with a picture (all at one scale),
+  quantity, name and LDraw number; a hint if LEGO does not make a part in that colour.
+- **Steps (1–4 per page):** new parts in full colour, earlier ones faded, a call-out
+  with every new part. Sub-assemblies are built on a blue panel and then attached.
+  A small yellow "first" box shows parts to put together in the hand before placing
+  them (a part hanging under an overhang together with the part that holds it).
+- **Big models (over 500 parts)** get steps layer by layer without a stability check
+  for every intermediate state; the cover says so.
+- Colour names stay the BrickLink/Rebrickable names, so they can be found there.
+
 ## Opening the results in other programs
 
-- **BrickLink Studio:** open the `.ldr`/`.mpd` with **File → Open**. On macOS, Studio's
+- **BrickLink Studio:** open the `.mpd` (or `.ldr`) with **File → Open**. On macOS, Studio's
   **Import** hung for every file in our test (even for files Studio exported itself);
   File → Open loads the same file at once. A Duo test file showed no overlaps, no
   duplicates and no stability issues in Studio.
-- LDraw viewers (LDView, LeoCAD) open the files directly.
+- LDraw viewers (LDView, LeoCAD) open the files directly. In the `.mpd` every
+  sub-assembly is its own sub-model with its own steps.
 
 ## Development
 

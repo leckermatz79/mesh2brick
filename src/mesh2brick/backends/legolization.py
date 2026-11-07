@@ -30,11 +30,12 @@ import dataclasses
 import importlib.metadata
 import math
 import multiprocessing
+import re
 import time
 import types
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import highspy
 import numpy as np
@@ -45,15 +46,14 @@ from legolization.catalog import Catalog, default_catalog
 from legolization.color import Palette, default_palette
 from legolization.graph import ConnectionGraph
 from legolization.instructions.bom import bill_of_materials
-from legolization.instructions.booklet import BookletConfig, ModelStats, write_booklet
 from legolization.instructions.chunking import chunk_bands, mirror_pairs
-from legolization.instructions.render import StepImages
 from legolization.instructions.sequencer import (
     BuildStep as LegoStep,
 )
 from legolization.instructions.sequencer import (
     InstructionPlan,
     InstructionsConfig,
+    RotStep,
     plan_instructions,
 )
 from legolization.layout import CollisionError
@@ -76,10 +76,14 @@ from mesh2brick.catalog.whitelist import (
 )
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.place.split import choose_split
+from mesh2brick.steps.balance import merge_small_steps, split_large_steps
+from mesh2brick.steps.hanging import attach_hanging
+from mesh2brick.steps.plan import PlanStep
+from mesh2brick.steps.structure import Structure
 from mesh2brick.voxel.grid import EMPTY, VoxelGrid
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
     from multiprocessing.connection import Connection
     from pathlib import Path
 
@@ -87,7 +91,7 @@ if TYPE_CHECKING:
     from legolization.layout import Layout, PlacedBrick
     from numpy.typing import NDArray
 
-    from mesh2brick.config import Settings
+    from mesh2brick.config import Settings, StepsConfig
     from mesh2brick.voxel.color import ColorQuantizer
     from mesh2brick.voxel.grid import HeightUnit
 
@@ -557,6 +561,10 @@ class _Native:
 
     layout: Layout
     plan: InstructionPlan | None
+    checked: bool = True
+    """Whether ``plan`` was stability-checked step by step."""
+    units: Mapping[int, int] = dataclasses.field(default_factory=dict)
+    """Brick id -> pre-assembly unit number within its step."""
 
 
 class LegolizationBackend:
@@ -633,9 +641,12 @@ class LegolizationBackend:
                     f"{len(report.unresolved)} part(s) could not be replaced by "
                     "existing shorter parts; see the parts list"
                 )
-        plan, notes = self._plan(result.layout, config, settings, deadline)
-        notes = [*allowed.notes, *early, *notes]
-        native = _Native(layout=result.layout, plan=plan)
+        plan, notes, checked = self._plan(result.layout, config, settings, deadline)
+        plan, units, refined = refine_plan(
+            result.layout, plan, settings.steps, checked=checked
+        )
+        notes = [*allowed.notes, *early, *notes, *refined]
+        native = _Native(layout=result.layout, plan=plan, checked=checked, units=units)
         return Placement(
             model=to_brick_model(
                 result.layout,
@@ -644,6 +655,9 @@ class LegolizationBackend:
                 source=(
                     f"{NAME} {VERSION}, strategy {config.strategy}, seed {config.seed}"
                 ),
+                checked=checked,
+                units=units,
+                buildable=stability.buildable,
             ),
             stability=stability,
             backend=NAME,
@@ -657,8 +671,12 @@ class LegolizationBackend:
         config: PipelineConfig,
         settings: Settings,
         deadline: float | None,
-    ) -> tuple[InstructionPlan, list[str]]:
-        """Choose and run the step planner within the remaining time."""
+    ) -> tuple[InstructionPlan, list[str], bool]:
+        """Choose and run the step planner within the remaining time.
+
+        Returns the plan, notes for the user and whether the plan was
+        stability-checked step by step.
+        """
         mode = settings.steps.sequencing
         notes: list[str] = []
         if mode == "auto":
@@ -670,7 +688,7 @@ class LegolizationBackend:
                     "steps.sequencing=thorough forces them)"
                 )
         if mode == "layers":
-            return layer_plan(layout, config.instructions), notes
+            return layer_plan(layout, config.instructions), notes, False
         smart = dataclasses.replace(
             config.instructions, mode="smart", solver=config.solver
         )
@@ -679,7 +697,7 @@ class LegolizationBackend:
             budget = deadline - time.monotonic() - export_reserve_s(len(layout))
             if budget < MIN_SEQUENCING_S:
                 notes.append(_TIME_FALLBACK_NOTE)
-                return layer_plan(layout, config.instructions), notes
+                return layer_plan(layout, config.instructions), notes, False
         self._say(
             "planning stability-checked steps"
             + (f" (up to {budget:.0f} s)" if budget is not None else "")
@@ -687,8 +705,8 @@ class LegolizationBackend:
         plan = plan_with_timeout(layout, smart, budget)
         if plan is None:
             notes.append(_TIME_FALLBACK_NOTE)
-            return layer_plan(layout, config.instructions), notes
-        return plan, notes
+            return layer_plan(layout, config.instructions), notes, False
+        return plan, notes, True
 
     # ------------------------------------------------------------ StabilityChecker
     def check(self, placement: Placement, settings: Settings) -> StabilityReport:
@@ -704,8 +722,9 @@ class LegolizationBackend:
         config = self.pipeline_config(settings)
         plan = plan_instructions(
             native.layout,
-            config=replace(config.instructions, solver=config.solver),
+            config=replace(config.instructions, mode="smart", solver=config.solver),
         )
+        plan, units, _ = refine_plan(native.layout, plan, settings.steps, checked=True)
         return replace(
             placement,
             model=to_brick_model(
@@ -713,64 +732,13 @@ class LegolizationBackend:
                 plan,
                 name=placement.model.name,
                 source=placement.model.source,
+                units=units,
+                buildable=placement.stability.buildable,
             ),
-            native=_Native(layout=native.layout, plan=plan),
+            native=_Native(layout=native.layout, plan=plan, units=units),
         )
 
     # ------------------------------------------------------------ Exporter
-    def write_instructions(
-        self,
-        placement: Placement,
-        path: Path,
-        images: Sequence[bytes | None],
-        *,
-        page_size: Literal["A4", "letter"] = "A4",
-        steps_per_page: int = 2,
-    ) -> Path:
-        """Write legolization's instruction booklet (PDF or HTML by suffix).
-
-        ``images`` holds one PNG per build step (``placement.model.steps``);
-        ``None`` entries become placeholder boxes.
-
-        Raises:
-            BackendError: without a step plan or with a wrong image count.
-        """
-        native = _native_of(placement)
-        if native.plan is None:
-            msg = "instructions need a step plan (smart sequencing)"
-            raise BackendError(msg)
-        if len(images) != len(native.plan.steps):
-            msg = f"{len(images)} step images for {len(native.plan.steps)} steps"
-            raise BackendError(msg)
-        model, stability = placement.model, placement.stability
-        stats = ModelStats(
-            name=model.name,
-            brick_count=model.part_count,
-            mass_g=float(native.layout.total_mass_g()),
-            step_count=model.step_count,
-            stable=stability.stable,
-            buildable=stability.buildable,
-            component_count=stability.component_count,
-            floating_count=stability.floating_count,
-        )
-        config = BookletConfig(
-            steps_per_page=steps_per_page,
-            page_size="a4" if page_size == "A4" else "letter",
-            title=model.name,
-        )
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            write_booklet(
-                native.plan,
-                stats,
-                StepImages(images=tuple(images), renderer=None, warnings=()),
-                path,
-                config=config,
-            )
-        except ValueError as error:
-            raise BackendError(str(error)) from error
-        return path
-
     def verify_ldraw(self, path: Path) -> int:
         """Re-read an LDraw file strictly and return its part count.
 
@@ -952,6 +920,101 @@ def layer_plan(layout: Layout, config: InstructionsConfig) -> InstructionPlan:
     return dataclasses.replace(plan, bom=bill_of_materials(layout, plan=plan))
 
 
+_STEP_NUMBERED: Final = re.compile(r"^(subassembly \S+: )?step \d+")
+
+
+def refine_plan(
+    layout: Layout,
+    plan: InstructionPlan,
+    steps: StepsConfig,
+    *,
+    checked: bool,
+) -> tuple[InstructionPlan, dict[int, int], list[str]]:
+    """Run mesh2brick's own step passes on a legolization plan (ADR 0012).
+
+    Unchecked (layer-order) plans first get their hanging parts moved to the
+    step of their holder; every plan then gets steps that are too small
+    merged into a neighbour. Returns the new plan, the brick id -> unit
+    number map of pre-assemblies and notes for the user.
+    """
+    structure = Structure.from_cells(
+        {brick.brick_id: layout.cells_of(brick) for brick in layout},
+        {brick.brick_id: str(layout.part_of(brick).category.value) for brick in layout},
+    )
+    rewritten = tuple(
+        PlanStep(
+            parts=step.brick_ids,
+            submodel=step.submodel,
+            attaches=step.attaches,
+            origin=(index,),
+        )
+        for index, step in enumerate(plan.steps)
+    )
+    notes: list[str] = []
+    target = steps.parts_per_step
+    largest = target + _DEFAULT_STEP_SPREAD
+    if not checked:
+        hanging = attach_hanging(rewritten, structure)
+        rewritten = split_large_steps(
+            hanging.steps, structure, target=target, max_size=largest
+        )
+        if hanging.moved:
+            notes.append(
+                f"{hanging.moved} part(s) below an overhang are placed together "
+                f"with the part that holds them ({hanging.units} pre-assemblies)"
+            )
+        if hanging.blocked:
+            notes.append(
+                f"{hanging.blocked} pre-assemblies cannot be lowered in from above "
+                "and have to be pushed on from below"
+            )
+        if hanging.loose:
+            notes.append(f"{hanging.loose} part(s) never get held by another part")
+    rewritten = merge_small_steps(
+        rewritten, structure, min_size=(target + 1) // 2, max_size=largest
+    )
+    units = {
+        part: number
+        for step in rewritten
+        for number, group in enumerate(step.units, start=1)
+        for part in group
+    }
+    return _rebuild_plan(layout, plan, rewritten), units, notes
+
+
+def _rebuild_plan(
+    layout: Layout, plan: InstructionPlan, steps: Sequence[PlanStep]
+) -> InstructionPlan:
+    """Rebuild a legolization plan from rewritten steps, keeping their verdicts."""
+    rebuilt = []
+    for index, step in enumerate(steps, start=1):
+        origins = [plan.steps[i] for i in step.origin]
+        rotations = [o.rotstep for o in origins if o.rotstep is not None]
+        rotstep = rotations[0] if rotations else None
+        if rotations and all(r.mode == "REL" for r in rotations):
+            yaw = sum(r.yaw for r in rotations) % 360
+            rotstep = RotStep(yaw=yaw, mode="REL") if yaw else None
+        rebuilt.append(
+            LegoStep(
+                index=index,
+                brick_ids=step.parts,
+                prefix_stable=all(o.prefix_stable for o in origins),
+                prefix_max_score=max(o.prefix_max_score for o in origins),
+                rotstep=rotstep,
+                submodel=step.submodel,
+                attaches=step.attaches,
+                insertion_fragile=any(o.insertion_fragile for o in origins),
+            )
+        )
+    result = InstructionPlan(
+        steps=tuple(rebuilt),
+        warnings=tuple(w for w in plan.warnings if not _STEP_NUMBERED.match(w)),
+        bom=plan.bom,
+        subassemblies=plan.subassemblies,
+    )
+    return dataclasses.replace(result, bom=bill_of_materials(layout, plan=result))
+
+
 # ---------------------------------------------------------------- palette
 def solid_color_codes() -> frozenset[int]:
     """LDraw codes of the opaque solid palette that placement accepts."""
@@ -1119,8 +1182,16 @@ def to_brick_model(
     *,
     name: str,
     source: str = "",
+    checked: bool = True,
+    units: Mapping[int, int] | None = None,
+    buildable: bool | None = None,
 ) -> BrickModel:
-    """Convert legolization's layout + plan into a :class:`BrickModel`."""
+    """Convert legolization's layout + plan into a :class:`BrickModel`.
+
+    ``checked`` says whether the plan's per-step stability verdicts are real
+    (layer-order plans carry placeholders); ``units`` maps brick ids to
+    their pre-assembly unit within the step.
+    """
     step_of: dict[int, int] = {}
     steps: tuple[BuildStep, ...] = ()
     if plan is not None:
@@ -1128,7 +1199,12 @@ def to_brick_model(
             for brick_id in step.brick_ids:
                 step_of.setdefault(brick_id, index)
         steps = tuple(
-            BuildStep(submodel=step.submodel, attaches=step.attaches)
+            BuildStep(
+                submodel=step.submodel,
+                attaches=step.attaches,
+                stable=step.prefix_stable if checked else None,
+                fragile=checked and step.insertion_fragile,
+            )
             for step in plan.steps
         )
     if not step_of:
@@ -1166,6 +1242,7 @@ def to_brick_model(
                 step=step_of[brick.brick_id],
                 category=str(part.category.value),
                 backend_key=brick.part_key,
+                unit=(units or {}).get(brick.brick_id),
             )
         )
     return BrickModel(
@@ -1174,6 +1251,8 @@ def to_brick_model(
         steps=steps,
         colors=dict(sorted(colors.items())),
         source=source,
+        mass_g=round(float(layout.total_mass_g()), 1),
+        buildable=buildable,
     )
 
 

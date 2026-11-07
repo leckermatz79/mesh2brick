@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import re
 from pathlib import Path
 
@@ -12,7 +13,6 @@ import numpy as np
 import pytest
 import trimesh
 
-from mesh2brick.backends import BackendError
 from mesh2brick.backends.legolization import LegolizationBackend
 from mesh2brick.catalog.rebrickable import catalogue_colors
 from mesh2brick.config import load_settings
@@ -30,12 +30,12 @@ def bunny(fixtures_dir: Path, tmp_path_factory: pytest.TempPathFactory):  # type
 
 
 def test_acceptance_convert_bunny(bunny) -> None:  # type: ignore[no-untyped-def]
-    """PDF opens, steps complete, BOM total = part count = parts in the .ldr."""
+    """PDF opens, steps complete, BOM total = part count = parts in the .mpd."""
     result, out = bunny
     names = {p.name for p in result.files}
     assert names >= {
         "bunny_lowpoly.grid.npz",
-        "bunny_lowpoly.ldr",
+        "bunny_lowpoly.mpd",
         "bunny_lowpoly.bricks.json",
         "bunny_lowpoly.bom.csv",
         "bunny_lowpoly.bricklink.xml",
@@ -44,18 +44,18 @@ def test_acceptance_convert_bunny(bunny) -> None:  # type: ignore[no-untyped-def
         "bunny_lowpoly.png",
     }
     model = result.model
-    ldr_parts = [
-        line
-        for line in (out / "bunny_lowpoly.ldr").read_text().splitlines()
-        if line.startswith("1 ")
-    ]
+    lines = (out / "bunny_lowpoly.mpd").read_text().splitlines()
+    ldr_parts = [line for line in lines if line.startswith("1 ") and ".dat" in line]
     with (out / "bunny_lowpoly.bom.csv").open() as handle:
         bom_total = sum(int(row["quantity"]) for row in csv.DictReader(handle))
     assert bom_total == result.bom.total == model.part_count == len(ldr_parts)
     # Stand-in for opening it in LDView/Studio: strict re-import.
-    assert LegolizationBackend().verify_ldraw(out / "bunny_lowpoly.ldr") == len(
+    assert LegolizationBackend().verify_ldraw(out / "bunny_lowpoly.mpd") == len(
         ldr_parts
     )
+    # Sub-assemblies are LDraw sub-models with their own steps (SPEC Phase 6).
+    files = [line for line in lines if line.startswith("0 FILE ")]
+    assert len(files) == 1 + len(model.submodels)
     # Every part sits in exactly one step; only attach steps are part-free.
     assert sorted(p.step for p in model.parts) == sorted(
         p.step for p in model.parts if 0 <= p.step < model.step_count
@@ -63,7 +63,8 @@ def test_acceptance_convert_bunny(bunny) -> None:  # type: ignore[no-untyped-def
     pdf = (out / "bunny_lowpoly.pdf").read_bytes()
     assert pdf.startswith(b"%PDF")
     pages = len(re.findall(rb"/Type /Page[^s]", pdf))
-    assert pages >= 1 + model.step_count // 2  # cover + 2 steps per page
+    assert pages == 2 + math.ceil(model.step_count / 2)  # cover, parts, 2 per page
+    assert len(pdf) < 10_000_000  # SPEC Phase 6
     assert result.stability.component_count == 1
     assert set(result.seconds) >= {"voxelize", "place", "export", "instructions"}
 
@@ -95,17 +96,23 @@ def test_convert_rejects_tiny_models(fixtures_dir: Path, tmp_path: Path) -> None
         convert(fixtures_dir / "cube_10mm.stl", settings)
 
 
-def test_instructions_need_one_image_per_step(bunny, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
-    result, out = bunny
-    backend = LegolizationBackend()
-    settings = load_settings(None, [])
-    grid_path = out / "bunny_lowpoly.grid.npz"
+def test_large_models_get_held_parts_and_even_steps(bunny, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """Layer-order steps (big models): nothing hangs in the air, sizes stay even."""
+    from mesh2brick.steps.metrics import step_stats  # noqa: PLC0415
     from mesh2brick.voxel.io import load_npz  # noqa: PLC0415
 
-    placement = backend.place(load_npz(grid_path), settings, name="b")
-    with pytest.raises(BackendError, match="step images"):
-        backend.write_instructions(placement, tmp_path / "b.pdf", [None])
-    assert result.model.step_count > 1
+    _, out = bunny
+    settings = load_settings(None, ["steps.sequencing=layers"])
+    placement = LegolizationBackend().place(
+        load_npz(out / "bunny_lowpoly.grid.npz"), settings, name="b"
+    )
+    model = placement.model
+    stats = step_stats(model)
+    assert stats.hanging == 0
+    assert stats.largest <= settings.steps.parts_per_step + 3
+    assert all(step.stable is None for step in model.steps)  # not checked
+    path = LegolizationBackend().write_ldraw(placement, tmp_path / "b.ldr")
+    assert LegolizationBackend().verify_ldraw(path) == model.part_count
 
 
 # ------------------------------------------------------------------ islands
