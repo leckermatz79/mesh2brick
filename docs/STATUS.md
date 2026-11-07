@@ -68,10 +68,9 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 
 ## Als Nächstes
 
-1. **Du:** den trimesh-Fehlerbericht einreichen (Befehl unter „Offene Kleinigkeiten“; Text einmal überfliegen).
-2. **Nächste Version 1.1 – große Modelle** (deine Entscheidung, siehe [PLAN.md](PLAN.md), „Fahrplan nach 1.0“): Größe in cm als Einstellung und eine harte Zeitgrenze über alle Schritte mit dem Ergebnis „bestes stabiles Modell bis dahin“. Bis dahin gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm) und hängen dann an der Zeitgrenze.
-3. **Danach Version 2.0 – Formtreue:** Dachsteine, Tiles, Rundungen.
-4. Upstream: Antworten auf legolization #88/#89 und #90/#91 abwarten, dazu den trimesh-Bericht.
+1. **Nächste Version 1.1 – große Modelle** (deine Entscheidung, siehe [PLAN.md](PLAN.md), „Fahrplan nach 1.0“): Größe in cm als Einstellung und eine harte Zeitgrenze über alle Schritte mit dem Ergebnis „bestes stabiles Modell bis dahin“. Bis dahin gehen 40 cm nur über Noppen (`--set input.target_studs=50`, 50 × 0,8 cm) und hängen dann an der Zeitgrenze.
+2. **Danach Version 2.0 – Formtreue:** Dachsteine, Tiles, Rundungen.
+3. Upstream: Antworten abwarten auf legolization #88/#89 und #90/#91 sowie [trimesh #2669](https://github.com/mikedh/trimesh/issues/2669) (16-Bit-Vertexfarben, von dir am 2026-11-07 eingereicht).
 
 ## Bekannte Einschränkungen
 
@@ -133,7 +132,7 @@ Alle Zahlen und die übrigen Modelle: [benchmarks.md](benchmarks.md), Abschnitt 
 | 2026-11-07 | Anrede in den Schritttexten? | **„du“** („Setze den Hut auf den Stiel.“). |
 | 2026-11-07 | Bauabschnitte auf dem Deckblatt? | **Ja**, als Übersicht mit Seitenzahlen. Umgesetzt im Nachtrag zu Phase 7. |
 | 2026-11-07 | Phase 7: Zugang zur Anthropic-API? | **`ANTHROPIC_API_KEY` ist gesetzt.** Für Entwicklung und Messungen dieser Phase wurden insgesamt etwa 1,05 $ verbraucht. |
-| 2026-11-07 | Fehlerbericht an trimesh (#14) einreichen? | **Ja.** trimesh ist groß und aktiv gepflegt, da kommen Antworten. Wie bei legolization: Text überfliegen, dann den fertigen Befehl ausführen. |
+| 2026-11-07 | Fehlerbericht an trimesh (#14) einreichen? | **Ja.** trimesh ist groß und aktiv gepflegt, da kommen Antworten. Wie bei legolization: Text überfliegen, dann den fertigen Befehl ausführen. Erledigt: [Issue #2669](https://github.com/mikedh/trimesh/issues/2669). |
 | 2026-11-07 | Was nach 1.0 zuerst? | **1.1 = große Modelle:** Größe in cm als Einstellung, harte Zeitgrenze über alle Schritte, Ergebnis „bestes stabiles Modell bis dahin“. Grund: Wer 40 cm will, bekommt heute gar nichts (Duo bei 48 Noppen wird nicht fertig). **2.0 = Formtreue** mit Dachsteinen, Tiles, Rundungen. So gehen große Modelle sofort, während die schönen Formen reifen. |
 | 2026-11-07 | Eigenes Modell in der Galerie? | **Duo nein.** Ein selbst entworfenes Fusion-Modell wäre das beste Schaufenster (echtes CAD-Teil statt Testkörper). Es gibt keins (Fusion lässt sich hier nicht ohne Oberfläche steuern), also bleibt die Galerie bei den Testmodellen. |
 
@@ -145,5 +144,3 @@ Zurzeit keine. Deine Antworten zu Phase 8 stehen unter „Deine Entscheidungen�
 
 - **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite. Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
-- **trimesh-Fehlerbericht (#14), von dir freigegeben:** Text in `docs/UPSTREAM.md`, Abschnitt „Draft #14“. Einreichen:
-  `awk '/^## Draft #14/{f=1;next} /^## /{f=0} f' docs/UPSTREAM.md | gh issue create --repo mikedh/trimesh --title "glTF: normalized integer COLOR_0 (e.g. UNSIGNED_SHORT) is truncated modulo 256" --body-file -`
