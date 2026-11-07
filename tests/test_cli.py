@@ -43,13 +43,7 @@ def test_version() -> None:
     assert __version__ in result.output
 
 
-@pytest.mark.parametrize(
-    "args",
-    [
-        ["inspect"],
-        ["feedback"],
-    ],
-)
+@pytest.mark.parametrize("args", [["inspect"]])
 def test_planned_commands_say_so(args: list[str]) -> None:
     result = runner.invoke(app, args)
     assert result.exit_code == EXIT_NOT_YET
@@ -360,3 +354,45 @@ def test_catalog_show() -> None:
     missing = runner.invoke(app, ["catalog", "show", "nope"])
     assert missing.exit_code == 1
     assert "nope" in missing.output
+
+
+def test_feedback_rates_lists_and_exports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mesh2brick.agent.feedback import (  # noqa: PLC0415
+        FeedbackStore,
+        RunRecord,
+        default_store_path,
+    )
+
+    monkeypatch.setenv("MESH2BRICK_DATA_DIR", str(tmp_path))
+    empty = runner.invoke(app, ["feedback"])
+    assert empty.exit_code == 0
+    assert "no runs yet" in empty.output
+    assert runner.invoke(app, ["feedback", "--rate", "4"]).exit_code == 1
+    store = FeedbackStore(default_store_path())
+    store.record_run(
+        RunRecord(
+            name="bunny",
+            source="bunny.stl",
+            language="de",
+            llm_model="claude-sonnet-5-5",
+            parts=10,
+            steps=3,
+            cost_usd=0.0831,
+            outputs={"write_step_text": {"1": "Los."}},
+        )
+    )
+    rated = runner.invoke(app, ["feedback", "--rate", "4", "--note", "schön"])
+    assert rated.exit_code == 0, rated.output
+    assert "rated run 1: 4/5 (schön)" in rated.output
+    listed = runner.invoke(app, ["feedback"])
+    assert "bunny" in listed.output
+    assert "$0.083" in listed.output
+    assert "4.0  schön" in listed.output
+    out = tmp_path / "runs.jsonl"
+    exported = runner.invoke(app, ["feedback", "--export", str(out)])
+    assert "wrote 1 line(s)" in exported.output
+    assert runner.invoke(app, ["feedback", "--rate", "9"]).exit_code == 2
+    assert runner.invoke(app, ["feedback", "--note", "x"]).exit_code == 1
+    assert runner.invoke(app, ["feedback", "--rate", "3", "--run", "7"]).exit_code == 1

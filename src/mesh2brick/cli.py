@@ -21,6 +21,7 @@ from mesh2brick.config import ConfigError, Settings, load_settings
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from mesh2brick.agent.feedback import RunSummary
     from mesh2brick.catalog.listing import CatalogRow
     from mesh2brick.model import BrickModel
     from mesh2brick.voxel.voxelize import VoxelizeReport
@@ -490,9 +491,70 @@ def inspect() -> None:
 
 
 @app.command()
-def feedback() -> None:
-    """Rate a result to teach the optional LLM layer (Phase 7)."""
-    _not_yet("feedback", phase=7)
+def feedback(
+    rate: Annotated[
+        int | None,
+        typer.Option(
+            "--rate", "-r", min=1, max=5, help="Rating from 1 (bad) to 5 (very good)."
+        ),
+    ] = None,
+    note: Annotated[
+        str,
+        typer.Option("--note", "-n", help="What was good or should change."),
+    ] = "",
+    run: Annotated[
+        int | None,
+        typer.Option("--run", help="Run number to rate (default: the latest run)."),
+    ] = None,
+    export: Annotated[
+        Path | None,
+        typer.Option(
+            "--export",
+            help="Write rated runs as JSON lines (for a later fine-tuning).",
+            dir_okay=False,
+        ),
+    ] = None,
+) -> None:
+    """Rate a result of the LLM layer, list the runs or export them.
+
+    Without options it lists the latest runs. Ratings of 4 or 5 turn a run's
+    sections and step texts into examples for later runs; notes are passed
+    on as feedback. Everything stays in a local file (MESH2BRICK_DATA_DIR).
+    """
+    from mesh2brick.agent.feedback import (  # noqa: PLC0415
+        FeedbackError,
+        FeedbackStore,
+        default_store_path,
+    )
+
+    store = FeedbackStore(default_store_path())
+    if rate is None and (note or run is not None):
+        _fail("--note and --run need --rate")
+    try:
+        if rate is not None:
+            rated = store.rate(rate, note, run_id=run)
+            typer.echo(f"rated run {rated}: {rate}/5" + (f" ({note})" if note else ""))
+        if export is not None:
+            typer.echo(f"wrote {store.export(export)} line(s) to {export}")
+    except FeedbackError as error:
+        _fail(str(error))
+    if rate is None and export is None:
+        typer.echo(runs_table(store.runs()))
+
+
+def runs_table(runs: list[RunSummary]) -> str:
+    """The runs of the feedback store as a small table."""
+    if not runs:
+        return "no runs yet: convert with --set llm.enabled=true"
+    lines = [f"{'run':>4}  {'date':<10}  {'model':<20}  {'cost':>7}  rating  notes"]
+    for run in runs:
+        cost = "?" if run.cost_usd is None else f"${run.cost_usd:.3f}"
+        rating = "-" if run.rating is None else f"{run.rating:.1f}"
+        lines.append(
+            f"{run.id:>4}  {run.created[:10]:<10}  {run.name[:20]:<20}  {cost:>7}  "
+            f"{rating:>6}  {'; '.join(run.notes)}"
+        )
+    return "\n".join(lines)
 
 
 def main() -> None:
