@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-07 · Aktuelle Phase: **6 – Anleitungsqualität: fertig, PR offen** · Nächste: **Phase 7 – KI-Schicht**
+Stand: 2026-11-07 · Aktuelle Phase: **6 – Anleitungsqualität: fertig, [PR #18](https://github.com/leckermatz79/mesh2brick/pull/18) offen (CI grün)** · Nächste: **Phase 7 – KI-Schicht**
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md)
 
 ## Fazit in zwei Sätzen
@@ -40,7 +40,7 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 
 ## Als Nächstes
 
-1. **Du:** PR prüfen und mergen, danach Tag `v0.6.0` (Befehle unten unter „Offene Kleinigkeiten“).
+1. **Du:** PR #18 prüfen und mergen, danach Tag `v0.6.0` (Befehle unten unter „Offene Kleinigkeiten“).
 2. **Optional, du:** ein PDF ansehen oder eine Seite ausdrucken und schauen, ob du danach bauen könntest. Am schnellsten: `uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/ --set input.target_studs=16` und dann `out/toadstool.pdf` öffnen.
 3. **Phase 7 (Issue #8): KI-Schicht.** Schrittgliederung und Erklärtexte per Claude, immer gegen Katalog und Stabilität geprüft; ohne KI bleibt das Ergebnis wie heute.
 4. Upstream: Antworten auf #88/#89 und #90/#91 abwarten.
