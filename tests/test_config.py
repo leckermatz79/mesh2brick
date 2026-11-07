@@ -34,8 +34,9 @@ def test_defaults_match_spec() -> None:
     assert s.steps.parts_per_step == 7
     assert s.llm.enabled is False
     assert s.llm.model == DEFAULT_LLM_MODEL
+    assert s.output.steps_per_page == 2
     assert s.output.formats == (
-        "ldr",
+        "mpd",  # Phase 6: sub-assemblies stay LDraw sub-models
         "bom_csv",
         "bom_bricklink",
         "bom_rebrickable",

@@ -216,14 +216,20 @@ class OutputConfig(_Section):
 
     dir: Path = Path("./out")
     formats: tuple[OutputFormat, ...] = (
-        "ldr",
+        "mpd",
         "bom_csv",
         "bom_bricklink",
         "bom_rebrickable",
         "pdf",
     )
+    """What to write. ``mpd`` (default since Phase 6) keeps sub-assemblies as
+    their own LDraw sub-models with their own steps; ``ldr`` writes one flat
+    file (sub-assemblies become ordinary steps)."""
     language: Literal["de", "en"] = "de"
+    """Language of the PDF instructions."""
     page_size: Literal["A4", "letter"] = "A4"
+    steps_per_page: Annotated[int, Field(ge=1, le=4)] = 2
+    """Build steps per PDF page (1-4; 4 are laid out 2 x 2)."""
 
     @model_validator(mode="after")
     def _check_formats(self) -> Self:

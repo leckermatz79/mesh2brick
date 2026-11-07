@@ -28,9 +28,16 @@ from mesh2brick.backends.pyldraw import library_release, part_geometry
 from mesh2brick.catalog.parts import PartSpec, part_specs, spec_cache_path
 from mesh2brick.catalog.rebrickable import catalogue_colors, common_colors
 from mesh2brick.catalog.whitelist import WhitelistError
-from mesh2brick.export.bom import Bom, bom_warnings, build_bom, write_boms
+from mesh2brick.export.bom import (
+    BOM_FORMATS,
+    Bom,
+    bom_warnings,
+    build_bom,
+    write_boms,
+)
 from mesh2brick.ingest import load_model, supported_suffixes
-from mesh2brick.render.preview import PreviewOptions, render_preview, render_step_images
+from mesh2brick.render.pdf import PdfOptions, write_instructions
+from mesh2brick.render.preview import PreviewOptions, render_preview
 from mesh2brick.voxel.color import colors_needed
 from mesh2brick.voxel.io import load_npz, save_npz
 from mesh2brick.voxel.voxelize import voxelize
@@ -45,7 +52,6 @@ if TYPE_CHECKING:
     from mesh2brick.voxel.grid import VoxelGrid
 
 VOXEL_SUFFIXES = (".npz", ".vox", ".npy")
-STEP_IMAGE_SIZE = (640, 480)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,23 +123,13 @@ def convert(
 
     if "pdf" in formats:
         with clock("instructions"):
-            width, height = STEP_IMAGE_SIZE
-            images = render_step_images(
-                model, PreviewOptions(width_px=width, height_px=height)
+            report = write_instructions(
+                model, bom, out_dir / f"{stem}.pdf", pdf_options(settings, stem)
             )
-            files.append(
-                backend.write_instructions(
-                    placement,
-                    out_dir / f"{stem}.pdf",
-                    images,
-                    page_size=settings.output.page_size,
-                )
-            )
-        say(f"instructions: {model.step_count} step images ({clock.last:.1f} s)")
-    if settings.output.language != "en" and "pdf" in formats:
-        warnings.append(
-            f"output.language={settings.output.language}: the PDF text is still "
-            "English (legolization booklet); translations follow in Phase 6"
+            files.append(report.path)
+        say(
+            f"instructions: {report.pages} pages, {model.step_count} steps "
+            f"({clock.last:.1f} s)"
         )
 
     with clock("preview"):
@@ -154,6 +150,25 @@ def convert(
         files=tuple(files),
         warnings=tuple(warnings),
         seconds=dict(clock.seconds),
+    )
+
+
+def pdf_options(settings: Settings, stem: str) -> PdfOptions:
+    """Booklet layout from ``settings.output`` (``stem`` names the parts lists)."""
+    output = settings.output
+    files = {
+        catalogue: f"{stem}{BOM_FORMATS[key]}"
+        for catalogue, key in (
+            ("bricklink", "bom_bricklink"),
+            ("rebrickable", "bom_rebrickable"),
+        )
+        if key in output.formats
+    }
+    return PdfOptions(
+        language=output.language,
+        page_size=output.page_size,
+        steps_per_page=output.steps_per_page,
+        files=files,
     )
 
 
