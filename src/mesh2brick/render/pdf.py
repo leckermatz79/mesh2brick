@@ -90,6 +90,7 @@ PART_PICTURE_PX: Final = (200, 150)
 UNIT_PICTURE_PX: Final = (240, 180)
 UNIT_ELEVATION: Final = -28.0
 MAX_UNITS_SHOWN: Final = 3
+SECTION_SIZE: Final = 12.0
 STEP_TEXT_SIZE: Final = 8.5
 MAX_STEP_TEXT_LINES: Final = 3
 TIMES: Final = chr(0xD7)
@@ -477,27 +478,32 @@ class _Booklet:
         c, lang, layout, model = self.canvas, self.lang, self.layout, self.model
         info = model.steps[step]
         sub = info.submodel
-        labels: list[tuple[str, Color]] = []
+        labels: list[tuple[str, Color, float]] = []
         if sub is not None:
             c.setFillColor(SUB_FILL)
             c.roundRect(panel.x, panel.y, panel.w, panel.h, 8, stroke=0, fill=1)
-            labels.append((text("subassembly", lang, name=self.labels[sub]), SUB_INK))
+            name = text("subassembly", lang, name=self.labels[sub])
+            labels.append((name, SUB_INK, 10))
         else:
             c.setStrokeColor(RULE)
             c.setLineWidth(0.6)
             c.line(panel.x, panel.y - 7, panel.x + panel.w, panel.y - 7)
         if info.section is not None:
-            labels.append((_fit(info.section, FONT_BOLD, 10, panel.w / 3), INK))
-        reserve = 6.0
-        c.setFont(FONT_BOLD, 10)
-        for row, (label, ink) in enumerate(labels):
+            title = _fit(info.section, FONT_BOLD, SECTION_SIZE, panel.w / 3)
+            labels.append((title, INK, SECTION_SIZE))
+        reserve, y = 6.0, panel.top - 4
+        for label, ink, size in labels:
+            y -= size + 4
             c.setFillColor(ink)
-            c.drawRightString(panel.x + panel.w - 8, panel.top - 16 - 14 * row, label)
-            reserve = max(reserve, pdfmetrics.stringWidth(label, FONT_BOLD, 10) + 16)
+            c.setFont(FONT_BOLD, size)
+            c.drawRightString(panel.x + panel.w - 8, y, label)
+            reserve = max(reserve, pdfmetrics.stringWidth(label, FONT_BOLD, size) + 16)
         c.setFillColor(SUB_INK if sub is not None else INK)
         c.setFont(FONT_BOLD, layout.number_size)
-        c.drawString(panel.x + 6, panel.top - layout.number_size - 2, str(step + 1))
-        x = panel.x + 6 + layout.number_size * 1.6 + 8
+        number_text = str(step + 1)
+        c.drawString(panel.x + 6, panel.top - layout.number_size - 2, number_text)
+        width = pdfmetrics.stringWidth(number_text, FONT_BOLD, layout.number_size)
+        x = panel.x + 6 + max(width, layout.number_size * 1.3) + 10
         if info.attaches is not None:
             width = layout.tile * 2.4
             caption = text("attach", lang, name=self.labels[info.attaches])
