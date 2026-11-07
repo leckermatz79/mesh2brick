@@ -4,9 +4,9 @@
 
 ``stalled_lp.npz`` is a stability LP captured from legolization 0.5.0 (low-poly
 bunny, 16 studs, slopes on) on which HiGHS presolve stalls indefinitely. With
-the patch, the first attempt gives up after ``LP_ATTEMPT_TIME_LIMIT_S`` and
-the presolve-free attempt solves it in a few seconds. Large LPs that neither
-simplex variant solves get the interior-point method without crossover next.
+the patch, the first simplex attempt gives up after ``LP_FIRST_SIMPLEX_S`` and
+the interior-point method without crossover solves it in about a second, in
+both LP paths (1.3.0).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from scipy.optimize import linprog
 
 from mesh2brick.backends.legolization import (
     LP_ATTEMPT_TIME_LIMIT_S,
+    LP_FIRST_SIMPLEX_S,
     LP_IPM_TIME_LIMIT_S,
     TimeLimitedHighs,
     _limit_lp_attempts,
@@ -46,13 +47,12 @@ def stalled_lp(fixtures_dir: Path) -> Lp:
 
 def test_patch_is_installed() -> None:
     attempts = solver._LP_ATTEMPTS
-    assert len(attempts) == 4
-    assert all(o["time_limit"] == LP_ATTEMPT_TIME_LIMIT_S for _, o in attempts[:2])
-    assert attempts[2] == (
-        "highs-ipm",
-        {"run_crossover": "off", "time_limit": LP_IPM_TIME_LIMIT_S},
+    assert attempts == (
+        ("highs", {"time_limit": LP_FIRST_SIMPLEX_S}),
+        ("highs-ipm", {"run_crossover": "off", "time_limit": LP_IPM_TIME_LIMIT_S}),
+        ("highs", {"presolve": False, "time_limit": LP_ATTEMPT_TIME_LIMIT_S}),
+        ("highs-ipm", None),  # legolization's last attempt, no limit
     )
-    assert attempts[-1][1] is None or "time_limit" not in attempts[-1][1]
     assert solver.highspy.Highs is TimeLimitedHighs
     assert solver.highspy.HighsLp is highspy.HighsLp  # everything else untouched
 
@@ -69,7 +69,7 @@ def test_ipm_without_crossover_agrees_and_stays_quiet(stalled_lp: Lp) -> None:
     reference = linprog(
         c=cost, A_ub=a_ub, b_ub=b_ub, bounds=(0, None), options={"presolve": False}
     )
-    method, options = solver._LP_ATTEMPTS[2]
+    method, options = solver._LP_ATTEMPTS[1]
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         result = solver.linprog(
@@ -88,8 +88,9 @@ def test_scipy_path_solves_the_stalled_lp(stalled_lp: Lp) -> None:
     cost, a_ub, b_ub = stalled_lp
     started = time.perf_counter()
     result = None
-    for method, options in solver._LP_ATTEMPTS:
-        result = linprog(
+    solved_by = -1
+    for solved_by, (method, options) in enumerate(solver._LP_ATTEMPTS):  # noqa: B007
+        result = solver.linprog(  # as legolization calls it (warning filtered)
             c=cost,
             A_ub=a_ub,
             b_ub=b_ub,
@@ -101,7 +102,8 @@ def test_scipy_path_solves_the_stalled_lp(stalled_lp: Lp) -> None:
             break
     assert result is not None
     assert result.success
-    assert time.perf_counter() - started < 4 * LP_ATTEMPT_TIME_LIMIT_S
+    assert solved_by == 1  # the interior-point method without crossover
+    assert time.perf_counter() - started < LP_FIRST_SIMPLEX_S + 10
 
 
 def test_direct_highspy_path_solves_the_stalled_lp(stalled_lp: Lp) -> None:
@@ -136,4 +138,7 @@ def test_direct_highspy_path_solves_the_stalled_lp(stalled_lp: Lp) -> None:
         if engine.getModelStatus() == highspy.HighsModelStatus.kOptimal:
             break
     assert engine.getModelStatus() == highspy.HighsModelStatus.kOptimal
-    assert time.perf_counter() - started < 4 * LP_ATTEMPT_TIME_LIMIT_S
+    assert engine.__dict__["_runs"] == 1  # run 1 fell back to the IPM itself
+    assert engine.getOptionValue("solver")[1] == "simplex"  # options restored
+    assert engine.getOptionValue("run_crossover")[1] == "on"
+    assert time.perf_counter() - started < LP_FIRST_SIMPLEX_S + 10

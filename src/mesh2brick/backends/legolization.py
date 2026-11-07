@@ -21,11 +21,14 @@ on some LPs (reproducer: the low-poly bunny at 16 studs, after the slope pass
 and again during step sequencing), which hangs the whole pipeline. We add a
 time limit to all but the last attempt - in both LP paths (scipy ``linprog``
 and direct ``highspy``) - so a stalled variant gives up and the next one,
-which solves such LPs in seconds, takes over. For large models (Duo at 48
-studs: 2,392 parts) neither simplex variant finishes and the interior-point
-method spends hours in its final "crossover"; the scipy path therefore tries
-the interior-point method *without* crossover before the original last
-attempt (49 s instead of more than an hour).
+which solves such LPs in seconds, takes over. The order matters as much as
+the limits (docs/benchmarks.md, Roadmap 2 and 1.3.0): simplex solves easy LPs
+in well under 3 s, but stalls on slope layouts and never finishes large LPs,
+while the interior-point method *without* its final "crossover" solves both
+quickly (Duo at 48 studs: 49 s instead of more than an hour; the bunny with
+slopes: 70 s instead of 147 s). Both paths therefore run: simplex (3 s), the
+interior-point method without crossover (300 s), simplex without presolve
+(5 s), and finally legolization's own last attempt without a limit.
 """
 
 from __future__ import annotations
@@ -142,19 +145,23 @@ _LAYER_PLAN_WARNING: Final = (
     "steps follow layer order without stability checks "
     "(steps.sequencing=layers); support overhangs by hand"
 )
+LP_FIRST_SIMPLEX_S: Final = 3.0
+"""Wall-clock limit for the first simplex attempt. Easy LPs finish within it
+(longest of 89 measured: 2.3 s); stalled and large ones go on to the
+interior-point method (1.3.0, docs/benchmarks.md)."""
 LP_ATTEMPT_TIME_LIMIT_S: Final = 5.0
-"""Wall-clock limit for every simplex LP attempt (local patch)."""
+"""Wall-clock limit for the later simplex attempts (local patch)."""
 LP_IPM_TIME_LIMIT_S: Final = 300.0
 """Wall-clock limit for the interior-point attempt without crossover."""
 IPM_WITHOUT_CROSSOVER: Final = ("highs-ipm", {"run_crossover": "off"})
 
 
 def _limit_lp_attempts() -> None:
-    """Give legolization's LP attempts a time limit (idempotent local patch).
+    """Reorder and limit legolization's LP attempts (idempotent local patch).
 
-    Every attempt but the last gets :data:`LP_ATTEMPT_TIME_LIMIT_S`; before
-    the last, the interior-point method without crossover gets
-    :data:`LP_IPM_TIME_LIMIT_S`.
+    The first simplex attempt gets :data:`LP_FIRST_SIMPLEX_S`, then the
+    interior-point method without crossover :data:`LP_IPM_TIME_LIMIT_S`,
+    the remaining attempts but the last :data:`LP_ATTEMPT_TIME_LIMIT_S`.
 
     Raises:
         BackendError: if legolization changed in a way the patch does not expect.
@@ -167,13 +174,14 @@ def _limit_lp_attempts() -> None:
         )
         raise BackendError(msg)
     if not isinstance(_lego_solver.__dict__.get("linprog"), _QuietLinprog):
-        method, options = IPM_WITHOUT_CROSSOVER
+        (first, first_options), ipm = attempts[0], IPM_WITHOUT_CROSSOVER
         patched = (
+            (first, {**(first_options or {}), "time_limit": LP_FIRST_SIMPLEX_S}),
+            (ipm[0], {**ipm[1], "time_limit": LP_IPM_TIME_LIMIT_S}),
             *(
                 (method, {**(options or {}), "time_limit": LP_ATTEMPT_TIME_LIMIT_S})
-                for method, options in attempts[:-1]
+                for method, options in attempts[1:-1]
             ),
-            (method, {**options, "time_limit": LP_IPM_TIME_LIMIT_S}),
             attempts[-1],
         )
         _lego_solver._LP_ATTEMPTS = patched  # documented local patch
@@ -201,23 +209,45 @@ class _QuietLinprog:
 
 
 class TimeLimitedHighs(highspy.Highs):
-    """``Highs`` that limits every run but the last of legolization's attempts.
+    """``Highs`` with the attempt order and limits of the scipy path.
 
-    legolization's direct path runs up to three attempts on one instance;
-    runs 1 and 2 get :data:`LP_ATTEMPT_TIME_LIMIT_S`, later runs no limit,
-    so a solution is still found whenever HiGHS can find one.
+    legolization's direct path runs up to three attempts on one instance
+    (simplex, simplex without presolve, interior point). Run 1 gets
+    :data:`LP_FIRST_SIMPLEX_S` and, if that does not solve the LP, continues
+    with the interior-point method without crossover; run 2 gets
+    :data:`LP_ATTEMPT_TIME_LIMIT_S`, run 3 no limit, so a solution is still
+    found whenever HiGHS can find one.
     """
 
     final_attempt: int = 3
 
     def run(self) -> highspy.HighsStatus:
-        """Run HiGHS with a per-attempt time limit."""
+        """Run HiGHS with the per-attempt limits."""
         runs = self.__dict__.get("_runs", 0) + 1
         self.__dict__["_runs"] = runs
+        if runs == 1:
+            status = self._run_limited(LP_FIRST_SIMPLEX_S)
+            if self.getModelStatus() == highspy.HighsModelStatus.kOptimal:
+                return status
+            return self._run_ipm_without_crossover()
         limit = LP_ATTEMPT_TIME_LIMIT_S if runs < self.final_attempt else math.inf
-        self.setOptionValue("time_limit", self.getRunTime() + limit)
+        return self._run_limited(limit)
+
+    def _run_limited(self, seconds: float) -> highspy.HighsStatus:
+        self.setOptionValue("time_limit", self.getRunTime() + seconds)
         status: highspy.HighsStatus = super().run()
         return status
+
+    def _run_ipm_without_crossover(self) -> highspy.HighsStatus:
+        _, solver = self.getOptionValue("solver")  # (status, value)
+        _, crossover = self.getOptionValue("run_crossover")
+        self.setOptionValue("solver", "ipm")
+        self.setOptionValue("run_crossover", "off")
+        try:
+            return self._run_limited(LP_IPM_TIME_LIMIT_S)
+        finally:
+            self.setOptionValue("solver", solver)
+            self.setOptionValue("run_crossover", crossover)
 
 
 class _HighspyShim(types.ModuleType):
