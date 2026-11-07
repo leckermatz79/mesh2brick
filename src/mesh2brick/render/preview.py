@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import io
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final
 
 import numpy as np
@@ -64,6 +64,12 @@ _DIRECTIONS: Final[tuple[tuple[tuple[int, int, int], float], ...]] = (
     ((0, 1, 0), 0.9),
     ((0, -1, 0), 0.74),
 )
+_BOTTOM_SHADE_FROM_BELOW: Final = 0.86
+"""Undersides are lit when the camera looks from below (pre-assembly views)."""
+MIN_FRAME_SHARE: Final = 0.25
+"""Growing step frames start at this share of the finished model's frame."""
+PART_MIN_SHARE: Final = 0.55
+"""Smallest scale of a part picture relative to the largest part."""
 _STUD_SIDE_SHADE: Final = 0.62
 _STUD_TOP_SHADE: Final = 1.08
 
@@ -81,6 +87,8 @@ class PreviewOptions:
     azimuth: float = -60.0
     """Camera azimuth, degrees (matplotlib convention: -90 looks along +y)."""
     title: str | None = None
+    margin: float = 0.02
+    """Blank border around the drawing, as a share of the image size."""
     up_to_step: int | None = None
     """Show the model as built after this 0-based step (see :func:`step_view`):
     that step in full colour, earlier parts faded. ``None`` = finished model."""
@@ -156,6 +164,99 @@ def render_png(
     return _draw(polygons, fills, options, extent)
 
 
+def render_parts_png(
+    model: BrickModel,
+    indices: Sequence[int],
+    options: PreviewOptions | None = None,
+) -> bytes:
+    """Render only the parts ``model.parts[i]`` for ``i`` in ``indices``.
+
+    Raises:
+        ValueError: if ``indices`` is empty.
+    """
+    if not indices:
+        msg = "nothing to render: no parts selected"
+        raise ValueError(msg)
+    options = options or PreviewOptions()
+    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    polygons, fills = _scene(
+        model, frozenset(indices), None, camera, options.background
+    )
+    return _palette_png(_draw(polygons, fills, options, None))
+
+
+def render_part_png(
+    part: PlacedPart,
+    color: ColorInfo | None,
+    options: PreviewOptions | None = None,
+    *,
+    reference: tuple[float, float] | None = None,
+    min_share: float = PART_MIN_SHARE,
+) -> bytes:
+    """Render one part on its own, long side to the right, for parts lists.
+
+    The part is moved to the origin and turned so its longer side runs along
+    ``x``; its studs face up. With ``reference`` (the largest
+    :func:`part_view_size` of a set of parts) all pictures share one scale,
+    except that parts smaller than ``min_share`` of the reference are
+    enlarged to that share, so a 1 x 1 plate stays recognisable next to a
+    2 x 8 brick.
+    """
+    options = options or PreviewOptions()
+    model = _part_alone(part, color)
+    if reference is None:
+        return render_parts_png(model, [0], options)
+    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    x0, x1, y0, y1 = _screen_bounds(model.parts, camera)
+    width, height = reference
+    share = max((x1 - x0) / width, (y1 - y0) / height, min_share)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    half_w, half_h = share * width / 2 * 1.04, share * height / 2 * 1.04
+    extent = _fit_aspect(
+        (cx - half_w, cx + half_w, cy - half_h, cy + half_h), _axes_aspect(options)
+    )
+    return _palette_png(render_png(model, options, extent=extent))
+
+
+def part_view_size(part: PlacedPart, options: PreviewOptions | None = None) -> Extent:
+    """Screen width and height (in studs) of a part as :func:`render_part_png` draws it.
+
+    Returned as ``(0, width, 0, height)`` so it can be combined with ``max``.
+    """
+    options = options or PreviewOptions()
+    camera = _Camera.from_angles(options.elevation, options.azimuth)
+    x0, x1, y0, y1 = _screen_bounds(_part_alone(part, None).parts, camera)
+    return (0.0, x1 - x0, 0.0, y1 - y0)
+
+
+def _part_alone(part: PlacedPart, color: ColorInfo | None) -> BrickModel:
+    """``part`` alone at the origin, its longer side along ``x``."""
+    xs, ys, zs = zip(*part.cells, strict=True)
+    x0, y0, z0 = min(xs), min(ys), min(zs)
+    swap = max(ys) - y0 > max(xs) - x0
+    cells = tuple(
+        (y - y0, x - x0, z - z0) if swap else (x - x0, y - y0, z - z0)
+        for x, y, z in part.cells
+    )
+    alone = PlacedPart(
+        part=part.part,
+        color=part.color,
+        x=0,
+        y=0,
+        layer=0,
+        yaw=0,
+        cells=cells,
+        step=0,
+        category=part.category,
+    )
+    return BrickModel(
+        name=part.part,
+        parts=(alone,),
+        steps=(BuildStep(),),
+        colors={part.color: color} if color is not None else {},
+    )
+
+
 def step_view(model: BrickModel, step: int) -> tuple[frozenset[int], frozenset[int]]:
     """Which parts are visible / newly placed after build step ``step``.
 
@@ -199,30 +300,53 @@ def step_view(model: BrickModel, step: int) -> tuple[frozenset[int], frozenset[i
 
 
 def render_step_images(
-    model: BrickModel, options: PreviewOptions | None = None
+    model: BrickModel,
+    options: PreviewOptions | None = None,
+    *,
+    grow: bool = False,
+    sub_background: str | None = None,
 ) -> list[bytes]:
     """One PNG per build step.
 
-    Main-model steps are framed like the finished model, subassembly steps
-    like the finished subassembly, so nothing jumps around between pages.
+    By default main-model steps are framed like the finished model and
+    subassembly steps like the finished subassembly, so nothing jumps
+    around between pages. With ``grow`` the frame follows the model as it
+    grows (never shrinking, starting at :data:`MIN_FRAME_SHARE` of the
+    final frame), so early steps are shown larger. ``sub_background``
+    replaces the background colour of subassembly steps.
     """
     options = options or PreviewOptions()
     camera = _Camera.from_angles(options.elevation, options.azimuth)
+    aspect = _axes_aspect(options)
     frames: dict[str | None, Extent] = {
-        None: _fit_extent(_screen_bounds(model.parts, camera))
+        None: _fit_aspect(_fit_extent(_screen_bounds(model.parts, camera)), aspect)
     }
     for name in model.submodels:
         members = [p for p in model.parts if model.steps[p.step].submodel == name]
-        frames[name] = _fit_extent(_screen_bounds(members, camera))
+        frames[name] = _fit_aspect(_fit_extent(_screen_bounds(members, camera)), aspect)
+    current: dict[str | None, Extent] = {}
     images: list[bytes] = []
     for step in range(model.step_count):
-        extent = frames[model.steps[step].submodel]
+        context = model.steps[step].submodel
+        extent = frames[context]
         visible, highlight = step_view(model, step)
+        if grow and visible:
+            seen = [model.parts[i] for i in visible]
+            extent = _grown_frame(
+                _fit_extent(_screen_bounds(seen, camera)),
+                previous=current.get(context),
+                final=extent,
+                aspect=aspect,
+            )
+            current[context] = extent
+        view = options
+        if context is not None and sub_background is not None:
+            view = replace(options, background=sub_background)
         if not visible:  # an empty step (should not happen) gets a blank frame
-            images.append(_draw([], [], options, extent))
+            images.append(_draw([], [], view, extent))
             continue
-        polygons, fills = _scene(model, visible, highlight, camera, options.background)
-        images.append(_palette_png(_draw(polygons, fills, options, extent)))
+        polygons, fills = _scene(model, visible, highlight, camera, view.background)
+        images.append(_palette_png(_draw(polygons, fills, view, extent)))
     return images
 
 
@@ -308,10 +432,8 @@ def _scene(
     groups_key: list[NDArray[np.float64]] = []
     groups_order: list[NDArray[np.int64]] = []
 
-    for direction, shade in _DIRECTIONS:
+    for direction, shade in _facing_shades(view):
         d = np.array(direction)
-        if float(np.dot(d, view)) <= _FACING_EPS:
-            continue
         exposed = occupied & ~np.roll(occupied, shift=-d, axis=(0, 1, 2))
         at = np.argwhere(exposed)
         if not len(at):
@@ -350,6 +472,18 @@ def _scene(
     flat: list[NDArray[np.float64]] = [poly for group in groups_poly for poly in group]
     permutation = np.lexsort((orders, keys))
     return [flat[i] for i in permutation], rgb[permutation]
+
+
+def _facing_shades(
+    view: NDArray[np.float64],
+) -> list[tuple[tuple[int, int, int], float]]:
+    """Face directions the camera sees, with their brightness."""
+    below = float(view[2]) < 0
+    return [
+        (direction, _BOTTOM_SHADE_FROM_BELOW if below and direction[2] < 0 else shade)
+        for direction, shade in _DIRECTIONS
+        if float(np.dot(np.array(direction), view)) > _FACING_EPS
+    ]
 
 
 def _cells(
@@ -502,6 +636,55 @@ def _screen_bounds(parts: Sequence[PlacedPart], camera: _Camera) -> Extent:
     return (float(x0), float(x1), float(y0), float(y1))
 
 
+def _axes_aspect(options: PreviewOptions) -> float:
+    """Width / height of the drawing area in :func:`_draw`."""
+    width, height = _axes_box(options)[2:]
+    return (width * options.width_px) / (height * options.height_px)
+
+
+def _axes_box(options: PreviewOptions) -> tuple[float, float, float, float]:
+    m = options.margin
+    top = 0.08 if options.title else m
+    return (m, m, 1 - 2 * m, 1 - m - top)
+
+
+def _fit_aspect(extent: Extent, aspect: float) -> Extent:
+    """Widen or heighten ``extent`` (about its centre) to ``aspect``."""
+    x0, x1, y0, y1 = extent
+    width, height = x1 - x0, y1 - y0
+    if width / height < aspect:
+        grow = (height * aspect - width) / 2
+        return (x0 - grow, x1 + grow, y0, y1)
+    grow = (width / aspect - height) / 2
+    return (x0, x1, y0 - grow, y1 + grow)
+
+
+def _grown_frame(
+    bounds: Extent, *, previous: Extent | None, final: Extent, aspect: float
+) -> Extent:
+    """Frame for a growing model: fits ``bounds``, never shrinks, has a floor.
+
+    The frame keeps the final frame's bottom edge (the table) so the model
+    does not jump up and down, and stays inside the final frame.
+    """
+    fx0, fx1, fy0, fy1 = final
+    x0, x1, y0, y1 = bounds
+    if previous is not None:
+        x0, x1 = min(x0, previous[0]), max(x1, previous[1])
+        y0, y1 = min(y0, previous[2]), max(y1, previous[3])
+    floor = MIN_FRAME_SHARE * (fy1 - fy0)
+    y0 = fy0
+    y1 = min(max(y1, y0 + floor), fy1)
+    height = y1 - y0
+    width = max(x1 - x0, height * aspect)
+    width = min(width, fx1 - fx0)
+    height = max(height, width / aspect)
+    y1 = y0 + height
+    centre = (x0 + x1) / 2
+    left = min(max(centre - width / 2, fx0), fx1 - width)
+    return (left, left + width, y0, y1)
+
+
 def _fit_extent(bounds: Extent) -> Extent:
     x0, x1, y0, y1 = bounds
     pad = 0.04 * max(x1 - x0, y1 - y0, 1e-6)
@@ -520,7 +703,7 @@ def _draw(
         facecolor=options.background,
     )
     FigureCanvasAgg(fig)
-    ax = fig.add_axes((0.02, 0.02, 0.96, 0.9 if options.title else 0.96))
+    ax = fig.add_axes(_axes_box(options))
     if polygons:
         ax.add_collection(
             PolyCollection(

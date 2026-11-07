@@ -31,6 +31,7 @@ dependencies = [
     "pillow>=11",
     "pydantic>=2.14",
     "pyyaml>=6.0.3",
+    "reportlab>=4.2",
     "scipy>=1.18",
     "trimesh>=5.2",
     "typer>=0.27",
@@ -91,9 +92,10 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PLR2004", "ARG", "FBT", "S101", "TC", "E501"]  # inline XML fixtures
+"tests/**" = ["D", "PLR2004", "ARG", "FBT", "S101", "TC", "E501", "RUF001"]  # inline XML fixtures; × in labels
 "scripts/**" = ["D", "T201"]
 "src/mesh2brick/cli.py" = ["FBT001", "FBT002", "PLR0917"]  # typer options are boolean parameters
+"src/mesh2brick/render/text.py" = ["RUF001", "RUF002"]  # the multiplication sign is intended
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
@@ -116,6 +118,11 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 # as Any.
 module = ["legolization", "legolization.*"]
 follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+# reportlab ships no type information (render/pdf.py also uses internal API).
+module = ["reportlab", "reportlab.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Generated at runtime by `ldraw generate`; not importable at type-check time.
