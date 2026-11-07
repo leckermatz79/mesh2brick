@@ -128,6 +128,29 @@ def test_section_titles_and_step_texts_render(
     assert pages_of(data) == 2 + -(-2 // per_page)
 
 
+def test_cover_lists_sections_with_their_pages(
+    tmp_path: Path, sample_model: BrickModel
+) -> None:
+    steps = tuple(
+        BuildStep(section=f"Teil {i}" if i % 2 == 0 else None) for i in range(12)
+    )
+    parts = tuple(replace(p, step=i * 5) for i, p in enumerate(sample_model.parts))
+    model = replace(sample_model, parts=parts, steps=steps)
+    assert pdf_module.section_pages(model, first_page=3, per_page=2) == [
+        ("Teil 0", 3),
+        ("Teil 2", 4),
+        ("Teil 4", 5),
+        ("Teil 6", 6),
+        ("Teil 8", 7),
+        ("Teil 10", 8),
+    ]
+    data = write(model, tmp_path / "c.pdf")  # six sections: two columns
+    assert pages_of(data) == 2 + 6
+    plain = write(sample_model, tmp_path / "p.pdf")
+    assert pdf_module.section_pages(sample_model, first_page=3, per_page=2) == []
+    assert pages_of(plain) == 3
+
+
 def test_png_parsing_falls_back_for_transparency() -> None:
     buffer = io.BytesIO()
     Image.new("RGBA", (4, 4), (255, 0, 0, 128)).save(buffer, format="PNG")

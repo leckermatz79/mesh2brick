@@ -33,6 +33,8 @@ _TEXT: Final[dict[str, dict[Language, str]]] = {
     "weight_value": {"de": "ca. {value}", "en": "about {value}"},
     "colours": {"de": "Farben", "en": "Colours"},
     "stability": {"de": "Stabilität", "en": "Stability"},
+    "sections": {"de": "Abschnitte", "en": "Sections"},
+    "page_short": {"de": "S. {page}", "en": "p. {page}"},
     "stable_yes": {
         "de": "steht von allein, aus einem Stück",
         "en": "stands on its own, in one piece",
