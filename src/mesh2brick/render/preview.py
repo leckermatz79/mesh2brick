@@ -10,8 +10,10 @@ back to front by cell depth; because all cells are translates of one box on a
 lattice, that order is exact - unlike matplotlib's own 3-D mode.
 
 Used for self-checks, STATUS reports and as instruction images in the PDF
-(no external LDraw renderer needed). Slopes are drawn as their bounding cells.
-Only matplotlib's object-oriented API is used (no ``pyplot``).
+(no external LDraw renderer needed). Slopes are drawn as wedges: their high
+row as cells with studs, the sloped columns as a slope down to a half-plate
+lip, as in the LDraw parts (1.3.0). Only matplotlib's object-oriented API is
+used (no ``pyplot``).
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
 from PIL import Image
 
-from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
+from mesh2brick.model import BrickModel, BuildStep, Cell, ColorInfo, PlacedPart
 from mesh2brick.voxel.grid import LDU_PER_PLATE, LDU_PER_STUD
 
 if TYPE_CHECKING:
@@ -38,6 +40,11 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from mesh2brick.voxel.grid import VoxelGrid
+
+    Polygons = tuple[
+        NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.int64]
+    ]
+    """(screen polygons, fills, depth keys, orders) of one group."""
 
 STUDS_PER_PLATE: Final = LDU_PER_PLATE / LDU_PER_STUD  # cell height: 0.4 studs
 STUD_RADIUS: Final = 0.3  # 4.8 mm stud diameter / 8 mm pitch
@@ -72,6 +79,9 @@ PART_MIN_SHARE: Final = 0.55
 """Smallest scale of a part picture relative to the largest part."""
 _STUD_SIDE_SHADE: Final = 0.62
 _STUD_TOP_SHADE: Final = 1.08
+LIP_PLATES: Final = 0.5
+"""Height of the vertical edge at the low end of a slope: 4 LDU in LDraw's
+3039, 3040b and 4286 (the slope falls from full height to it)."""
 
 Extent = tuple[float, float, float, float]
 
@@ -241,6 +251,13 @@ def _part_alone(part: PlacedPart, color: ColorInfo | None) -> BrickModel:
         (y - y0, x - x0, z - z0) if swap else (x - x0, y - y0, z - z0)
         for x, y, z in part.cells
     )
+    studs = (
+        None
+        if part.studs is None
+        else tuple(
+            (y - y0, x - x0) if swap else (x - x0, y - y0) for x, y in part.studs
+        )
+    )
     alone = PlacedPart(
         part=part.part,
         color=part.color,
@@ -251,6 +268,7 @@ def _part_alone(part: PlacedPart, color: ColorInfo | None) -> BrickModel:
         cells=cells,
         step=0,
         category=part.category,
+        studs=studs,
     )
     return BrickModel(
         name=part.part,
@@ -419,15 +437,10 @@ def _scene(
     index = np.fromiter(sorted(visible), dtype=np.int64)
     cells, owner_of_cell = _cells(model, index)
     base = _part_colours(model, index, highlight, background)
-    studded = np.array(
-        [model.parts[i].category not in _NO_STUD_CATEGORIES for i in index]
-    )
-    low = cells.min(axis=0) - 1
-    shape = cells.max(axis=0) - low + 2
-    owner = np.full(tuple(int(n) for n in shape), -1, dtype=np.int64)
-    local = cells - low
-    owner[local[:, 0], local[:, 1], local[:, 2]] = owner_of_cell  # position in index
+    low, owner, studded = _lattice(model, index, cells, owner_of_cell)
     occupied = owner >= 0
+    wedges = {pos: _slope_faces(model.parts[i]) for pos, i in enumerate(index)}
+    sloped = _sloped_mask(wedges, occupied, low)
     view = camera.toward_viewer
 
     groups_poly: list[NDArray[np.float64]] = []
@@ -437,7 +450,7 @@ def _scene(
 
     for direction, shade in _facing_shades(view):
         d = np.array(direction)
-        exposed = occupied & ~np.roll(occupied, shift=-d, axis=(0, 1, 2))
+        exposed = occupied & ~np.roll(occupied, shift=-d, axis=(0, 1, 2)) & ~sloped
         at = np.argwhere(exposed)
         if not len(at):
             continue
@@ -455,7 +468,7 @@ def _scene(
             groups_key.append(depth[keep])
             groups_order.append(np.ones(int(keep.sum()), dtype=np.int64))
         if direction == (0, 0, 1):
-            with_stud = studded[part_pos]
+            with_stud = studded[at[:, 0], at[:, 1], at[:, 2]]
             if with_stud.any():
                 centres = (world[with_stud] + np.array([0.5, 0.5, 1.0])) * _SCALE
                 for template, shade_stud, order in _stud_templates(camera):
@@ -467,6 +480,12 @@ def _scene(
                     groups_key.append(depth[with_stud])
                     groups_order.append(np.full(int(with_stud.sum()), order))
 
+    for poly, rgb, key, rank in _wedge_polygons(wedges, base, camera):
+        groups_poly.append(poly)
+        groups_rgb.append(rgb)
+        groups_key.append(key)
+        groups_order.append(rank)
+
     if not groups_poly:
         return [], np.zeros((0, 3))
     keys = np.concatenate(groups_key)
@@ -475,6 +494,239 @@ def _scene(
     flat: list[NDArray[np.float64]] = [poly for group in groups_poly for poly in group]
     permutation = np.lexsort((orders, keys))
     return [flat[i] for i in permutation], rgb[permutation]
+
+
+def _lattice(
+    model: BrickModel,
+    index: NDArray[np.int64],
+    cells: NDArray[np.int64],
+    owner_of_cell: NDArray[np.int64],
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.bool_]]:
+    """Grid origin, owner per cell (position in ``index``, -1 empty), studs."""
+    low = cells.min(axis=0) - 1
+    shape = tuple(int(n) for n in cells.max(axis=0) - low + 2)
+    owner = np.full(shape, -1, dtype=np.int64)
+    local = cells - low
+    owner[local[:, 0], local[:, 1], local[:, 2]] = owner_of_cell
+    studded = np.zeros(shape, dtype=bool)
+    studded[local[:, 0], local[:, 1], local[:, 2]] = _stud_cells(model, index, cells)
+    return low, owner, studded
+
+
+def _sloped_mask(
+    wedges: dict[int, tuple[set[Cell], list[_Face]] | None],
+    occupied: NDArray[np.bool_],
+    low: NDArray[np.int64],
+) -> NDArray[np.bool_]:
+    """Cells drawn as slope wedges instead of boxes."""
+    sloped = np.zeros_like(occupied)
+    for wedge in wedges.values():
+        if wedge is not None:
+            at = np.asarray(sorted(wedge[0]), dtype=np.int64) - low
+            sloped[at[:, 0], at[:, 1], at[:, 2]] = True
+    return sloped
+
+
+def _wedge_polygons(
+    wedges: dict[int, tuple[set[Cell], list[_Face]] | None],
+    base: NDArray[np.float64],
+    camera: Camera,
+) -> list[Polygons]:
+    """Camera-facing slope faces and their edge strips, one polygon per entry."""
+    view = camera.toward_viewer
+    result: list[Polygons] = []
+    for pos, wedge in wedges.items():
+        if wedge is None:
+            continue
+        for face in wedge[1]:
+            corners = face.corners * _SCALE
+            normal = _outward_normal(corners, face.outward)
+            if float(normal @ view) <= _FACING_EPS:
+                continue
+            depth = np.array([(np.asarray(face.key_cell, float) * _SCALE) @ view])
+            fill = np.clip(base[pos] * _shade(normal, view), 0.0, 1.0)
+            result.append(
+                (
+                    camera.project(corners)[None],
+                    fill[None],
+                    depth,
+                    np.zeros(1, np.int64),
+                )
+            )
+            result.extend(
+                (
+                    camera.project(strip)[None],
+                    (base[pos] * _EDGE_DARKEN)[None],
+                    depth,
+                    np.ones(1, np.int64),
+                )
+                for strip in _outline(corners, face.edges)
+            )
+    return result
+
+
+def _stud_cells(
+    model: BrickModel, index: NDArray[np.int64], cells: NDArray[np.int64]
+) -> NDArray[np.bool_]:
+    """Per cell (in ``_cells`` order): whether a stud sits on its top."""
+    flags: list[bool] = []
+    for i in index:
+        part = model.parts[i]
+        if part.studs is not None:
+            columns = set(part.studs)
+            flags.extend((x, y) in columns for x, y, _ in part.cells)
+        else:
+            flags.extend([part.category not in _NO_STUD_CATEGORIES] * len(part.cells))
+    return np.asarray(flags, dtype=bool).reshape(len(cells))
+
+
+@dataclass(frozen=True, slots=True)
+class _Face:
+    """One planar face of a slope wedge, in unit-cell coordinates."""
+
+    corners: NDArray[np.float64]
+    outward: tuple[float, float, float]
+    """Rough outward direction, to orient the computed normal."""
+    key_cell: tuple[int, int, int]
+    """Cell whose depth orders this face among the others."""
+    edges: tuple[bool, ...]
+    """Which edges (corner i to i+1) get a dark strip."""
+
+
+def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
+    """Cells of a slope's sloped columns and the faces that replace them.
+
+    The slope falls from full height at the stud row (``part.studs``) to a
+    lip of :data:`LIP_PLATES` at the far end, over all sloped columns (one
+    stud for 3039/3040b, two for 4286). Faces are split per column so the
+    painter's order stays per cell. ``None`` for every other part.
+    """
+    if part.category != "slope" or not part.studs:
+        return None
+    columns = {(x, y) for x, y, _ in part.cells}
+    high = set(part.studs) & columns
+    low = columns - high
+    if not high or not low:
+        return None
+    z0 = min(c[2] for c in part.cells)
+    z1 = max(c[2] for c in part.cells) + 1
+    shift = [
+        float(np.mean([c[k] for c in low]) - np.mean([c[k] for c in high]))
+        for k in (0, 1)
+    ]
+    axis = 0 if abs(shift[0]) >= abs(shift[1]) else 1
+    across = 1 - axis
+    sign = 1 if shift[axis] > 0 else -1
+    along = sorted({c[axis] for c in low})
+    sides = sorted({c[across] for c in low})
+    edge = along[0] if sign > 0 else along[-1] + 1
+    drop = (z1 - z0 - LIP_PLATES) / len(along)
+
+    def height(a: float) -> float:
+        return z1 - drop * (a - edge) * sign
+
+    def point(a: float, b: float, z: float) -> list[float]:
+        xyz = [0.0, 0.0, z]
+        xyz[axis], xyz[across] = a, b
+        return xyz
+
+    def unit(k: int, value: float) -> tuple[float, float, float]:
+        vector = [0.0, 0.0, 0.0]
+        vector[k] = value
+        return (vector[0], vector[1], vector[2])
+
+    faces: list[_Face] = []
+    for column in sorted(low):
+        a0, b0 = column[axis], column[across]
+        a1, b1 = a0 + 1, b0 + 1
+        a_low = a1 if sign > 0 else a0
+        first = (a0 if sign > 0 else a1) == edge
+        last = a_low == (along[-1] + 1 if sign > 0 else along[0])
+        outer0, outer1 = b0 == sides[0], b1 == sides[-1] + 1
+        key = (column[0], column[1], z0 + (z1 - z0) // 2)
+        top = [
+            point(a0, b0, height(a0)),
+            point(a1, b0, height(a1)),
+            point(a1, b1, height(a1)),
+            point(a0, b1, height(a0)),
+        ]
+        ends = (first, last) if sign > 0 else (last, first)  # at a0, at a1
+        faces.append(
+            _Face(np.asarray(top), (0, 0, 1), key, (outer0, ends[1], outer1, ends[0]))
+        )
+        for b, outer, out in ((b0, outer0, -1.0), (b1, outer1, 1.0)):
+            if outer:
+                side = [
+                    point(a0, b, z0),
+                    point(a1, b, z0),
+                    point(a1, b, height(a1)),
+                    point(a0, b, height(a0)),
+                ]
+                faces.append(
+                    _Face(np.asarray(side), unit(across, out), key, (True,) * 4)
+                )
+        if last:
+            lip = [
+                point(a_low, b0, z0),
+                point(a_low, b1, z0),
+                point(a_low, b1, z0 + LIP_PLATES),
+                point(a_low, b0, z0 + LIP_PLATES),
+            ]
+            faces.append(
+                _Face(np.asarray(lip), unit(axis, float(sign)), key, (True,) * 4)
+            )
+        bottom = [
+            point(a0, b0, z0),
+            point(a1, b0, z0),
+            point(a1, b1, z0),
+            point(a0, b1, z0),
+        ]
+        faces.append(_Face(np.asarray(bottom), (0, 0, -1), key, (True,) * 4))
+    sloped = {
+        (x, y, z) for x, y in low for z in range(z0, z1) if (x, y, z) in set(part.cells)
+    }
+    return sloped, faces
+
+
+def _outward_normal(
+    corners: NDArray[np.float64], outward: tuple[float, float, float]
+) -> NDArray[np.float64]:
+    """Unit normal of a planar polygon, pointing to the ``outward`` side."""
+    normal = np.cross(corners[1] - corners[0], corners[-1] - corners[0])
+    if float(normal @ np.asarray(outward)) < 0:
+        normal = -normal
+    unit: NDArray[np.float64] = normal / np.linalg.norm(normal)
+    return unit
+
+
+def _shade(normal: NDArray[np.float64], view: NDArray[np.float64]) -> float:
+    """Brightness of a face: the axis shades, blended by the normal's direction."""
+    below = float(view[2]) < 0
+    weights = 0.0
+    total = 0.0
+    for direction, shade in _DIRECTIONS:
+        weight = max(0.0, float(normal @ np.asarray(direction))) ** 2
+        lit = _BOTTOM_SHADE_FROM_BELOW if below and direction[2] < 0 else shade
+        weights += weight
+        total += weight * lit
+    return total / weights if weights else 1.0
+
+
+def _outline(
+    corners: NDArray[np.float64], edges: Sequence[bool]
+) -> list[NDArray[np.float64]]:
+    """Dark strips inside the flagged edges of a planar polygon."""
+    centre = corners.mean(axis=0)
+    strips = []
+    for k, flagged in enumerate(edges):
+        if not flagged:
+            continue
+        p, q = corners[k], corners[(k + 1) % len(corners)]
+        along = (q - p) / np.linalg.norm(q - p)
+        inward = (centre - p) - ((centre - p) @ along) * along
+        inward = inward / np.linalg.norm(inward) * _EDGE_WIDTH
+        strips.append(np.stack([p, q, q + inward, p + inward]))
+    return strips
 
 
 def _facing_shades(

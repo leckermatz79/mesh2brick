@@ -16,7 +16,8 @@ The STEP case is built on the fly (a small castle of boxes, see
 ``castle_step``) and converted with ``--config examples/mesh2brick.yaml``,
 the literal SPEC §9 command. ``--local`` adds models that must not be
 published (only their numbers are printed); ``@STUDS:SECONDS`` also sets
-``placement.time_limit_s``.
+``placement.time_limit_s``. ``--set KEY=VALUE`` applies to every input (for
+example slopes on for all).
 """
 
 from __future__ import annotations
@@ -64,6 +65,13 @@ def main() -> None:
         "--local", action="append", default=[], help="MODEL@STUDS[:SECONDS]"
     )
     parser.add_argument("--skip-fixtures", action="store_true")
+    parser.add_argument(
+        "--set",
+        action="append",
+        default=[],
+        dest="overrides",
+        help="KEY=VALUE for every input, e.g. 'parts.categories=[brick, plate, slope]'",
+    )
     parser.add_argument("--results", default="results.json", help="file name in OUT")
     args = parser.parse_args()
     out: Path = args.out
@@ -102,6 +110,8 @@ def main() -> None:
                 "name": f"{path.stem}-{size.replace(':', '-')}",
             }
         )
+    for case in cases:
+        case["set"] = [*case.get("set", []), *args.overrides]
     rows: list[dict[str, Any]] = []
     for case in cases:
         rows.append(_run(case, out))

@@ -164,6 +164,7 @@ RULES = BackendRules(
 
 
 def allow(**settings: object) -> frozenset[str]:
+    settings.setdefault("categories", ("brick", "plate"))  # the pre-1.3 default
     whitelist = allowed_parts(
         PLACEABLE,
         PartsConfig(**settings),  # type: ignore[arg-type]

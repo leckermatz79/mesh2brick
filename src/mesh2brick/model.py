@@ -22,12 +22,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 Cell = tuple[int, int, int]
-SCHEMA_VERSION: Final = 4
+SCHEMA_VERSION: Final = 5
 """Version 2 (Phase 6) added step verdicts, pre-assembly units, mass and the
 buildability verdict; version 3 (Phase 7) added section titles and step
-texts; version 4 (Roadmap 2) the time-limit mark ``best_so_far``. Older
-files still load (the new fields default)."""
-READABLE_SCHEMAS: Final = frozenset({1, 2, 3, SCHEMA_VERSION})
+texts; version 4 (Roadmap 2) the time-limit mark ``best_so_far``; version 5
+(1.3.0) the stud columns of slopes. Older files still load (the new fields
+default)."""
+READABLE_SCHEMAS: Final = frozenset({1, 2, 3, 4, SCHEMA_VERSION})
 MAX_SECTION_CHARS: Final = 40
 MAX_STEP_TEXT_CHARS: Final = 200
 MM_PER_STUD: Final = 8.0
@@ -62,6 +63,9 @@ class PlacedPart:
         unit: parts of one step that share a ``unit`` number are put together
             in the hand first and then placed as one piece (a part that hangs
             below the part holding it); ``None`` for parts placed on their own.
+        studs: ``(x, y)`` columns with a stud on top, for parts with studs on
+            only some columns (slopes: the high row); ``None`` means the
+            category decides (bricks and plates everywhere, tiles nowhere).
     """
 
     part: str
@@ -75,6 +79,7 @@ class PlacedPart:
     category: str = "brick"
     backend_key: str = ""
     unit: int | None = None
+    studs: tuple[tuple[int, int], ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.cells:
@@ -256,8 +261,13 @@ class BrickModel:
             raise ValueError(msg)
         parts = tuple(
             PlacedPart(
-                **{k: v for k, v in raw.items() if k != "cells"},
+                **{k: v for k, v in raw.items() if k not in {"cells", "studs"}},
                 cells=tuple((int(c[0]), int(c[1]), int(c[2])) for c in raw["cells"]),
+                studs=(
+                    None
+                    if raw.get("studs") is None
+                    else tuple((int(s[0]), int(s[1])) for s in raw["studs"])
+                ),
             )
             for raw in data["parts"]
         )

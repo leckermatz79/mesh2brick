@@ -6,6 +6,30 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-07 - Solver order and slopes back on
+
+Slopes are back, and big models convert faster (issue #34, ROADMAP item 8 moved up, ADR 0016).
+The stability LPs now try simplex for 3 s and then the interior-point method without crossover.
+Small models take the same time as in 1.2, big ones up to 32 s less; with slopes every fixture
+stays one stable piece at most 1.45x slower (docs/benchmarks.md, "Solver order and slopes back on").
+
+### Added
+- Slopes are drawn as slopes in previews, step pictures and part tiles: the stud row as cells
+  with studs, the sloped columns as a wedge down to a half-plate lip, as in LDraw's 3039, 3040b
+  and 4286. `PlacedPart.studs` records the stud row (brick-model schema 5).
+- `scripts/benchmark_release.py --set KEY=VALUE` applies a setting to every input.
+
+### Changed
+- `parts.categories` defaults to `[brick, plate, slope]` again (opt-in since Phase 1);
+  `[brick, plate]` turns slopes off.
+- Local patch #2: stability LPs try simplex (3 s), the interior-point method without crossover
+  (300 s), simplex without presolve (5 s), then legolization's last attempt, in both LP paths
+  (also legolization's step planning).
+
+### Known
+- legolization's `preserve` mode places few slopes, and most on the inner wall of hollow shells
+  (10 of 130 visible on the fixtures). More visible slopes are the 2.0 part of ROADMAP item 8.
+
 ## [1.2.0] - 2026-11-07 - Roadmap 2: hard time limit
 
 A conversion no longer runs past `placement.time_limit_s`. Duo at 48 studs (local model) with

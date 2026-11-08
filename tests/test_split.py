@@ -117,7 +117,8 @@ def test_unavailable_parts_for_exclusion() -> None:
     slopes = load_settings(None, ["parts.categories=[brick, plate, slope]"])
     gone = unavailable_parts([GREEN], slopes, _missing(("3039", GREEN)))
     assert {"3039", "3040b", "4286"} <= gone  # all slopes or none
-    assert unavailable_parts([GREEN], settings, _missing(("3039", GREEN))) == set()
+    no_slopes = load_settings(None, ["parts.categories=[brick, plate]"])
+    assert unavailable_parts([GREEN], no_slopes, _missing(("3039", GREEN))) == set()
 
 
 @pytest.mark.ldraw

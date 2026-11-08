@@ -157,10 +157,10 @@ PartNumbers = Annotated[tuple[str, ...], BeforeValidator(_part_numbers)]
 class PartsConfig(_Section):
     """Which parts placement may use."""
 
-    categories: tuple[PartCategory, ...] = ("brick", "plate")
-    """Part families placement may use. ``slope`` is opt-in for now: with
-    legolization 0.5.0 it can slow placement down 50x (docs/UPSTREAM.md #2);
-    SPEC §4 lists it as a default."""
+    categories: tuple[PartCategory, ...] = ("brick", "plate", "slope")
+    """Part families placement may use. ``slope`` is on again since 1.3.0: the
+    LP attempt order made it cheap (every fixture stable, at most 1.45x the
+    time without slopes, docs/benchmarks.md); ``[brick, plate]`` turns it off."""
     include: PartNumbers = ()
     """LDraw part numbers to allow explicitly (whitelist, Phase 4)."""
     exclude: PartNumbers = ()
