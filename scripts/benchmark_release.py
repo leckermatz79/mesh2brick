@@ -39,6 +39,11 @@ from make_fixtures import step_boxes
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
 MODEL_SUFFIXES = {".stl", ".obj", ".ply", ".3mf", ".glb", ".step", ".blend", ".vox"}
+KB_PER_STEP_WARN = 40.0
+"""Booklets of models above 500 parts above this many kB per step are flagged
+(1.4: 43-75 kB; with the compact step pictures of 1.5 about 20-30 kB,
+docs/benchmarks.md "PDF size (Roadmap 4)")."""
+WARN_MIN_PARTS = 501
 
 
 def castle_step() -> str:
@@ -189,6 +194,9 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
         "bom_total": bom_total,
         "ldraw_parts": LegolizationBackend().verify_ldraw(ldraw),
         "pdf_mb": round((target / f"{name}.pdf").stat().st_size / 1e6, 2),
+        "kb_per_step": round(
+            (target / f"{name}.pdf").stat().st_size / max(model.step_count, 1) / 1e3, 1
+        ),
         "shell_cells": inspection.shell.filled_count,
         "estimate": inspection.parts_estimate,
         "grid": inspection.grid.shape,
@@ -209,9 +217,16 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
     print(
         "| Input | Parts | Steps | Checked states | Need a hand | Colours "
         "| One stable piece | Files + BOM + LDraw ok "
-        "| PDF MB | Time s | Shell cells | Parts/cell |"
+        "| PDF MB | kB per step | Time s | Shell cells | Parts/cell |"
     )
-    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    big = [
+        r
+        for r in rows
+        if not r["exit"]
+        and r["parts"] >= WARN_MIN_PARTS
+        and r["kb_per_step"] > KB_PER_STEP_WARN
+    ]
     for row in rows:
         if row["exit"]:
             print(f"| {row['label']} | failed: {row.get('error')} |")
@@ -228,8 +243,15 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
             f"| {'yes' if row['buildable'] else 'NO'}"
             f"{' (best so far)' if row.get('best_so_far') else ''} "
             f"| {'yes' if checks else 'NO'} "
-            f"| {row['pdf_mb']} | {row['seconds']:.0f} | {row['shell_cells']:,} "
+            f"| {row['pdf_mb']} | {row['kb_per_step']} | {row['seconds']:.0f} "
+            f"| {row['shell_cells']:,} "
             f"| {ratio:.2f} |"
+        )
+
+    for row in big:
+        print(
+            f"WARNING: {row['label']}: {row['kb_per_step']} kB per step in the PDF "
+            f"(more than {KB_PER_STEP_WARN:.0f}; PDF size, Roadmap 4)"
         )
 
 
