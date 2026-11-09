@@ -38,3 +38,11 @@ def test_bottom_checked_top_open() -> None:
     result = coverage(_tower([True, True, None, None, True]))
     assert (result.kind, result.checked, result.total) == ("partial", 3, 5)
     assert (result.layers, result.all_layers) == (2, 5)
+
+
+def test_llm_description_names_the_checked_states() -> None:
+    from mesh2brick.agent.describe import _checks_line  # noqa: PLC0415
+
+    assert _checks_line(coverage(_tower([True, False]))).startswith("Every")
+    assert _checks_line(coverage(_tower([True, None]))).startswith("1 of 2")
+    assert "not checked" in _checks_line(coverage(_tower([None, None])))
