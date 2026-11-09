@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-09 · **1.4.0 – Stabilitätsprüfung auch für große Modelle fertig** ([#26](https://github.com/leckermatz79/mesh2brick/issues/26), ROADMAP Punkt 3) · davor 1.3.0 (Löserreihenfolge + Dachsteine) · Nächster Punkt: **Roadmap 4 – kleinere PDFs** ([#27](https://github.com/leckermatz79/mesh2brick/issues/27), [ROADMAP.md](../ROADMAP.md))
+Stand: 2026-11-09 · **1.4.0 – Stabilitätsprüfung auch für große Modelle fertig** ([Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.4.0)) ([#26](https://github.com/leckermatz79/mesh2brick/issues/26), ROADMAP Punkt 3) · davor 1.3.0 (Löserreihenfolge + Dachsteine) · Nächster Punkt: **Roadmap 4 – kleinere PDFs** ([#27](https://github.com/leckermatz79/mesh2brick/issues/27), [ROADMAP.md](../ROADMAP.md))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
@@ -74,8 +74,8 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | Die KI legt selten Schritte zusammen: Die kleinen hat mesh2brick schon vorher zusammengelegt, und die übrigen Nachbarn verdecken sich meist gegenseitig. | akzeptieren; der Nutzen liegt in Abschnitten und Texten |
 | Für Claude-Modelle, deren Preise mesh2brick nicht kennt, gilt die Kostengrenze nicht (der Lauf sagt das). | Preistabelle bei neuen Modellen ergänzen |
 | Große Modelle prüfen ihre Zwischenstände in der Zeit, die nach der Platzierung bleibt. In 5 Minuten schaffen die größten Testmodelle 40–87 % (Würfel, Burg, Vertex-Modell, Kugel); die ungeprüften stehen oben im Modell. Deckblatt und Kommandozeile sagen, wie viele geprüft sind. | `--time 20min` prüft alle; kein eigener Code nötig |
-| Während der Prüfung rechnet mesh2brick auf allen Kernen bis auf einen (bis zu einige Minuten, Lüfter hörbar). | Frage an dich unten |
-| Kleine Modelle (bis 500 Teile) nutzen weiter legolizations Suche; die geprüfte Schichtfolge wäre auch dort schneller und bräuchte seltener eine Hand (Rakete: 0 statt 11 Schritte). | Frage an dich unten |
+| Während der Prüfung rechnet mesh2brick auf allen Kernen bis auf einen (bis zu einige Minuten, Lüfter hörbar). | von dir so gewollt (2026-11-09) |
+| Kleine Modelle (bis 500 Teile) nutzen weiter legolizations Suche; die geprüfte Schichtfolge wäre auch dort schneller und bräuchte seltener eine Hand (Rakete: 0 statt 11 Schritte). | von dir so entschieden (2026-11-09); Wiedervorlage bei 2.x Punkt 17 |
 | Hängen mehrere vorher zusammengesteckte Teile aneinander, wird ein Schritt größer (Kugel bei 32 Noppen: einmal 18 Teile, sonst meist höchstens 10). | selten; eigener Code, falls es stört |
 | Bei kleinen Modellen übernimmt legolization die Reihenfolge, bei großen die geprüfte Schichtfolge. Wo die Stabilitätsrechnung „braucht Stütze“ meldet, steht im PDF „Halte das Modell fest“. | akzeptiert |
 | „Teile weglassen“ gilt fürs ganze Modell, nicht pro Farbe. | Upstream #9 (nach #8) |
@@ -140,14 +140,21 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | 2026-11-07 | Schnelleren Rechenweg bei legolization vorschlagen? | **Ja, nach deinem Blick auf den Text.** Er benennt die Ursache statt des Symptoms und ist damit wertvoller als unser Zeitlimit-PR. Kommentar an #89, Verweis in #88. **Erledigt** von dir: [Kommentar an #89](https://github.com/hbmartin/legolization/pull/89#issuecomment-6712391855), [Verweis in #88](https://github.com/hbmartin/legolization/issues/88#issuecomment-6712393969). |
 | 2026-11-07 | Vor Roadmap 3: Ist der Slope-Hänger dasselbe Crossover-Problem? | **Gemessen:** nein, ein Simplex-Problem, aber derselbe Ausweg hilft (Hase mit Dachsteinen 147 s → 17,5 s). Vorschlag: Löserreihenfolge zuerst. |
 | 2026-11-07 | Reihenfolge nach der Slope-Messung? | **Erst Löserreihenfolge + Dachsteine wieder an als 1.3.0, dann Roadmap 3.** Vorher „Simplex 1 s, dann Innere-Punkte-Löser“ messen; kleine Modelle dürfen nicht spürbar langsamer werden, die 5-s-Grenze pro Versuch bleibt. Dachsteine nur standardmäßig an, wenn alle Testmodelle stabil sind und höchstens die doppelte Zeit brauchen. ROADMAP Punkt 8 ist in die 1.x-Liste gerückt; mehr Dachsteine setzen bleibt in 2.0. |
+| 2026-11-09 | Kleine Modelle auch auf die geprüfte Schichtfolge umstellen? | **Nein**, bis 500 Teile bleibt legolizations Suche wie in 1.3. Zum Vergleich die Rakete beide Male als PDF (Befehle unter „Offene Kleinigkeiten“). **Wiedervorlage bei 2.x Punkt 17** (geometrische Baugruppen). |
+| 2026-11-09 | Alle Kerne für die Prüfung? | **Ja, alle bis auf einen.** Keine Einstellung dafür. |
+| 2026-11-09 | legolization-Issue zu den drei Funden einreichen? | **Ja**, nach deinem Blick auf den Text; mit Halbsatz-Verweis auf #88/#89 (ergänzt). Befehl unter „Offene Kleinigkeiten“. |
 
 ## Fragen an dich
 
-1. **Kleine Modelle auch auf die geprüfte Schichtfolge umstellen?** Bis 500 Teile plant weiter legolizations Suche (mit den blauen Baugruppen-Feldern). Gemessen wäre die Schichtfolge mit Mini-Vorbauten auch dort schneller und bräuchte seltener eine Hand (Rakete: 0 statt 11 Schritte mit „Halte fest“, 4 statt 8 s; L-Winkel 0 statt 1). Dafür sähen die Anleitungen kleiner Modelle anders aus: Schicht für Schicht, keine blauen Baugruppen. **Standard, wenn du nichts sagst:** bleibt wie in 1.3; ausprobieren mit `--set steps.sequencing=checked-layers`.
-2. **Alle Kerne für die Prüfung?** Große Modelle rechnen bis zu einige Minuten auf allen Kernen bis auf einen (11 von 12, 10–13 % schneller als 8). **Standard:** bleibt so. Wenn dich Lüfter oder ein träger Rechner stören, mache ich daraus eine Einstellung.
-3. **legolization-Issue zu den drei Funden einreichen?** Text in [UPSTREAM.md](UPSTREAM.md), Entwurf #15–17 (eine Meldung mit Messwerten und zwei kleinen Korrekturen; Verweis auf #88/#89 und #90/#91). **Standard:** ja, nach deinem Blick auf den Text; der fertige Befehl steht im PR.
+Zurzeit keine. Deine Antworten zu Roadmap 3 stehen unter „Deine Entscheidungen“.
 
 ## Offene Kleinigkeiten
 
+- **Rakete im Vergleich** (Wiedervorlage bei 2.x Punkt 17): legolizations Suche (Standard, mit blauen Baugruppen) gegen die geprüfte Schichtfolge mit Mini-Vorbauten:
+  `uv run mesh2brick convert tests/fixtures/rocket.blend -o out/rocket-suche`
+  `uv run mesh2brick convert tests/fixtures/rocket.blend -o out/rocket-schichten --set steps.sequencing=checked-layers`
+  Danach `out/rocket-suche/rocket.pdf` und `out/rocket-schichten/rocket.pdf` nebeneinanderlegen (gemessen: 11 gegen 0 Schritte mit „Halte fest“).
+- **legolization-Issue** (Entwurf #15–17 in [UPSTREAM.md](UPSTREAM.md), Text in `out/upstream/legolization-step-planning.md`), nach deinem Blick auf den Text:
+  `gh issue create --repo hbmartin/legolization --title "Step planning on large hollow models: where the time goes (measurements, two small fixes)" --body-file out/upstream/legolization-step-planning.md`
 - **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite (Roadmap 7, #30). Befehl für `v0.0.0`:
   `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
