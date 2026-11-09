@@ -7,6 +7,7 @@ from __future__ import annotations
 import time
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -20,7 +21,6 @@ from mesh2brick.backends import (
     StepSequencer,
 )
 from mesh2brick.backends.legolization import (
-    AUTO_THOROUGH_MAX_PARTS,
     LegolizationBackend,
     from_lego_grid,
     load_voxel_file,
@@ -272,7 +272,9 @@ def test_sequencing_modes_translate(
     ) == expected
 
 
-@pytest.mark.parametrize("mode", ["auto", "thorough", "fast", "layers"])
+@pytest.mark.parametrize(
+    "mode", ["auto", "thorough", "fast", "checked-layers", "layers"]
+)
 def test_every_sequencing_mode_covers_every_part(
     backend: LegolizationBackend, heart: VoxelGrid, mode: str, tmp_path: Path
 ) -> None:
@@ -320,10 +322,10 @@ def test_expired_deadline_falls_back_to_layers(
 ) -> None:
     settings = load_settings(None, ["steps.sequencing=thorough"])
     layout = heart_placement.native.layout  # type: ignore[union-attr]
-    plan, notes, checked = backend._plan(
+    plan, notes, kind = backend._plan(
         layout, backend.pipeline_config(settings), settings, time.monotonic()
     )
-    assert not checked
+    assert kind == "layers"
     assert any("time limit reached" in note for note in notes)
     assert sorted(b for s in plan.steps for b in s.brick_ids) == sorted(
         b.brick_id for b in layout
@@ -337,15 +339,43 @@ def test_expired_deadline_before_placement_is_reported(
         backend.place(heart, Settings(), name="h", deadline=time.monotonic())
 
 
-def test_auto_uses_layers_for_big_models(
+def test_auto_checks_layer_order_for_big_models(
     backend: LegolizationBackend, heart: VoxelGrid, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from mesh2brick.steps import budget  # noqa: PLC0415
+
+    assert budget.THOROUGH_MAX_PARTS == 500
+    monkeypatch.setattr(budget, "THOROUGH_MAX_PARTS", 3)
+    placement = backend.place(heart, Settings(), name="h")
+    assert any("intermediate states were checked" in n for n in placement.notes)
+    steps = placement.model.steps
+    assert all(step.stable is not None for step in steps)
+    lowest = [
+        min(p.layer for p in placement.model.parts_in_step(i))
+        for i in range(len(steps))
+    ]
+    assert lowest == sorted(lowest)  # layer order
+
+
+def test_checks_cut_short_keep_what_was_checked(
+    backend: LegolizationBackend, heart: VoxelGrid, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mesh2brick.backends import checks  # noqa: PLC0415
     from mesh2brick.backends import legolization as module  # noqa: PLC0415
 
-    assert AUTO_THOROUGH_MAX_PARTS == 500
-    monkeypatch.setattr(module, "AUTO_THOROUGH_MAX_PARTS", 3)
-    placement = backend.place(heart, Settings(), name="h")
-    assert any("steps follow layer order" in note for note in placement.notes)
+    def first_two(
+        layout: Any, steps: list[Any], *_: object, **__: object
+    ) -> list[checks.Verdict | None]:
+        verdicts = checks.check_states(layout, steps, None, workers=1)
+        return [*verdicts[:2], *[None] * (len(steps) - 2)]
+
+    monkeypatch.setattr(module, "check_states", first_two)
+    settings = load_settings(None, ["steps.sequencing=checked-layers"])
+    placement = backend.place(heart, settings, name="h")
+    stable = [step.stable for step in placement.model.steps]
+    assert stable[:2] != [None, None]
+    assert stable[2:] == [None] * (len(stable) - 2)
+    assert any("2 of" in note for note in placement.notes)
 
 
 def test_default_placement_budget(backend: LegolizationBackend) -> None:
