@@ -10,7 +10,9 @@ the other, and measures the wall-clock time of the whole process. Afterwards
 it checks every result: all output files written, parts list total = parts,
 the LDraw file re-reads strictly (every part known to the library, no
 duplicates), the model is one stable piece. It also records the hollow-shell
-cell count of ``mesh2brick inspect`` to calibrate its rough part estimate.
+cell count of ``mesh2brick inspect`` to calibrate its rough part estimate, and
+how many intermediate states were checked for stability ("checked states",
+Roadmap 3) and how many steps need a supporting hand.
 
 The STEP case is built on the fly (a small castle of boxes, see
 ``castle_step``) and converted with ``--config examples/mesh2brick.yaml``,
@@ -127,6 +129,7 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     from mesh2brick.config import load_settings  # noqa: PLC0415
     from mesh2brick.inspection import inspect_file  # noqa: PLC0415
     from mesh2brick.model import BrickModel  # noqa: PLC0415
+    from mesh2brick.steps.coverage import coverage  # noqa: PLC0415
 
     path: Path = case["path"]
     target = out / (case.get("name") or path.stem)
@@ -172,9 +175,12 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     inspection = inspect_file(path, settings, name=name)
     with (target / f"{name}.bom.csv").open(encoding="utf-8", newline="") as handle:
         bom_total = sum(int(row["quantity"]) for row in csv.DictReader(handle))
+    checks = coverage(model)
     row |= {
         "parts": model.part_count,
         "steps": model.step_count,
+        "checked_states": checks.checked,
+        "hand_steps": sum(1 for step in model.steps if step.stable is False),
         "colours": len(model.colors),
         "buildable": model.buildable,
         "best_so_far": model.best_so_far,
@@ -201,10 +207,11 @@ def _stages(stdout: str) -> dict[str, float]:
 def _print_table(rows: list[dict[str, Any]]) -> None:
     print()
     print(
-        "| Input | Parts | Steps | Colours | One stable piece | Files + BOM + LDraw ok "
+        "| Input | Parts | Steps | Checked states | Need a hand | Colours "
+        "| One stable piece | Files + BOM + LDraw ok "
         "| PDF MB | Time s | Shell cells | Parts/cell |"
     )
-    print("|---|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for row in rows:
         if row["exit"]:
             print(f"| {row['label']} | failed: {row.get('error')} |")
@@ -216,7 +223,8 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
         )
         ratio = row["parts"] / row["shell_cells"] if row["shell_cells"] else 0
         print(
-            f"| {row['label']} | {row['parts']:,} | {row['steps']} | {row['colours']} "
+            f"| {row['label']} | {row['parts']:,} | {row['steps']} "
+            f"| {row['checked_states']} | {row['hand_steps']} | {row['colours']} "
             f"| {'yes' if row['buildable'] else 'NO'}"
             f"{' (best so far)' if row.get('best_so_far') else ''} "
             f"| {'yes' if checks else 'NO'} "
