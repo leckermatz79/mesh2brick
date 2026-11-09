@@ -83,7 +83,10 @@ Metric for every item: surface deviation to the input mesh (and part count) at u
 15. **Masonry offset.** 41 % of vertical joints run straight through to the next layer. Upstream candidate #11,
     or our own post-pass behind the `Placer` protocol once we own placement.
 16. **Internal support for large hollow models** (pillars in the cavity, weight reduction).
-17. **Geometric sub-assemblies**: detect symmetry and repeated modules ("build 2×").
+17. **Geometric sub-assemblies**: detect symmetry and repeated modules ("build 2×"). Revisit here (product
+    owner, 2026-11-09): whether models up to 500 parts should also use the checked layer order of 1.4
+    instead of legolization's search (rocket: 0 instead of 11 steps that need a hand; STATUS has the
+    commands to compare both PDFs).
 18. **Automatic camera per step** to avoid hidden new parts.
 19. **Cost estimate on the cover page** from BrickLink price data (catalogue already has the mapping).
 
