@@ -103,6 +103,13 @@ class PreviewOptions:
     """Show the model as built after this 0-based step (see :func:`step_view`):
     that step in full colour, earlier parts faded. ``None`` = finished model."""
     background: str = "#ffffff"
+    faded_edges: bool = True
+    """Draw the joints between faded (earlier) parts of a step picture;
+    ``False`` shows them as plain faces, so the new parts stand out."""
+    octree_palette: bool = False
+    """Quantize step pictures with a fast octree instead of median cut: a
+    third smaller files, colours off by at most one level per channel
+    (Roadmap 4, ADR 0018)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,17 +373,35 @@ def render_step_images(
         if not visible:  # an empty step (should not happen) gets a blank frame
             images.append(draw_png([], [], view, extent))
             continue
-        polygons, fills = _scene(model, visible, highlight, camera, view.background)
-        images.append(_palette_png(draw_png(polygons, fills, view, extent)))
+        polygons, fills = _scene(
+            model,
+            visible,
+            highlight,
+            camera,
+            view.background,
+            faded_edges=view.faded_edges,
+        )
+        images.append(
+            _palette_png(
+                draw_png(polygons, fills, view, extent),
+                method=(
+                    Image.Quantize.FASTOCTREE
+                    if view.octree_palette
+                    else Image.Quantize.MEDIANCUT
+                ),
+            )
+        )
     return images
 
 
-def _palette_png(png: bytes, colors: int = STEP_IMAGE_COLORS) -> bytes:
+def _palette_png(
+    png: bytes,
+    colors: int = STEP_IMAGE_COLORS,
+    method: Image.Quantize = Image.Quantize.MEDIANCUT,
+) -> bytes:
     """Re-encode an RGB(A) PNG with a small colour palette."""
     with Image.open(io.BytesIO(png)) as image:
-        quantized = image.convert("RGB").quantize(
-            colors=colors, method=Image.Quantize.MEDIANCUT
-        )
+        quantized = image.convert("RGB").quantize(colors=colors, method=method)
     buffer = io.BytesIO()
     quantized.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
@@ -426,15 +451,24 @@ def grid_to_model(
 
 
 # --------------------------------------------------------------------------- scene
-def _scene(
+def _scene(  # noqa: PLR0915 - one pass over faces, edges and studs
     model: BrickModel,
     visible: frozenset[int],
     highlight: frozenset[int] | None,
     camera: Camera,
     background: str,
+    *,
+    faded_edges: bool = True,
 ) -> tuple[list[NDArray[np.float64]], NDArray[np.float64]]:
-    """Back-to-front polygons (screen space) and their RGB fills."""
+    """Back-to-front polygons (screen space) and their RGB fills.
+
+    Without ``faded_edges`` the joints between faded parts (those outside
+    ``highlight``) are not drawn.
+    """
     index = np.fromiter(sorted(visible), dtype=np.int64)
+    edged = np.ones(len(index), dtype=bool)
+    if not faded_edges and highlight is not None:
+        edged = np.isin(index, np.fromiter(highlight, dtype=np.int64))
     cells, owner_of_cell = _cells(model, index)
     base = _part_colours(model, index, highlight, background)
     low, owner, studded = _lattice(model, index, cells, owner_of_cell)
@@ -462,7 +496,11 @@ def _scene(
         groups_rgb.append(np.clip(base[part_pos] * shade, 0.0, 1.0))
         groups_key.append(depth)
         groups_order.append(np.zeros(len(at), dtype=np.int64))
-        for strip, keep in _strips(at, d, corners, owner, exposed):
+        for strip_all, keep_all in _strips(at, d, corners, owner, exposed):
+            shown = edged[part_pos[keep_all]]
+            strip, keep = strip_all[shown], keep_all & edged[part_pos]
+            if not len(strip):
+                continue
             groups_poly.append(camera.project(strip))
             groups_rgb.append(base[part_pos[keep]] * _EDGE_DARKEN)
             groups_key.append(depth[keep])
