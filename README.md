@@ -130,6 +130,8 @@ All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.ya
   every intermediate state is checked for stability, in parallel on several cores; a
   step that needs a supporting hand says so. If the time limit stops the checks, the
   cover says how many states were checked (`--time 20min` checks all).
+  In their step pictures the parts built earlier are plain faces (studs, no joints), so the
+  new parts stand out and the PDF stays below 10 MB.
 - Colour names stay the BrickLink/Rebrickable names, so they can be found there;
   German booklets add a German name in brackets ("Bright Green (Hellgrün)").
 - **With the LLM layer:** build sections with titles ("Base", "Head", "Left ear") and a

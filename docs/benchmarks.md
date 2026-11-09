@@ -711,3 +711,110 @@ All files, parts-list totals and strict LDraw re-reads pass; no model is cut sho
 - **Duo at 48 studs with 20 minutes: two thirds.** Placement alone takes about 10 of the 20 minutes,
   and checking all states took 919 s with 8 processes on the finished layout; `--time 30min` should
   check all of them (estimate, not measured).
+
+## PDF size (Roadmap 4, 2026-11-09)
+
+Issue #27. `scripts/benchmark_pdf.py` writes the booklet of a finished model again (from the
+`.bricks.json` of the 1.4 release run, so placement is not repeated) and counts every picture the
+booklet renders by kind; the rest of the file is page content (text, vectors), fonts and structure.
+
+**Where the bytes are (1.4):**
+
+| Model | Parts | Steps | PDF MB | Step pictures MB | kB per step picture | Part tiles MB | Callouts MB | Cover MB | Rest MB | PDF time |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| textured cube | 2,280 | 327 | 23.22 | 22.06 (95 %) | 67.5 | 0.10 | 0.13 | 0.54 | 0.39 | 54 s |
+| STEP cube | 1,952 | 274 | 20.36 | 19.41 (95 %) | 70.8 | 0.10 | 0.14 | 0.36 | 0.35 | 44 s |
+| sphere | 1,499 | 207 | 10.11 | 8.83 (87 %) | 42.7 | 0.11 | 0.66 | 0.32 | 0.20 | 44 s |
+| bunny | 873 | 126 | 5.59 | 4.73 (85 %) | 37.5 | 0.11 | 0.28 | 0.27 | 0.20 | 17 s |
+| rocket | 263 | 42 | 1.19 | 0.78 (66 %) | 18.6 | 0.11 | 0.01 | 0.17 | 0.12 | 3 s |
+
+- **The step pictures are the PDF.** Part tiles, callouts, cover, text and fonts together are
+  0.4–1.3 MB for every model.
+- **A step picture's size follows the area the model covers** (correlation 0.72–0.91 with the share
+  of non-background pixels; about 200 kB for a fully covered picture at 130 dpi): the cubes fill 38 %
+  of their frame, sphere and bunny 20 %. The number of visible parts hardly matters (−0.19 to 0.68).
+  What costs bytes are the edges: joint lines between parts and stud outlines, anti-aliased, then
+  quantized to 64 colours.
+
+**The levers, on single step pictures** (cube step 220, toadstool step 120, rocket step 30;
+`out/pdf-size/levers/` has the pictures):
+
+| Lever | Cube | Toadstool | Rocket | Look |
+|---|---:|---:|---:|---|
+| 1.4: median-cut palette, 64 colours, 130 dpi, anti-aliased | 41.1 kB | 33.1 kB | 15.5 kB | – |
+| a) palette by fast octree, 64 colours | 24.0 kB | 24.8 kB | 11.3 kB | flat colours off by ≤ 1 level per channel, edges more exact than median cut |
+| a) median cut with 32 / 24 colours | 32.7 / 28.8 kB | – | 12.3 / 11.7 kB | visible banding at 24 |
+| a) zlib strategies and PNG row filters on top of Pillow | ≤ −1.5 % | ≤ −1.5 % | ≤ −2.7 % | – (Pillow is already near-optimal) |
+| a) no anti-aliasing | 13.4 kB | – | – | jagged edges, joints look heavier: a visible change |
+| b) 110 / 100 / 90 dpi (with octree) | 18.9 / 16.6 / 14.8 kB | 19.9 / 17.0 / 14.7 kB | – | softer, part still clear at 100 |
+| c) vector paths (PDF, Flate) | 602 kB | 556 kB | 106 kB | vectors win only below about 120 polygons (one or two parts: heart step 1 1.4 kB against 2.0 kB) |
+| d) faded parts without joints (octree, 130 dpi) | 11.2 kB | 16.6 kB | – | earlier parts as plain faces with studs; new parts stand out more |
+| d) … and without studs on faded parts | 7.6 kB | 11.4 kB | – | no studs left to count positions on: rejected |
+
+**Whole booklets** (`benchmark_pdf.py --compact on --dpi …`; MB):
+
+| Variant | Textured cube | STEP cube | Castle | Sphere | Vertex model |
+|---|---:|---:|---:|---:|---:|
+| 1.4 | 23.22 | 20.36 | 19.35 | 10.11 | 9.91 |
+| octree palette, 130 dpi | 18.83 | 12.57 | 10.26 | 7.09 | 8.73 |
+| octree, 110 dpi | 15.01 | 10.16 | 8.05 | 5.80 | 7.12 |
+| octree, 100 dpi | 12.98 | 8.60 | 7.25 | 5.19 | 6.35 |
+| octree + faded parts without joints, 130 dpi | 11.84 | 7.65 | 6.41 | 5.17 | 6.64 |
+| **octree + faded parts without joints, 110 dpi (chosen)** | **9.45*** | **6.31*** | – | – | – |
+| octree + faded parts without joints, 100 dpi | 8.10 | 5.26 | – | – | – |
+
+\* `--dpi` also lowers the cover picture here; as shipped only the step pictures change (textured
+cube 9.56 MB, STEP cube 6.39 MB, see below).
+
+- **Only with the faded parts drawn without joints does the textured cube get below 10 MB** without
+  going below 100 dpi; its two-colour pattern makes many more edges than the plain cube. The product
+  owner chose it for big models only (2026-11-09; comparison page in `out/pdf-size/`): models above
+  500 parts get faded parts without joints, the octree palette and 110 dpi; small models keep the
+  pictures of 1.4 pixel for pixel (ADR 0018).
+- Drawing fewer polygons also makes the booklet faster: textured cube 54 → 31 s.
+
+**1.5 rule on every booklet** (`benchmark_pdf.py` on the 1.4 models, compact by size; MB, 1.4 in
+brackets; step pages of heart, L-bracket and rocket pixel-identical to 1.4):
+
+| Model | Parts | PDF MB | kB per step picture | PDF time |
+|---|---:|---:|---:|---:|
+| heart, L-bracket, rocket | 12–263 | 0.29 / 1.22 / 1.19 (same) | 13–23 (same) | same |
+| torus | 552 | 1.98 (4.11) | 17.8 | 6 s |
+| two bodies | 606 | 2.24 (4.22) | 18.6 | 6 s |
+| bunny | 873 | 2.62 (5.59) | 14.0 | 10 s (17) |
+| Duo @32 (local only) | 1,025 | 3.68 (6.99) | 15.2 | 12 s |
+| toadstool | 1,239 | 3.88 (7.61) | 13.5 | 17 s |
+| sphere | 1,499 | 4.39 (10.11) | 15.0 | 24 s (44) |
+| vertex model | 1,519 | 5.58 (9.91) | 19.1 | 25 s |
+| castle | 1,657 | 5.11 (19.35) | 17.7 | 20 s |
+| STEP cube | 1,952 | 6.39 (20.36) | 19.8 | 26 s (44) |
+| textured cube | 2,280 | 9.56 (23.22) | 25.7 | 31 s (54) |
+| Duo @48 (local only) | 2,308 | 7.61 (16.43) | 17.0 | 39 s |
+
+**Release run 1.5** (`scripts/benchmark_release.py --out out/release-1.5 --local …@32 --local …@48:1200`,
+on AC power, lid open; in brackets 1.4). Parts, steps and pages as in 1.4 for every input; all files,
+parts-list totals and strict LDraw re-reads pass; no warning above 40 kB per step.
+
+| Input | Parts | Steps | PDF MB | kB per step | PDF s | Time s | Checked states |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `heart.vox` | 12 | 7 | 0.29 (0.29) | 42.0 | 0 | 4 (4) | 7 of 7 |
+| `l_bracket.stl` | 153 | 37 | 1.22 (1.22) | 32.9 | 3 | 30 (29) | 37 of 37 |
+| `rocket.blend` | 263 | 42 | 1.19 (1.19) | 28.3 | 3 | 18 (19) | 42 of 42 |
+| `torus.stl` | 552 | 74 | 1.98 (4.11) | 26.8 | 5 | 33 (36) | 74 of 74 |
+| `two_bodies.step` | 606 | 83 | 2.24 (4.22) | 27.0 | 6 | 163 (166) | 83 of 83 |
+| `bunny_lowpoly.stl` | 873 | 126 | 2.62 (5.59) | 20.8 | 9 (16) | 120 (125) | 126 of 126 |
+| Duo @32 (local only) | 1,025 | 153 | 3.74 (6.99) | 24.4 | 11 | 128 (139) | 153 of 153 |
+| `toadstool.obj` | 1,239 | 178 | 3.88 (7.61) | 21.8 | 16 (29) | 250 (259) | 178 of 178 |
+| `sphere_r10.stl` | 1,499 | 207 | 4.39 (10.11) | 21.2 | 24 (43) | 261 (280) | 172 of 207 |
+| `vertex_colors.ply` | 1,519 | 212 | 5.58 (9.91) | 26.3 | 24 (44) | 260 (281) | 156 of 212 |
+| `castle.step` (generated), `--config` | 1,657 | 234 | 5.11 (19.35) | 21.8 | 19 (32) | 251 (265) | 151 of 234 |
+| `cube_10mm.step` / `.stl` | 1,952 | 274 | 6.39 (20.36) | 23.3 | 26 (42) | 250 (265) | 123 of 274 |
+| `textured_cube.obj` | 2,280 | 327 | 9.56 (23.22) | 29.2 | 31 (52) | 245 (266) | 125 of 327 |
+| Duo @48, `--time 20min` (local only) | 2,308 | 324 | 7.61 (16.43) | 23.5 | 37 (76) | 1,151 (1,189) | 214 of 324 |
+
+- **Every booklet below 10 MB**, the closed bodies by a factor of 2.4–3.8. Small models are unchanged
+  byte for byte in their step pictures (step pages pixel-identical to 1.4; the cover differs only in
+  date and version).
+- **The PDF takes 40–50 % less time** for big models; conversions finish 9–21 s earlier, because
+  the step checks keep their time (the export reserve depends on the part count, not on the PDF).
+  Checked states move by a few between runs (sphere 172 instead of 180, cube 123 instead of 126).

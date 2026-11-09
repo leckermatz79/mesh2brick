@@ -137,6 +137,8 @@ beschrieben.
   auf mehreren Kernen; ein Schritt, bei dem man das Modell halten muss, sagt das. Stoppt
   die Zeitgrenze die Prüfung, steht auf dem Deckblatt, wie viele Zwischenstände geprüft
   sind (`--time 20min` prüft alle).
+  In ihren Schrittbildern sind die schon gebauten Teile ruhige Flächen (Noppen ja, Fugen nein),
+  damit die neuen Teile herausstechen und das PDF unter 10 MB bleibt.
 - Farbnamen bleiben wie bei BrickLink und Rebrickable (englisch), damit man sie dort
   findet; dahinter steht in Klammern ein deutscher Name („Bright Green (Hellgrün)“).
 - **Mit der KI-Schicht:** Bauabschnitte mit Titeln („Sockel“, „Kopf“, „Linkes Ohr“) und
