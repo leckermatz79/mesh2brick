@@ -6,6 +6,28 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-09 - Smaller PDFs for big models
+
+Every booklet of the fixtures is below 10 MB (issue #27, ROADMAP item 4, ADR 0018): textured cube
+23.2 → 9.6 MB, STEP cube 20.4 → 6.4 MB, castle 19.4 → 5.1 MB, sphere 10.1 → 4.4 MB. Almost all of a
+big booklet were step pictures; for models above 500 parts the parts built earlier are now drawn
+without joints (studs stay), with a fast-octree palette at 110 dpi, which also makes the new parts
+stand out and the booklet faster to write (textured cube 54 → 31 s). Small models keep the pictures
+of 1.4 pixel for pixel (docs/benchmarks.md, "PDF size").
+
+### Added
+- `PdfOptions.compact` (default: by model size, above 500 parts) and `PreviewOptions.faded_edges` /
+  `octree_palette` for compact step pictures.
+- `scripts/benchmark_pdf.py`: where the bytes of a booklet are (step pictures, part tiles, callouts,
+  cover, rest), per step picture with covered area and part counts.
+- `scripts/benchmark_release.py` reports kB per step and warns above 40 kB for models above 500
+  parts.
+- pypdf (BSD-3-Clause) as a development dependency: tests read the booklets back.
+
+### Changed
+- Step pictures of models above 500 parts: faded parts without joints, octree palette, 110 dpi
+  (product owner, 2026-11-09). Part tiles, callouts, cover and text are unchanged.
+
 ## [1.4.0] - 2026-11-08 - Stability checks for big models
 
 Big models get stability-checked steps (issue #26, ROADMAP item 3, ADR 0017). They keep the
