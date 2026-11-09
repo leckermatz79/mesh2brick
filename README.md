@@ -126,8 +126,10 @@ All settings are documented in [examples/mesh2brick.yaml](examples/mesh2brick.ya
   with every new part. Sub-assemblies are built on a blue panel and then attached.
   A small yellow "first" box shows parts to put together in the hand before placing
   them (a part hanging under an overhang together with the part that holds it).
-- **Big models (over 500 parts)** get steps layer by layer without a stability check
-  for every intermediate state; the cover says so.
+- **Big models (over 500 parts)** get steps layer by layer (with the "first" boxes), and
+  every intermediate state is checked for stability, in parallel on several cores; a
+  step that needs a supporting hand says so. If the time limit stops the checks, the
+  cover says how many states were checked (`--time 20min` checks all).
 - Colour names stay the BrickLink/Rebrickable names, so they can be found there;
   German booklets add a German name in brackets ("Bright Green (Hellgrün)").
 - **With the LLM layer:** build sections with titles ("Base", "Head", "Left ear") and a

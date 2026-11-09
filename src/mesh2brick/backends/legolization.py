@@ -74,6 +74,7 @@ from legolization.placement.repair import RepairConfig
 from legolization.stability import solver as _lego_solver
 from legolization.stability.solver import StabilityResult, analyze
 
+from mesh2brick.backends.checks import check_states, default_workers
 from mesh2brick.backends.protocols import BackendError, Placement, StabilityReport
 from mesh2brick.backends.pyldraw import part_exists
 from mesh2brick.catalog.rebrickable import available_colors
@@ -90,6 +91,11 @@ from mesh2brick.steps.balance import (
     largest_step,
     merge_small_steps,
     split_large_steps,
+)
+from mesh2brick.steps.budget import (
+    LLM_RESERVE_S,
+    MIN_SEQUENCING_S,
+    choose_planner,
 )
 from mesh2brick.steps.hanging import attach_hanging
 from mesh2brick.steps.plan import PlanStep
@@ -131,15 +137,17 @@ _MANAGED_FIELDS: Final = frozenset(
         "progress",
     }
 )
-AUTO_THOROUGH_MAX_PARTS: Final = 500
-"""``steps.sequencing: auto`` uses stability-checked steps up to this size."""
 PLACE_BUDGET_SHARE: Final = 0.25
 """Default share of ``placement.time_limit_s`` for legolization's placement
 and repair (``time_budget_s``), unless set in ``placement.backend_options``."""
-MIN_SEQUENCING_S: Final = 5.0
 _TIME_FALLBACK_NOTE: Final = (
-    "time limit reached during step planning; steps follow layer order "
-    "(raise placement.time_limit_s for stability-checked steps)"
+    "time limit reached before the steps could be checked; steps follow layer "
+    "order without stability checks (raise placement.time_limit_s, e.g. --time "
+    "20min, to check them)"
+)
+_SEARCH_FALLBACK_NOTE: Final = (
+    "legolization's step search did not finish in time; steps follow layer "
+    "order instead and are checked one by one"
 )
 _LAYER_PLAN_WARNING: Final = (
     "steps follow layer order without stability checks "
@@ -154,6 +162,20 @@ LP_ATTEMPT_TIME_LIMIT_S: Final = 5.0
 LP_IPM_TIME_LIMIT_S: Final = 300.0
 """Wall-clock limit for the interior-point attempt without crossover."""
 IPM_WITHOUT_CROSSOVER: Final = ("highs-ipm", {"run_crossover": "off"})
+CHECK_SIMPLEX_MAX_ROWS: Final = 10_000
+"""Step-check workers skip the simplex above this LP size (about 460 parts,
+21-23 rows per part): on bigger intermediate states it never finished within
+its 3 s, on smaller ones it is about as fast as the interior point."""
+
+
+def skip_simplex_for_large_lps(rows: int | None = CHECK_SIMPLEX_MAX_ROWS) -> None:
+    """Send stability LPs above ``rows`` rows straight to the interior point.
+
+    Process-wide; only the step-check workers call it (ADR 0017).
+    """
+    linprog = _lego_solver.__dict__["linprog"]
+    if isinstance(linprog, _QuietLinprog):
+        linprog.simplex_max_rows = rows
 
 
 def _limit_lp_attempts() -> None:
@@ -194,13 +216,30 @@ class _QuietLinprog:
     """scipy's ``linprog`` without its warning for HiGHS-only options.
 
     scipy passes options it does not know (``run_crossover``) to HiGHS
-    verbatim and warns about each call; the option is intended here.
+    verbatim and warns about each call; the option is intended here. With
+    ``simplex_max_rows`` set (only in the step-check workers, ADR 0017), the
+    simplex attempts are skipped for LPs with more rows: on intermediate
+    states above about 460 parts they never finished within their limit
+    (measured on the toadstool and the bunny: 3 s lost per state).
     """
+
+    simplex_max_rows: int | None = None
 
     def __init__(self, linprog: Callable[..., Any]) -> None:
         self._linprog = linprog
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        limit = self.simplex_max_rows
+        a_ub = kwargs.get("A_ub")
+        if (
+            limit is not None
+            and kwargs.get("method") == "highs"
+            and a_ub is not None
+            and a_ub.shape[0] > limit
+        ):
+            return types.SimpleNamespace(
+                success=False, status=1, x=None, message="simplex skipped (large LP)"
+            )
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore", re.escape("Unrecognized options detected: {'run_crossover'")
@@ -961,8 +1000,8 @@ class _Native:
 
     layout: Layout
     plan: InstructionPlan | None
-    checked: bool = True
-    """Whether ``plan`` was stability-checked step by step."""
+    checked: tuple[bool, ...] | bool = True
+    """Per step of ``plan`` whether its verdict was checked (``True``: all)."""
     units: Mapping[int, int] = dataclasses.field(default_factory=dict)
     """Brick id -> pre-assembly unit number within its step."""
 
@@ -1054,10 +1093,17 @@ class LegolizationBackend:
                     f"{len(report.unresolved)} part(s) could not be replaced by "
                     "existing shorter parts; see the parts list"
                 )
-        plan, notes, checked = self._plan(layout, config, settings, deadline)
+        plan, notes, kind = self._plan(layout, config, settings, deadline)
         plan, units, refined = refine_plan(
-            layout, plan, settings.steps, checked=checked
+            layout, plan, settings.steps, checked=kind == "searched"
         )
+        checked: tuple[bool, ...] | bool = kind == "searched"
+        if kind == "checked-layers":
+            reserve = LLM_RESERVE_S if settings.llm.enabled else 0.0
+            plan, checked, check_notes = self._check_steps(
+                layout, plan, config, None if deadline is None else deadline - reserve
+            )
+            refined.extend(check_notes)
         notes = [*allowed.notes, *early, *notes, *refined]
         native = _Native(layout=layout, plan=plan, checked=checked, units=units)
         return Placement(
@@ -1085,42 +1131,81 @@ class LegolizationBackend:
         config: PipelineConfig,
         settings: Settings,
         deadline: float | None,
-    ) -> tuple[InstructionPlan, list[str], bool]:
-        """Choose and run the step planner within the remaining time.
+    ) -> tuple[InstructionPlan, list[str], str]:
+        """Choose and run the step planner within the remaining time (ADR 0017).
 
-        Returns the plan, notes for the user and whether the plan was
-        stability-checked step by step.
+        Returns the plan, notes for the user and its kind: ``searched``
+        (legolization's search, checked step by step), ``checked-layers``
+        (layer order, to be checked by :meth:`_check_steps`) or ``layers``
+        (layer order without checks).
         """
-        mode = settings.steps.sequencing
-        notes: list[str] = []
-        if mode == "auto":
-            mode = "thorough" if len(layout) <= AUTO_THOROUGH_MAX_PARTS else "layers"
-            if mode == "layers":
-                notes.append(
-                    f"{len(layout)} parts: steps follow layer order (stability-checked "
-                    f"steps are used up to {AUTO_THOROUGH_MAX_PARTS} parts; "
-                    "steps.sequencing=thorough forces them)"
-                )
-        if mode == "layers":
-            return layer_plan(layout, config.instructions), notes, False
-        smart = dataclasses.replace(
-            config.instructions, mode="smart", solver=config.solver
-        )
         budget = None
         if deadline is not None:
             budget = deadline - time.monotonic() - export_reserve_s(len(layout))
-            if budget < MIN_SEQUENCING_S:
-                notes.append(_TIME_FALLBACK_NOTE)
-                return layer_plan(layout, config.instructions), notes, False
-        self._say(
-            "planning stability-checked steps"
-            + (f" (up to {budget:.0f} s)" if budget is not None else "")
-        )
-        plan = plan_with_timeout(layout, smart, budget)
-        if plan is None:
+        choice = choose_planner(settings.steps.sequencing, len(layout), budget)
+        notes: list[str] = []
+        if choice.planner in ("thorough", "fast"):
+            smart = dataclasses.replace(
+                config.instructions, mode="smart", solver=config.solver
+            )
+            limit = choice.search_s
+            self._say(
+                "planning stability-checked steps"
+                + (f" (up to {limit:.0f} s)" if limit is not None else "")
+            )
+            plan = plan_with_timeout(layout, smart, limit)
+            if plan is not None:
+                return plan, notes, "searched"
+            notes.append(_SEARCH_FALLBACK_NOTE)
+            return layer_plan(layout, config.instructions), notes, "checked-layers"
+        if choice.planner == "layers" and choice.reason == "no time left":
             notes.append(_TIME_FALLBACK_NOTE)
-            return layer_plan(layout, config.instructions), notes, False
-        return plan, notes, True
+        return layer_plan(layout, config.instructions), notes, choice.planner
+
+    def _check_steps(
+        self,
+        layout: Layout,
+        plan: InstructionPlan,
+        config: PipelineConfig,
+        deadline: float | None,
+    ) -> tuple[InstructionPlan, tuple[bool, ...], list[str]]:
+        """Check the state after every step of a layer plan, in parallel.
+
+        Returns the plan with real verdicts, which steps got one and notes.
+        Steps the time limit leaves unchecked keep no verdict.
+        """
+        count = len(plan.steps)
+        left = None
+        if deadline is not None:
+            left = deadline - time.monotonic() - export_reserve_s(len(layout))
+            if left < MIN_SEQUENCING_S:
+                return plan, (False,) * count, [_TIME_FALLBACK_NOTE]
+        workers = default_workers()
+        self._say(
+            f"checking {count} intermediate states for stability with {workers} "
+            "processes" + (f" (up to {left:.0f} s)" if left is not None else "")
+        )
+        verdicts = check_states(
+            layout,
+            [step.brick_ids for step in plan.steps],
+            config.solver,
+            deadline=None if left is None else time.monotonic() + left,
+            workers=workers,
+        )
+        steps = tuple(
+            step
+            if verdict is None
+            else dataclasses.replace(
+                step, prefix_stable=verdict.stable, prefix_max_score=verdict.score
+            )
+            for step, verdict in zip(plan.steps, verdicts, strict=True)
+        )
+        mask = tuple(verdict is not None for verdict in verdicts)
+        return (
+            dataclasses.replace(plan, steps=steps),
+            mask,
+            _check_notes(len(layout), steps, mask),
+        )
 
     # ------------------------------------------------------------ StabilityChecker
     def check(self, placement: Placement, settings: Settings) -> StabilityReport:
@@ -1177,19 +1262,22 @@ class LegolizationBackend:
             raise BackendError(f"cannot merge steps: {error}") from error
         plan = _rebuild_plan(native.layout, native.plan, merged)
         units = _unit_numbers(merged)
+        checked = native.checked
+        if not isinstance(checked, bool):
+            checked = tuple(all(checked[i] for i in step.origin) for step in merged)
         model = to_brick_model(
             native.layout,
             plan,
             name=placement.model.name,
             source=placement.model.source,
-            checked=native.checked,
+            checked=checked,
             units=units,
             buildable=placement.model.buildable,
         )
         return replace(
             placement,
             model=model,
-            native=dataclasses.replace(native, plan=plan, units=units),
+            native=dataclasses.replace(native, plan=plan, units=units, checked=checked),
         )
 
     # ------------------------------------------------------------ Exporter
@@ -1372,6 +1460,37 @@ def layer_plan(layout: Layout, config: InstructionsConfig) -> InstructionPlan:
         bom=bill_of_materials(layout),
     )
     return dataclasses.replace(plan, bom=bill_of_materials(layout, plan=plan))
+
+
+def _check_notes(
+    parts: int, steps: Sequence[LegoStep], checked: Sequence[bool]
+) -> list[str]:
+    """What the step checks of a layer plan found, for the user."""
+    done = sum(checked)
+    hands = sum(
+        1
+        for step, ok in zip(steps, checked, strict=True)
+        if ok and not step.prefix_stable
+    )
+    held = (
+        f"; {hands} of them need a supporting hand" if hands else "; every one stands"
+    )
+    if not done:
+        return [_TIME_FALLBACK_NOTE]
+    if done == len(steps):
+        note = (
+            f"{parts:,} parts: steps follow layer order (parts under overhangs are "
+            f"pre-assembled); all {done} intermediate states were checked for "
+            f"stability{held}"
+        )
+    else:
+        note = (
+            f"time limit reached while checking steps: {done} of {len(steps)} "
+            f"intermediate states were checked for stability{held}; the others "
+            "were not (raise placement.time_limit_s, e.g. --time 20min, to check "
+            "all)"
+        )
+    return [note]
 
 
 _STEP_NUMBERED: Final = re.compile(r"^(subassembly \S+: )?step \d+")
@@ -1662,7 +1781,7 @@ def to_brick_model(
     *,
     name: str,
     source: str = "",
-    checked: bool = True,
+    checked: bool | Sequence[bool] = True,
     units: Mapping[int, int] | None = None,
     buildable: bool | None = None,
     best_so_far: bool = False,
@@ -1670,7 +1789,8 @@ def to_brick_model(
     """Convert legolization's layout + plan into a :class:`BrickModel`.
 
     ``checked`` says whether the plan's per-step stability verdicts are real
-    (layer-order plans carry placeholders); ``units`` maps brick ids to
+    (all, none, or per step; unchecked layer-order steps carry placeholders);
+    ``units`` maps brick ids to
     their pre-assembly unit within the step; ``best_so_far`` marks a layout
     the time limit cut short (ADR 0015).
     """
@@ -1680,14 +1800,19 @@ def to_brick_model(
         for index, step in enumerate(plan.steps):
             for brick_id in step.brick_ids:
                 step_of.setdefault(brick_id, index)
+        real = (
+            (checked,) * len(plan.steps)
+            if isinstance(checked, bool)
+            else tuple(checked)
+        )
         steps = tuple(
             BuildStep(
                 submodel=step.submodel,
                 attaches=step.attaches,
-                stable=step.prefix_stable if checked else None,
-                fragile=checked and step.insertion_fragile,
+                stable=step.prefix_stable if ok else None,
+                fragile=ok and step.insertion_fragile,
             )
-            for step in plan.steps
+            for step, ok in zip(plan.steps, real, strict=True)
         )
     if not step_of:
         # No plan: one step per occupied layer (what the plain .ldr writer does).

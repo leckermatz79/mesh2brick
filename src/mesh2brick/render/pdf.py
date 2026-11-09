@@ -64,6 +64,7 @@ from mesh2brick.render.text import (
     subassembly_label,
     text,
 )
+from mesh2brick.steps.coverage import coverage
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -723,8 +724,29 @@ def _cover_notes(model: BrickModel, lang: Language) -> list[tuple[str, Color]]:
         )
     if model.buildable is False:
         notes.append((text("stable_no", lang).capitalize() + ".", WARN_FILL))
-    if any(step.stable is None for step in model.steps):
+    checks = coverage(model)
+    if checks.kind == "none":
         notes.append((text("layer_order", lang), HINT_FILL))
+    elif checks.kind == "partial":
+        amount = {0: "none", 1: "one"}.get(checks.layers, "many")
+        scope = text(
+            f"checked_layers_{amount}",
+            lang,
+            layers=checks.layers,
+            all_layers=checks.all_layers,
+        )
+        notes.append(
+            (
+                text(
+                    "layer_order_partial",
+                    lang,
+                    checked=checks.checked,
+                    total=checks.total,
+                    scope=scope,
+                ),
+                HINT_FILL,
+            )
+        )
     return notes
 
 

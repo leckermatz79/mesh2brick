@@ -218,15 +218,19 @@ class StepsConfig(_Section):
     parts_per_step: Annotated[int, Field(ge=1, le=50)] = 7
     keep_symmetry: bool = True
     submodels: bool = True
-    sequencing: Literal["auto", "thorough", "fast", "layers"] = "auto"
-    """How build steps are ordered. ``thorough``: every intermediate state is
-    checked for stability, with a search when the order gets stuck (best
-    instructions, slow for big models). ``fast``: one candidate per step and a
-    cheap layer-order escape instead of the search. ``layers``: bottom-up layer
-    chunks without stability checks (seconds, may need a supporting hand).
-    ``auto``: ``thorough`` for models up to 500 parts, ``layers`` above. The
-    checked modes fall back to ``layers`` when ``placement.time_limit_s`` runs
-    out."""
+    sequencing: Literal["auto", "thorough", "fast", "checked-layers", "layers"] = "auto"
+    """How build steps are ordered. ``thorough``: legolization searches an
+    order whose every intermediate state is stable, with sub-assemblies (time
+    grows with the square of the part count). ``fast``: the same with one
+    candidate per step. ``checked-layers``: bottom-up layer chunks with parts
+    under overhangs pre-assembled, every intermediate state checked for
+    stability afterwards, in parallel (ADR 0017). ``layers``: the same layer
+    order without checks (seconds, may need a supporting hand). ``auto``:
+    ``thorough`` for models up to 500 parts when its estimated time fits the
+    time left, ``checked-layers`` otherwise. The search falls back to
+    ``checked-layers`` when it does not finish in time; the checks stop at
+    ``placement.time_limit_s``, and the states checked by then keep their
+    verdict."""
 
 
 class LlmConfig(_Section):

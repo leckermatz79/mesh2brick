@@ -13,6 +13,8 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | 2 | `src/mesh2brick/backends/legolization.py` (`_limit_lp_attempts`, `TimeLimitedHighs`, `_QuietLinprog`) | Orders and limits legolization's stability-LP attempts in both LP paths (scipy `linprog` table `_LP_ATTEMPTS` and direct `highspy`): simplex with presolve 3 s, the interior-point method **without crossover** 300 s, simplex without presolve 5 s, then legolization's own last attempt without a limit. Roadmap 2 added the crossover-free attempt (first stability LP of Duo at 48 studs: 49 s instead of more than an hour); 1.3.0 moved it to second place, which makes slopes cheap (bunny at 16 studs with slopes 147 s → 70 s; ADR 0016). | legolization ships per-attempt time limits (candidate #2) and this attempt order (suggested on #89) |
 | 5 | `src/mesh2brick/backends/legolization.py` (`_state_hook`) | During `run()`, `legolization.pipeline._phase_gauge` and `pipeline.analyze` are wrapped to report every intermediate layout (before each stability check, after placement, refill rounds and the final merge), so a run stopped at the time limit can return its best state (ADR 0015). | `run()` offers a phase callback and a deadline for all phases (candidate #5) |
 | 8 | `src/mesh2brick/backends/legolization.py` (`_placement_catalog`) | During `run()`, `legolization.pipeline.default_catalog` returns a catalogue reduced to the whitelisted parts; restored afterwards (also on errors). | a legolization release contains `run(..., catalog=...)` (on `main` since 65d6afb); then pass the catalogue instead |
+| 16 | `src/mesh2brick/backends/checks.py` (`WarmWalker`) | The step checks (ADR 0017) subclass legolization's `PrefixSolver` and swap its HiGHS instance for one with a 5 s limit per warm solve and the primal simplex (a solve that does not finish falls back to legolization's cold path, as any failed warm solve does). Relies on the private attribute `_h`; an import-time check fails loudly if it disappears. | `PrefixSolver` limits its warm solves (candidate #16) |
+| 2b | `src/mesh2brick/backends/legolization.py` (`_QuietLinprog.simplex_max_rows`, `skip_simplex_for_large_lps`) | Extension of #2, only inside the step-check worker processes: stability LPs above 10,000 rows (about 460 parts) skip the two simplex attempts and go straight to the crossover-free interior point (on intermediate states of that size the simplex never finished within its 3 s; toadstool: 3 s saved per state, same verdicts). | legolization picks the attempt order by LP size (suggested with #2b) |
 
 ## Candidates
 
@@ -32,6 +34,9 @@ Status values: `idea` → `draft ready` → `approved` → `opened` → `merged`
 | 12 | legolization | Layer-order steps: place hanging parts with their holder, merge tiny steps | In a pure layer order, parts under an overhang are placed before the part that holds them (155 of 1,025 parts on our test model hang in the air for 1–16 steps), and layers with 1–2 parts become steps of their own. mesh2brick's graph-only passes (ADR 0012, `steps/`) fix both in 0.1 s; the same idea would help legolization's `band` fallback. | idea | – |
 | 13 | legolization | `_assign_rotsteps` drops `insertion_fragile` | It rebuilds every main step with a rotation as `BuildStep(index, brick_ids, prefix_stable, prefix_max_score, rotstep)`, so the `insertion_fragile` flag (and any other new field) is lost whenever `rotstep=True` (the default). `dataclasses.replace(step, rotstep=...)` would keep them. Small bug fix with a test. | idea | – |
 | 14 | trimesh | **glTF loader ignores `normalized` on integer `COLOR_0`; 16-bit vertex colours wrap modulo 256** | Blender writes colour attributes as normalised `uint16`. For primitives without a material, `trimesh.exchange.gltf` passes the raw accessor to `Trimesh(vertex_colors=...)`, and `visual.color.to_rgba` ends with `astype(uint8)`: 14146 (linear 0.216 = sRGB 0.5) becomes 66 instead of 55, and every vertex-painted Blender model gets wrong colours. Still on trimesh `main` (6c158cce22, checked 2026-11-07: the reader never looks at `normalized`), no issue found. The fix belongs in the glTF reader (scale normalised integer accessors to 0..1 floats, as the spec says), not in `to_rgba`, which must keep accepting plain integer lists 0–255. mesh2brick rescales the colours before trimesh builds the meshes (`ingest/gltf.py`, `_exact_vertex_colors`). | opened | [issue #2669](https://github.com/mikedh/trimesh/issues/2669) (filed by the product owner on 2026-11-07) |
+| 15 | legolization | **Sub-assembly rewrite re-checks every later step with a cold LP** | After `extract_subassemblies` moves a floating cluster out, `_rewrite` analyses every kept main step whose prefix changed with `analyze(layout.subset(key))`, from scratch. The prefixes only grow in world order, so one warm `PrefixSolver` walk (as `_press_walker` already does for presses) serves them all. Measured on the torus fixture (552 parts): rewrite 45 s → 12 s, whole planner 100 s → 68 s, same plan. mesh2brick does not patch this (big models no longer use the search, ADR 0017); worth a small PR. | draft ready | Draft #15–17 below |
+| 16 | legolization | **`PrefixSolver` warm solves have no time limit** | Same family as #88: the persistent HiGHS model never gets `time_limit`. After a few chunks were committed without a solve (floating chunks answered by the shortcut), one warm solve stalled for more than 4 minutes on the torus; the cold fallback would have taken 1 s. A per-run limit (e.g. 5 s) with the existing fallback on a non-optimal status fixes it. mesh2brick's local patch #16 does this for its own checks. | draft ready | Draft #15–17 below |
+| 17 | legolization | **The rescue re-plans the whole rest of the model with cold LPs of nearly the whole model** | On hollow organic shells, `rescue()` dominates the planner (bunny, 873 parts: 331 of 385 s, 49 cold LPs of 600–873 parts) and the resulting plans need a hand in 40–75 % of the steps (bunny 60/153, toadstool 158/212, sphere 155/241), while a layer order with hanging parts pre-assembled (candidate #12) needs none on the same layouts. A rescue window (only the next few bands) was prototyped and was *not* faster with the warm engine (bunny > 670 s), so this is a report with numbers, not a fix. | draft ready | Draft #15–17 below |
 
 ## Draft #2 (as filed in issue #88)
 
@@ -181,3 +186,41 @@ When an accessor has `"normalized": true` and an integer component type, convert
 **Context**
 
 Found while adding `.blend` import to [mesh2brick](https://github.com/leckermatz79/mesh2brick), a GPL tool that turns 3D models into LEGO-compatible build instructions; it is developed in a "vibe-coding" setup with Claude Code. mesh2brick currently works around the bug by rescaling the colours in the kwargs from `trimesh.exchange.gltf.load_gltf/load_glb` before building the scene. Happy to turn the fix above into a PR with a test if that helps.
+
+## Draft #15–17 (one issue for legolization; not filed, needs the product owner's approval)
+
+**Title:** Step planning on large hollow models: where the time goes (measurements, two small fixes)
+
+**Version:** legolization 0.5.0, highspy 1.15.1, scipy 1.18.1, macOS arm64 / Python 3.12; mesh2brick's
+LP attempt order from #89 (simplex 3 s, crossover-free IPM, then the 0.5.0 chain).
+
+**Context:** this came up in a vibe-coding project (mesh2brick) that wraps legolization; same project as
+#88/#89 and #90/#91. We measured `plan_instructions(layout, config=InstructionsConfig(mode="smart"))` on
+finished layouts of 552–2,308 parts with `telemetry.record()` and a span sink that counts LPs.
+
+**1. Where the time goes.** The greedy forward pass is cheap (bunny, 873 parts: 52 warm probes in 0.1 s).
+When no ready chunk gives a stable prefix, `rescue()` re-plans the *whole remainder* by disassembly, and
+every removal probe is one cold LP of nearly the whole model (one contact component): 331 of 385 s on the
+bunny (49 LPs at 6.8 s), 56 of 102 s on a torus. Planner times with this order: torus 552 parts 100 s,
+bunny 873 parts 392 s, a 1,025-part figure 346 s, toadstool 1,239 parts 415 s, sphere 1,499 parts 776 s,
+a 1,519-part model > 20 min. The plans of the hollow organic ones need support in 40–75 % of the steps
+(bunny 60 of 153, toadstool 158 of 212, sphere 155 of 241). For comparison, a plain band order with each
+hanging part moved into the step of the part that holds it (and put together in the hand first) has no
+unstable prefix on the same four layouts; we now check such plans with one cold `analyze` per prefix in
+a process pool (bunny 67 s with 8 processes). We tried a rescue limited to a few bands with warm probes:
+not faster (warm solves of a whole window take thousands of simplex iterations), so no fix to offer
+there, just the numbers.
+
+**2. Small fix: warm re-checks in `_rewrite`.** After a cluster is extracted, every later kept step is
+re-analysed cold (`analyze(layout.subset(key))`). The world prefixes only grow, so a warm `PrefixSolver`
+(probe the kept bricks, commit) gives the same verdicts: on the torus the rewrite goes from 45 s to 12 s
+and the whole planner from 100 s to 68 s with an identical plan. Happy to send a PR (a walker like
+`_press_walker`, used for the verdicts too).
+
+**3. Small fix: a time limit for warm solves.** `PrefixSolver._h` has no `time_limit`. When chunks are
+committed without having been solved (`commit()` after a probe the floating shortcut answered, as in
+the `band` fallback; we hit it with an extra shortcut of our own), the next warm solve has to catch up
+on all of them; on the 552-part torus one such solve ran for more than 4 minutes, where a cold
+`analyze` of the same prefix takes about 1 s. A per-run limit (we use 5 s,
+`setOptionValue("time_limit", getRunTime() + 5)`) falls through to the existing `PrefixSolverError`
+→ cold path. Also a candidate for the PR in 2.

@@ -132,8 +132,11 @@ beschrieben.
   neuen Teile als Bilder. Baugruppen werden auf blauem Feld gebaut und dann aufgesetzt.
   Ein kleines gelbes Feld „zuerst“ zeigt Teile, die man vorher in der Hand
   zusammensteckt (ein Teil unter einem Überhang zusammen mit dem Teil, das es hält).
-- **Große Modelle (über 500 Teile)** bekommen Schritte Schicht für Schicht, ohne dass
-  jeder Zwischenstand auf Standfestigkeit geprüft ist; das steht auf dem Deckblatt.
+- **Große Modelle (über 500 Teile)** bekommen Schritte Schicht für Schicht (mit den
+  „zuerst“-Feldern), und jeder Zwischenstand wird auf Standfestigkeit geprüft, parallel
+  auf mehreren Kernen; ein Schritt, bei dem man das Modell halten muss, sagt das. Stoppt
+  die Zeitgrenze die Prüfung, steht auf dem Deckblatt, wie viele Zwischenstände geprüft
+  sind (`--time 20min` prüft alle).
 - Farbnamen bleiben wie bei BrickLink und Rebrickable (englisch), damit man sie dort
   findet; dahinter steht in Klammern ein deutscher Name („Bright Green (Hellgrün)“).
 - **Mit der KI-Schicht:** Bauabschnitte mit Titeln („Sockel“, „Kopf“, „Linkes Ohr“) und

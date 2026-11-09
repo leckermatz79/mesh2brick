@@ -6,6 +6,43 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-08 - Stability checks for big models
+
+Big models get stability-checked steps (issue #26, ROADMAP item 3, ADR 0017). They keep the
+layer order of 1.3 with parts under overhangs pre-assembled, and every intermediate state is now
+checked with legolization's stability model, in parallel on several cores. On every fixture above
+500 parts no checked step needs a supporting hand (legolization's own search, still used up to 500 parts,
+needs one in 40–75 % of the steps of the hollow organic ones and would take 6–17 minutes there). When the
+time limit stops the checks, the states checked by then keep their verdict and the cover says how
+many (docs/benchmarks.md, "Scalable stability checks").
+
+### Added
+- `steps.sequencing: checked-layers`: layer order with pre-assemblies, every intermediate state
+  checked (`backends/checks.py`): one worker walks bottom-up with a warm LP, the others check
+  top-down, each state with its own LP; all cores but one, at most 12 processes.
+- Cover sentence and command-line note for partly checked plans ("There was time to check k of n
+  intermediate states (all of the bottom L of A layers)"); the LLM layer's model description says
+  the same.
+- `scripts/benchmark_sequencing.py` (step planner alone on finished layouts, with LP counts) and
+  `scripts/sequencing_prototypes.py` (the options measured for ADR 0017); `scripts/benchmark_release.py`
+  reports checked states and steps that need a hand.
+
+### Changed
+- `steps.sequencing: auto` no longer switches to unchecked layer order above 500 parts: it uses
+  legolization's search up to 500 parts when its estimated time fits 75 % of the time left
+  (`steps/budget.py`), and checked layers otherwise; a search that does not finish in time falls
+  back to checked layers instead of unchecked ones. `layers` stays the unchecked layer order.
+- With the LLM layer on, the step checks leave 60 s for it.
+- Local patch #2: inside the step-check workers only, LPs above 10,000 rows (about 460 parts) skip
+  the simplex attempts (they never finished there within 3 s).
+
+### Known
+- Within the 5-minute default every state is checked up to about 1,250 parts (Duo at 32 studs:
+  all 153 in 139 s); the biggest fixtures get 46–87 % (sphere, vertex-colour model, castle, cubes)
+  and the cover says how many. Duo at 48 studs with `--time 20min` gets 217 of 324 (placement alone
+  takes half of the 20 minutes); more time checks all.
+- A conversion of a big model now uses several cores for up to a few minutes.
+
 ## [1.3.0] - 2026-11-07 - Solver order and slopes back on
 
 Slopes are back, and big models convert faster (issue #34, ROADMAP item 8 moved up, ADR 0016).

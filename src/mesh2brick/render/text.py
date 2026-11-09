@@ -136,6 +136,32 @@ _TEXT: Final[dict[str, dict[Language, str]]] = {
             "overhangs with your hand while building."
         ),
     },
+    "layer_order_partial": {
+        "de": (
+            "Die Schritte folgen den Schichten von unten nach oben. Die Zeit hat "
+            "gereicht, um {checked} von {total} Zwischenständen auf Standfestigkeit "
+            "zu prüfen ({scope}); die übrigen sind nicht geprüft: Stütze Überhänge "
+            "dort beim Bauen mit der Hand."
+        ),
+        "en": (
+            "The steps follow the layers from bottom to top. There was time to "
+            "check {checked} of {total} intermediate states for stability "
+            "({scope}); the others were not checked: support overhangs there with "
+            "your hand while building."
+        ),
+    },
+    "checked_layers_none": {
+        "de": "noch keine Steinlage vollständig",
+        "en": "no brick layer completely yet",
+    },
+    "checked_layers_one": {
+        "de": "vollständig die unterste von {all_layers} Steinlagen",
+        "en": "all of the bottom brick layer of {all_layers}",
+    },
+    "checked_layers_many": {
+        "de": "vollständig die unteren {layers} von {all_layers} Steinlagen",
+        "en": "all of the bottom {layers} of {all_layers} brick layers",
+    },
     "made_with": {
         "de": "Erstellt mit mesh2brick {version} am {date}.",
         "en": "Made with mesh2brick {version} on {date}.",

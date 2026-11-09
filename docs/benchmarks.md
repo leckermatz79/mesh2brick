@@ -563,3 +563,151 @@ LDraw re-reads pass in both runs; none is cut short.
 - **Slopes are drawn as slopes** in previews, step pictures and part tiles (wedge from the stud
   row to a half-plate lip, as in LDraw's 3039, 3040b and 4286); the PDF of the bunny shows them in
   the callouts.
+
+## Scalable stability checks (Roadmap 3, 2026-11-08)
+
+Issue #26. `scripts/benchmark_sequencing.py` reads the finished layouts of the 1.3 release run back
+(`out/release-1.3*/…/*.mpd`, strict LDraw import), so placement is not repeated, and runs only the step
+planner, each input in its own process, one after the other. It counts legolization's LPs through its
+telemetry (warm = re-solved on a growing model, cold = from scratch; "no LP" = a part not connected to
+the ground, unstable without a solve). Duo at 48 studs uses the 2,308-part layout of the 1.2 release run.
+Up to two runs at a time on the 12-core M2 Max; timings vary by about a fifth between runs.
+
+**Measured first: legolization's search (`steps.sequencing=thorough`) with the 1.3 LP order.**
+
+| Model | Parts | Sequencing | Steps (all checked) | States evaluated | LPs (warm / cold) | No LP | Steps that need a hand |
+|---|---:|---:|---:|---:|---|---:|---:|
+| torus | 552 | 100 s | 99 | 441 | 75 (30 / 45) | 366 | 41 |
+| two bodies (STEP) | 606 | 34 s | 91 | 227 | 92 (86 / 6) | 135 | 0 |
+| bunny | 873 | 392 s | 153 | 512 | 104 (30 / 74) | 408 | 60 |
+| Duo @32 (local only) | 1,025 | 346 s | 193 | 866 | 100 (43 / 57) | 766 | 107 |
+| toadstool | 1,239 | 415 s | 212 | 1,230 | 91 (23 / 68) | 1,154 | 158 |
+| sphere | 1,499 | 776 s | 241 | 1,157 | 93 (22 / 71) | 1,064 | 155 |
+| vertex colours (PLY) | 1,519 | > 1,200 s (stopped) | – | 1,146 by then | 90 (13 / 77) | 1,056 | – |
+| castle (STEP) | 1,657 | 842 s | 264 | 324 | 259 (221 / 38) | 65 | 16 |
+| STEP cube | 1,952 | 1,025 s | 291 | 474 | 292 (267 / 25) | 182 | 0 |
+| textured cube | 2,280 | 613 s | 336 | 563 | 337 (327 / 10) | 226 | 0 |
+| Duo @48 (local only) | 2,308 | > 1,500 s (stopped) | – | 1,843 by then | 73 (58 / 15) | 1,770 | – |
+
+- **Result no. 1: the 1.3 order alone does not move the 500-part limit.** Duo at 32 studs needs
+  346 s instead of about 400 s (Phase 2, old order), but after voxels, placement and the export reserve
+  a 5-minute conversion leaves about 195 s for its steps. Only the two models around 600 parts would
+  fit; above 870 parts the search takes 6–17 minutes or does not finish in 20.
+- **Where the time goes** (phase profile, `profile_seq.py`): the greedy pass is almost free (bunny:
+  52 warm probes in 0.1 s). Once no candidate is stable, the rescue re-plans the whole rest backwards
+  with one cold LP of nearly the whole model per removal (bunny: 331 of 385 s, 49 LPs at 6.8 s; torus:
+  56 of 102 s); the re-checks after forming sub-assemblies are cold too (torus 45 s, bunny 54 s). On the
+  closed bodies a few huge LPs dominate (cube: the moment the hollow roof becomes load-bearing).
+- **The search's plans need a hand often on hollow organic shapes** (last column: 40–75 % of the
+  steps).
+
+**The options of ROADMAP item 3** (planner-only seconds; "hand" = steps whose state needs a hand):
+
+| Option | torus 552 | bunny 873 | Duo @32 1,025 | sphere 1,499 |
+|---|---|---|---|---|
+| search (baseline) | 100 s, 41 hand | 392 s, 60 hand | 346 s, 107 hand | 776 s, 155 hand |
+| a1) no LP for parts resting on fully supported parts | 102 s; as a walk 96 s instead of 11 s | – | – | – |
+| a2) warm re-checks after sub-assemblies | 68 s, same plan | – | – | – |
+| a3) rescue only a window of bands (+ a2) | 61 s, 41 hand | > 670 s (stopped) | – | – |
+| a4) no rescue: mark the step, go on (+ a2) | 19 s, 41 hand | 406 s, 57 hand | 135 s, 111 hand | – |
+| b) blocks of ~200 parts planned alone, states then checked as in c3 | 23 s, 41 hand | 185 s, 66 hand | 286 s, 107 hand | 454 s, 155 hand |
+| c1) rescue candidates in a pool of 4 | 106 s, 41 hand | – | – | – |
+| c2) layer order + pre-assemblies, every state cold in a pool of 8 | 25 s, 0 hand | 76 s, 0 hand | 106 s, 0 hand | – |
+| **c3)** as c2, one warm walker bottom-up + 7 cold workers top-down | 18 s, 0 hand | 67 s, 0 hand | 99 s, 0 hand | 268 s, 0 hand |
+| d) as c3, but only every 4th state, bisect when unstable | 4 s* | 15 s, 32 of 125 checked | 21 s, 39 of 153 checked | 65 s, 52 of 207 checked |
+
+\* on the plain layer order without pre-assemblies: 26 of 81 states unchecked, 16 of its 65 unstable
+states missed. "–": not run, because the option had already lost on the smaller models.
+
+- **a) incremental** does not pay off with legolization's warm LP model: skipping the LP for parts
+  that rest fully on fully supported parts leaves them unsolved, and the next LP has to solve them all
+  at once (torus walk 11 s → 96 s); a rescue window needs warm LPs of whole windows, which take
+  thousands of simplex iterations each. Only a2 helps (and is exact), but the search stays far over
+  the budget.
+- **b) blocks** plan faster than the whole search but keep its steps that need a hand.
+- **c) parallel** only helps where the work is independent: rescue candidates are not (first stable
+  wins, warm state), the states of a fixed plan are.
+- **d) every k-th state** is fast but leaves three quarters of the states unchecked; with the
+  pre-assemblies there was nothing to bisect.
+
+**Two accelerators for c3** (toadstool / sphere, planner only): cold workers skipping the simplex above
+10,000 rows: 152 → 119 s / 268 → 196 s; 11 instead of 8 processes on top: 104 s / 176 s.
+
+**Chosen (ADR 0017): c3 on every model above 500 parts** (planner-only, 8 processes, before the two
+accelerators; the layer order and its pre-assemblies are those of 1.3, so parts and steps are
+unchanged; search times from the first table). The end-to-end numbers are in the release run below.
+
+| Model | Parts | Steps | Checked states | Need a hand | Checks | Search (1.3 order) | Left for steps in a 5-minute run |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| torus | 552 | 74 | 74 | 0 | 18 s | 100 s (41 need a hand) | ~250 s |
+| two bodies (STEP) | 606 | 83 | 83 | 0 | 22 s | 34 s (0) | ~120 s |
+| bunny | 873 | 125 | 125 | 0 | 67 s | 392 s (60) | ~190 s |
+| Duo @32 (local only) | 1,025 | 153 | 153 | 0 | 99 s | 346 s (107) | ~195 s |
+| toadstool | 1,239 | 178 | 178 | 0 | 152 s | 415 s (158) | ~115 s |
+| sphere | 1,499 | 207 | 207 | 0 | 268 s | 776 s (155) | ~150 s |
+| vertex colours (PLY) | 1,519 | 212 | 212 | 0 | 283 s | > 1,200 s | ~140 s |
+| castle (STEP) | 1,657 | 234 | 234 | 0 | 243 s | 842 s (16) | ~40 s |
+| STEP cube | 1,952 | 274 | 274 | 0 | 460 s | 1,025 s (0) | ~45 s |
+| textured cube | 2,280 | 327 | 327 | 0 | 707 s | 613 s (0) | ~35 s |
+| Duo @48 (local only) | 2,308 | 325 | 325 | 0 | 919 s | > 1,500 s | ~440 s with `--time 20min` |
+
+"Left for steps" = 5 minutes minus voxels, placement (1.3 release run) and the export reserve.
+
+- **The layer order of 1.3 is the better plan:** with parts under overhangs pre-assembled, *no*
+  intermediate state of any fixture needs a hand; legolization's search leaves 40–75 % of the steps
+  of the hollow organic models needing one. The same holds for the small fixtures (rocket 0 instead
+  of 11 of 46, L-bracket 0 instead of 1 of 40, heart 0 and 0), where the checks also take less time
+  than the search (rocket 4 s instead of 8 s, L-bracket 6 s instead of 21 s); small models still use
+  the search (unchanged instructions; product-owner question).
+- **Every verdict is a full LP of exactly that state** (legolization's `analyze`, or its warm
+  `PrefixSolver` with the boundary guard); nothing is inferred, so no state can be called stable
+  without a check.
+- **Cost per state** grows with its size, warm or cold: cold IPM 3.5 s at 473 parts, 6 s at 722,
+  12 s at 964, 20 s at 1,239 (toadstool states); the simplex never finished in its 3 s above about
+  470 parts (10,000 rows), so the cold workers skip it there; below, it is about as fast as the
+  interior point (0.4–1.9 s against 0.5–2.1 s for 139–346 parts). A warm walk is milliseconds per state on
+  simply stacked walls (cube: 245 states in 12 s) but 0.5–5 s on big hollow shells and degrades when
+  a solve runs out of time.
+- **Warm re-checks after sub-assemblies (a2) are exact:** same plan fingerprint as the search on the
+  torus (`0b137a60af`), 117 s → 91 s in that run; an upstream candidate (#15), not used here.
+
+**Release run 1.4** (`scripts/benchmark_release.py --out out/release-1.4`, defaults, one conversion at a
+time, on AC power; in brackets 1.3 with slopes). Parts and steps are those of 1.3 for every input; the
+small models (≤ 500 parts) still use legolization's search.
+
+| Input | Parts | Time s (1.3) | Checked states | Need a hand | One stable piece |
+|---|---:|---:|---:|---:|---|
+| `heart.vox` | 12 | 4 (4) | 7 of 7 | 0 | yes |
+| `l_bracket.stl` | 153 | 29 (30) | 37 of 37 | 1 | yes |
+| `rocket.blend` | 263 | 19 (19) | 42 of 42 | 11 | yes |
+| `torus.stl` | 552 | 36 (25) | **74 of 74** | 0 | yes |
+| `two_bodies.step` | 606 | 166 (156) | **83 of 83** | 0 | yes |
+| `bunny_lowpoly.stl` | 873 | 125 (81) | **126 of 126** | 0 | yes |
+| `toadstool.obj` | 1,239 | 259 (157) | **178 of 178** | 0 | yes |
+| `sphere_r10.stl` | 1,499 | 280 (126) | 180 of 207 | 0 | yes |
+| `vertex_colors.ply` | 1,519 | 281 (141) | 155 of 212 | 0 | yes |
+| `castle.step` (generated), `--config` | 1,657 | 265 (223) | 151 of 234 | 0 | yes |
+| `cube_10mm.step` / `.stl` | 1,952 | 265 / 266 (220 / 222) | 126 / 125 of 274 | 0 | yes |
+| `textured_cube.obj` | 2,280 | 266 (231) | 130 of 327 | 0 | yes |
+
+All files, parts-list totals and strict LDraw re-reads pass; no model is cut short.
+
+- **Every state checked within the 5-minute default** for every model up to 1,239 parts. Above that
+  the checks fill the time left and stop at the hard limit: the sphere gets 87 % of its states, the
+  vertex-colour model 73 %, the castle 65 %, the cubes 46 % and 40 % (their solid floors and roofs are
+  made of many plates, so the bottom states alone are many steps). No checked state needs a hand.
+- **Big models now use the time they are given:** a conversion that left 100–150 s unused in 1.3 now
+  spends them on checks (bunny 81 → 125 s, toadstool 157 → 259 s); none goes over 281 s.
+- The two Duo cases of this run were invalid (the laptop went to sleep with its lid closed, so the
+  workers hardly got any CPU). Re-run awake on AC (`--skip-fixtures --out out/release-1.4-duo`, the
+  castle runs too: 265 s, 150 of 234, as before):
+
+| Input | Parts | Time s (1.3) | Checked states | Need a hand | One stable piece |
+|---|---:|---:|---:|---:|---|
+| Duo @32 (local only) | 1,025 | 139 (78) | **153 of 153** | 0 | yes |
+| Duo @48, `--time 20min` (local only) | 2,308 | 1,189 (733 in 1.2) | 217 of 324 | 0 | yes |
+
+- **Duo at 32 studs: every state checked within the 5-minute default** (acceptance of #26).
+- **Duo at 48 studs with 20 minutes: two thirds.** Placement alone takes about 10 of the 20 minutes,
+  and checking all states took 919 s with 8 processes on the finished layout; `--time 30min` should
+  check all of them (estimate, not measured).

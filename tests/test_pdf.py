@@ -136,6 +136,33 @@ def test_cover_marks_a_model_cut_short_by_the_time_limit() -> None:
     )
 
 
+def test_cover_says_how_many_states_were_checked() -> None:
+    parts = tuple(make_brick("3001", 0, 0, 3 * i, i) for i in range(4))
+
+    def model(verdicts: tuple[bool | None, ...]) -> BrickModel:
+        return BrickModel(
+            name="tower",
+            parts=parts,
+            steps=tuple(BuildStep(stable=v) for v in verdicts),
+        )
+
+    def sentences(verdicts: tuple[bool | None, ...], lang: str) -> list[str]:
+        return [n[0] for n in pdf_module._cover_notes(model(verdicts), lang)]  # type: ignore[arg-type]
+
+    assert sentences((True, False, True, True), "de") == []
+    partial = sentences((True, True, None, None), "de")
+    assert len(partial) == 1
+    assert "2 von 4 Zwischenständen" in partial[0]
+    assert "vollständig die unteren 2 von 4 Steinlagen" in partial[0]
+    one = sentences((True, None, None, None), "de")[0]
+    assert "vollständig die unterste von 4 Steinlagen" in one
+    english = sentences((True, True, None, None), "en")[0]
+    assert "check 2 of 4 intermediate states" in english
+    none = sentences((None,) * 4, "en")
+    assert none[0].startswith("The steps follow the layers")
+    assert "not every" in none[0]
+
+
 def test_booklet_of_a_model_cut_short_renders(
     tmp_path: Path, sample_model: BrickModel
 ) -> None:

@@ -24,11 +24,13 @@ from mesh2brick.render.text import (
     part_label,
     subassembly_label,
 )
+from mesh2brick.steps.coverage import coverage
 from mesh2brick.steps.structure import Structure
 
 if TYPE_CHECKING:
     from mesh2brick.model import BrickModel, PlacedPart
     from mesh2brick.render.text import Language
+    from mesh2brick.steps.coverage import Coverage
 
 THIRDS: Final = (1 / 3, 2 / 3)
 Kind = tuple[str, int]
@@ -74,7 +76,7 @@ def overview(model: BrickModel) -> str:
         for code, count in counts.most_common()
     )
     (x0, y0, z0), (x1, y1, z1) = model.bounds()
-    checked = all(step.stable is not None for step in model.steps)
+    checks = coverage(model)
     size = " x ".join(number(v, "en") for v in (width, depth, height))
     lines = [
         (
@@ -83,13 +85,7 @@ def overview(model: BrickModel) -> str:
         ),
         f"Colours (parts): {colours}.",
         f"Extent: x {x0}-{x1}, y {y0}-{y1} studs; height layers {z0}-{z1} (plates).",
-        (
-            "Every intermediate state was checked: 'stands' means the model holds "
-            "on its own after the step, 'needs a hand' means the builder must hold it."
-            if checked
-            else "Steps follow the layers bottom-up; intermediate states were not "
-            "checked for stability."
-        ),
+        _checks_line(checks),
     ]
     if model.submodels:
         names = ", ".join(subassembly_label(i) for i in range(len(model.submodels)))
@@ -230,3 +226,19 @@ def _third(value: float, span: tuple[int, int], names: tuple[str, str, str]) -> 
     if share < THIRDS[0]:
         return names[0]
     return names[1] if share <= THIRDS[1] else names[2]
+
+
+def _checks_line(checks: Coverage) -> str:
+    """What the step verdicts mean, for the prompt."""
+    meaning = (
+        "'stands' means the model holds on its own after the step, 'needs a hand' "
+        "means the builder must hold it"
+    )
+    if checks.kind == "all":
+        return f"Every intermediate state was checked: {meaning}."
+    if checks.kind == "partial":
+        return (
+            f"{checks.checked} of {checks.total} intermediate states were checked "
+            f"({meaning}); the others ('not checked') were not."
+        )
+    return "Steps follow the layers bottom-up; intermediate states were not checked."
