@@ -7,7 +7,6 @@ from __future__ import annotations
 import io
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pytest
 from PIL import Image
 from typer.testing import CliRunner
@@ -21,7 +20,7 @@ from mesh2brick.inspection import (
     inspection_text,
     render_inspection,
 )
-from mesh2brick.voxel.estimate import CELLS_PER_PART, quick_fill
+from mesh2brick.voxel.estimate import CELLS_PER_PART, plate_shell
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,8 +39,8 @@ def test_coloured_mesh(fixtures_dir: Path) -> None:
     cells = result.color_cells
     assert sum(n for _, n in cells) == result.shell.filled_count
     assert {code for code, _ in cells} >= {4, 15}  # red cap, white spots
-    low, expected, high = result.parts_estimate
-    assert 0 < low < expected < high
+    estimate = result.parts_estimate
+    assert 0 < estimate.low < estimate.expected < estimate.high
 
     colors = color_info(result.grid.colors_used)
     text = inspection_text(result, settings, colors)
@@ -193,22 +192,13 @@ def test_cli_size_errors_name_the_problem(fixtures_dir: Path, tmp_path: Path) ->
     assert not list(tmp_path.iterdir())
 
 
-@pytest.mark.parametrize(
-    ("shape", "parts"),
-    [((2, 8, 1), 1), ((4, 8, 1), 2), ((1, 1, 3), 3), ((3, 3, 1), 2), ((2, 9, 2), 4)],
-)
-def test_quick_fill_uses_the_largest_bricks(
-    shape: tuple[int, int, int], parts: int
-) -> None:
-    assert quick_fill(np.ones(shape, dtype=bool)) == parts
-
-
 def test_estimate_falls_back_to_cells_for_huge_grids(
     fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     result = inspect_file(fixtures_dir / "heart.vox", load_settings(None, []), name="h")
     exact = result.parts_estimate
+    assert exact.low <= 12 <= exact.high  # heart.vox places 12 parts
     monkeypatch.setattr("mesh2brick.voxel.estimate.MAX_FILL_CELLS", 0)
     rough = result.parts_estimate
-    assert rough[1] == round(result.grid.filled_count / CELLS_PER_PART * 1.3)
-    assert exact[0] <= 12 <= exact[2]  # heart.vox places 12 parts
+    cells = int(plate_shell(result.grid, wall_thickness=2).sum()) / 3
+    assert rough.expected == round(cells / CELLS_PER_PART)

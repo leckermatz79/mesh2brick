@@ -24,7 +24,7 @@ from mesh2brick.pipeline import VOXEL_SUFFIXES, palette_for, time_hint
 from mesh2brick.render.mesh import NEUTRAL_RGB, render_mesh_png, side_by_side
 from mesh2brick.render.preview import PreviewOptions, grid_to_model, render_png
 from mesh2brick.voxel.color import sample_rgb
-from mesh2brick.voxel.estimate import parts_estimate
+from mesh2brick.voxel.estimate import PartsEstimate, parts_estimate
 from mesh2brick.voxel.grid import LEGO_MM_PER_STUD, lego_cell_height_mm
 from mesh2brick.voxel.io import load_npz
 from mesh2brick.voxel.voxelize import hollow, scale_note, voxelize
@@ -60,6 +60,10 @@ class Inspection:
     """Share of the surface area each colour source covers."""
     warnings: tuple[str, ...] = ()
     seconds: float = 0.0
+    hollow: bool = True
+    """``voxel.fill == "hollow"`` (placement builds a shell)."""
+    wall_thickness: int = 2
+    """``voxel.wall_thickness``."""
 
     @property
     def color_cells(self) -> list[tuple[int, int]]:
@@ -71,13 +75,11 @@ class Inspection:
         return sorted(pairs, key=lambda pair: (-pair[1], pair[0]))
 
     @property
-    def parts_estimate(self) -> tuple[int, int, int]:
-        """Rough ``(low, expected, high)`` part count of the converted model.
-
-        Based on :func:`quick_fill` of the solid grid; the real placement
-        hollows the model and repairs stability, which the factors cover.
-        """
-        return parts_estimate(self.grid.occupancy)
+    def parts_estimate(self) -> PartsEstimate:
+        """Expected part count of the converted model, with a range."""
+        return parts_estimate(
+            self.grid, hollow=self.hollow, wall_thickness=self.wall_thickness
+        )
 
 
 def inspect_file(source: Path, settings: Settings, *, name: str) -> Inspection:
@@ -102,6 +104,8 @@ def inspect_file(source: Path, settings: Settings, *, name: str) -> Inspection:
             grid=grid,
             shell=_shell(grid, settings),
             seconds=time.perf_counter() - started,
+            hollow=settings.voxel.fill == "hollow",
+            wall_thickness=settings.voxel.wall_thickness,
         )
     if suffix not in supported_suffixes():
         supported = ", ".join((*supported_suffixes(), *VOXEL_SUFFIXES))
@@ -119,6 +123,8 @@ def inspect_file(source: Path, settings: Settings, *, name: str) -> Inspection:
         surface_colors=surface_shares(model),
         warnings=(*model.warnings, *result.warnings),
         seconds=time.perf_counter() - started,
+        hollow=settings.voxel.fill == "hollow",
+        wall_thickness=settings.voxel.wall_thickness,
     )
 
 
@@ -234,12 +240,12 @@ def inspection_text(
         )
     lines.append("  LEGO colours: " + _lego_colors(inspection.color_cells, colors))
     if shell.filled_count:
-        low, expected, high = inspection.parts_estimate
+        estimate = inspection.parts_estimate
         lines.append(
-            f"  rough estimate: about {expected:,} parts ({low:,}-{high:,}); "
-            "`convert` gives the exact count"
+            f"  rough estimate: about {estimate.expected:,} parts "
+            f"({estimate.low:,}-{estimate.high:,}); `convert` gives the exact count"
         )
-        if hint := time_hint(expected, settings.placement.time_limit_s):
+        if hint := time_hint(estimate.expected, settings.placement.time_limit_s):
             lines.append(f"  {hint}")
     return "\n".join(lines)
 
