@@ -1,12 +1,24 @@
 # Projektstatus
 
-Stand: 2026-11-10 · **Roadmap 7 – Aufräumen fertig** ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) · davor **1.6.0 – bessere Teileschätzung in `inspect`** ([#28](https://github.com/leckermatz79/mesh2brick/issues/28), [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.6.0)) · Nächster Punkt: **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), [ROADMAP.md](../ROADMAP.md))
+Stand: 2026-11-10 · **1.6.1 – Bewertungsskala dokumentiert, damit ist 1.x abgeschlossen** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), ROADMAP Punkt 6) · davor Roadmap 7 (Aufräumen, [#30](https://github.com/leckermatz79/mesh2brick/issues/30)) und 1.6.0 (bessere Teileschätzung, [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.6.0)) · Nächster Schritt: **deine Entscheidung, mit welchem 2.0-Punkt es losgeht** (siehe „Als Nächstes“)
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **Aufgeräumt (Roadmap 7):** Jede Version seit Phase 0 hat jetzt eine Release-Seite, und der Test, der bei zugeklapptem Laptop gescheitert ist, hängt nicht mehr an der Uhr.
-- **Stand der Software ist 1.6.0:** `inspect` sagt die Teilezahl bei allen 15 Testläufen richtig voraus (Burg: 1.718 geschätzt, 1.657 gebaut), der angezeigte Bereich ist im Mittel Faktor 1,78 breit statt 2,2.
+- **Die Bewertungsskala steht jetzt da, wo man sie braucht:** `mesh2brick feedback --help` und beide READMEs sagen „1 bis 5 Sterne, 5 = am besten“ (1 = unbrauchbar, 3 = in Ordnung).
+- **Damit ist 1.x fertig:** Große Modelle gehen (Größe in cm, harte Zeitgrenze, geprüfte Schritte, PDFs unter 10 MB, verlässliche Teileschätzung). Mit 2.0 fange ich erst an, wenn du die Reihenfolge entschieden hast.
+
+## Erledigt (1.6.1, ROADMAP Punkt 6)
+
+- **Hilfe:** `mesh2brick feedback --help` nennt die Skala zweimal, in der Beschreibung („The scale is 1 to 5 stars, 5 = best“) und bei `--rate` („Stars from 1 to 5, 5 = best (1 = unusable, 3 = okay)“, dazu: 4 oder 5 machen den Lauf zum Beispiel für spätere Läufe). Ein Test prüft das unabhängig von der Breite des Terminals.
+- **README.md und README.de.md** nennen die Skala beim Befehl und im Text.
+- **SPEC §8, neue Regel 8 (von dir):** Ich darf Release-Seiten für schon vorhandene Tags anlegen; Merge, Tags und alles Upstream bleiben bei dir.
+
+| Abnahme (Issue #29) | Ergebnis |
+|---|---|
+| `mesh2brick feedback --help` nennt die Skala (1–5, 5 = am besten) | **ja** |
+| README.md und README.de.md nennen sie | **ja** |
+| Tests grün, ruff/mypy sauber | **ja** |
 
 ## Erledigt (Roadmap 7, Aufräumen)
 
@@ -66,10 +78,17 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 4. ~~Roadmap 3 – Stabilitätsprüfung auch für große Modelle~~ ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)): **fertig in 1.4.0**.
 5. ~~Roadmap 4 – kleinere PDFs~~ ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)): **fertig in 1.5.0**.
 6. ~~Roadmap 5 – bessere Teileschätzung in `inspect`~~ ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)): **fertig in 1.6.0**, siehe oben.
-7. **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), nächster Punkt): `mesh2brick feedback --help`, README.md und README.de.md nennen die Skala (1–5 Sterne, 5 = am besten).
+7. ~~Roadmap 6 – Bewertungsskala dokumentiert~~ ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)): **fertig in 1.6.1**, siehe oben.
 8. ~~Roadmap 7 – Aufräumen~~ ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)): **fertig**, siehe oben (alte Release-Seiten, Test ohne Uhr-Abhängigkeit).
 
-**Danach 2.0 – Formtreue:** mehr Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
+**1.x ist abgeschlossen.** Alle sieben Punkte sind fertig.
+
+**2.0 – Formtreue: Der erste Punkt braucht deine Entscheidung zur Reihenfolge.** Zur Wahl stehen ROADMAP 8 (mehr Dachsteine) oder ROADMAP 9 (Tiles) zuerst; ich fange keinen 2.0-Punkt an, bevor du entschieden hast. Was ich dazu weiß (noch nichts gemessen):
+
+- **8 – mehr Dachsteine:** Der größte sichtbare Schritt bei runden Formen (Duos Flügel, Fliegenpilz-Hut), heute setzt legolization nur wenige (14 beim Hasen; über alle Testmodelle sind nur 10 von 130 von außen sichtbar). Dafür muss die Platzierung selbst beeinflusst werden. Hängt das an einer Änderung in legolization, steht die offene Frage „Fork oder Warten“ bei legolization an; die entscheidest du, wenn es so weit ist (vereinbart am 2026-11-07).
+- **9 – Tiles:** Kleiner und eher eigener Code. legolization kann schon jede freiliegende obere Platte durch eine glatte Fliese ersetzen (abschaltbar, heute aus); ROADMAP 9 will das nur dort, wo das Modell wirklich glatt sein soll (Oberseiten, Sockel, Augen).
+
+Danach folgen runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `choose_part` (Roadmap 10–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 ## Bekannte Einschränkungen
 
@@ -154,7 +173,7 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 ## Fragen an dich
 
-Zurzeit keine. Deine Antwort zum Zeithinweis bei den Würfeln steht unter „Deine Entscheidungen“.
+1. **Welcher 2.0-Punkt zuerst: ROADMAP 8 (mehr Dachsteine) oder 9 (Tiles)?** Einordnung unter „Als Nächstes“. **Standard, wenn keine Antwort kommt:** Ich fange keinen 2.0-Punkt an und frage beim nächsten Mal wieder.
 
 ## Offene Kleinigkeiten
 
