@@ -223,7 +223,10 @@ def _say_grid(
 ) -> None:
     """Report the voxel grid and, for a big model, the time advice."""
     say(f"voxels: {grid.filled_count:,} cells, grid {grid.shape} ({seconds:.1f} s)")
-    expected = parts_estimate(grid.occupancy)[1]
+    voxel = settings.voxel
+    expected = parts_estimate(
+        grid, hollow=voxel.fill == "hollow", wall_thickness=voxel.wall_thickness
+    ).expected
     if hint := time_hint(expected, settings.placement.time_limit_s):
         say(f"note: {hint}")
 

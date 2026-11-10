@@ -9,8 +9,9 @@ Runs the real command line (``mesh2brick convert``) once per input, one after
 the other, and measures the wall-clock time of the whole process. Afterwards
 it checks every result: all output files written, parts list total = parts,
 the LDraw file re-reads strictly (every part known to the library, no
-duplicates), the model is one stable piece. It also records the hollow-shell
-cell count of ``mesh2brick inspect`` to calibrate its rough part estimate, and
+duplicates), the model is one stable piece. It also records the part estimate
+of ``mesh2brick inspect`` and whether the result falls inside its range
+(Roadmap 5; ``scripts/benchmark_estimate.py`` re-checks it without converting), and
 how many intermediate states were checked for stability ("checked states",
 Roadmap 3) and how many steps need a supporting hand.
 
@@ -162,6 +163,7 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
         "public": case["public"],
         "seconds": round(seconds, 1),
         "exit": done.returncode,
+        "dir": str(target),
     }
     if done.returncode != 0:
         row["error"] = done.stderr.strip().splitlines()[-1:]
@@ -178,6 +180,7 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     ]
     settings = load_settings(case.get("config"), overrides)
     inspection = inspect_file(path, settings, name=name)
+    estimate = inspection.parts_estimate
     with (target / f"{name}.bom.csv").open(encoding="utf-8", newline="") as handle:
         bom_total = sum(int(row["quantity"]) for row in csv.DictReader(handle))
     checks = coverage(model)
@@ -198,7 +201,7 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
             (target / f"{name}.pdf").stat().st_size / max(model.step_count, 1) / 1e3, 1
         ),
         "shell_cells": inspection.shell.filled_count,
-        "estimate": inspection.parts_estimate,
+        "estimate": [estimate.low, estimate.expected, estimate.high],
         "grid": inspection.grid.shape,
     }
     print(json.dumps(row, default=str), flush=True)
@@ -217,7 +220,7 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
     print(
         "| Input | Parts | Steps | Checked states | Need a hand | Colours "
         "| One stable piece | Files + BOM + LDraw ok "
-        "| PDF MB | kB per step | Time s | Shell cells | Parts/cell |"
+        "| PDF MB | kB per step | Time s | Estimate | In range |"
     )
     print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     big = [
@@ -236,7 +239,7 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
             and row["bom_total"] == row["parts"]
             and row["ldraw_parts"] == row["parts"]
         )
-        ratio = row["parts"] / row["shell_cells"] if row["shell_cells"] else 0
+        low, expected, high = row["estimate"]
         print(
             f"| {row['label']} | {row['parts']:,} | {row['steps']} "
             f"| {row['checked_states']} | {row['hand_steps']} | {row['colours']} "
@@ -244,8 +247,15 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
             f"{' (best so far)' if row.get('best_so_far') else ''} "
             f"| {'yes' if checks else 'NO'} "
             f"| {row['pdf_mb']} | {row['kb_per_step']} | {row['seconds']:.0f} "
-            f"| {row['shell_cells']:,} "
-            f"| {ratio:.2f} |"
+            f"| {expected:,} ({low:,}-{high:,}) "
+            f"| {'yes' if low <= row['parts'] <= high else 'NO'} |"
+        )
+    if ranges := [(r["parts"], *r["estimate"]) for r in rows if not r["exit"]]:
+        inside = sum(1 for parts, low, _, high in ranges if low <= parts <= high)
+        width = sum(high / max(low, 1) for _, low, _, high in ranges) / len(ranges)
+        print(
+            f"\nestimate: {inside} of {len(ranges)} inside the shown range, "
+            f"range on average a factor {width:.2f} wide"
         )
 
     for row in big:

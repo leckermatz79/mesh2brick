@@ -6,6 +6,30 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-10 - Better part estimate in inspect
+
+The part estimate of `inspect` (and of the start of `convert`) retraces what legolization does
+(issue #28, ROADMAP item 5, ADR 0019): it hollows and tiles at plate resolution like legolization and
+adds what legolization's joining step costs where bricks cannot hold each other: areas one cell high
+(castle courtyard, Duo's base) and thin, wide floors. All 15 release runs are inside the shown range
+(1.5: 14), the range is on average a factor 1.78 wide instead of 2.22, and the castle is estimated at
+1,718 (1,384–2,242) instead of 602 (417–926) for 1,657 placed parts (docs/benchmarks.md, "Part
+estimate"). No change to placement, steps or PDF.
+
+### Added
+- `PartsEstimate` (low, expected, high, plus the tiled parts and the cells legolization rebuilds) and
+  `plate_shell` (legolization's hollowing at plate resolution; a test compares both).
+- `scripts/benchmark_estimate.py`: the estimate against a finished release run, without converting.
+- `scripts/benchmark_release.py` shows estimate and "in range" per input and how many are inside.
+
+### Changed
+- `parts_estimate` takes the voxel grid (colours, cell height) and `hollow` / `wall_thickness`
+  instead of the occupancy alone; fixed factors 0.9 / 1.3 / 2.0 are gone.
+- The time advice from 2,000 expected parts now appears for Duo at 48 studs only among the test
+  models; the STEP cube and the textured cube (about 250 s) no longer get it.
+- Fallback for very big models: above 500,000 plate cells of the shell (was: 400,000 cells of the
+  solid grid), from the shell size; a sphere of 128 studs is still estimated exactly (1.3 s).
+
 ## [1.5.0] - 2026-11-09 - Smaller PDFs for big models
 
 Every booklet of the fixtures is below 10 MB (issue #27, ROADMAP item 4, ADR 0018): textured cube
