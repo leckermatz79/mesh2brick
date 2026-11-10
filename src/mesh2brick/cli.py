@@ -586,7 +586,12 @@ def feedback(
     rate: Annotated[
         int | None,
         typer.Option(
-            "--rate", "-r", min=1, max=5, help="Rating from 1 (bad) to 5 (very good)."
+            "--rate",
+            "-r",
+            min=1,
+            max=5,
+            help="Stars from 1 to 5, 5 = best (1 = unusable, 3 = okay). Runs rated "
+            "4 or 5 become examples for later runs.",
         ),
     ] = None,
     note: Annotated[
@@ -608,9 +613,10 @@ def feedback(
 ) -> None:
     """Rate a result of the LLM layer, list the runs or export them.
 
-    Without options it lists the latest runs. Ratings of 4 or 5 turn a run's
-    sections and step texts into examples for later runs; notes are passed
-    on as feedback. Everything stays in a local file (MESH2BRICK_DATA_DIR).
+    The scale is 1 to 5 stars, 5 = best. Without options it lists the latest
+    runs. Ratings of 4 or 5 turn a run's sections and step texts into
+    examples for later runs; notes are passed on as feedback. Everything
+    stays in a local file (MESH2BRICK_DATA_DIR).
     """
     from mesh2brick.agent.feedback import (  # noqa: PLC0415
         FeedbackError,

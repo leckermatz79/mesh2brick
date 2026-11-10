@@ -153,17 +153,17 @@ uv run mesh2brick convert model.stl -o out/ --set llm.enabled=true
 # -> out/model.llm.json: what was accepted, tokens and cost of the run
 
 uv run mesh2brick feedback                # list the runs
-uv run mesh2brick feedback --rate 4 --note "texts a bit long"   # rate the latest run
+uv run mesh2brick feedback --rate 4 --note "texts a bit long"   # latest run, 1-5 stars, 5 = best
 uv run mesh2brick feedback --export runs.jsonl                  # for a later fine-tuning
 ```
 
 A run costs about $0.06–0.20 for models of 270–1,000 parts with the default
 `claude-sonnet-5-5` (limit `llm.max_cost_usd: 1.0`, see
-[docs/benchmarks.md](docs/benchmarks.md)). Ratings stay on your computer
-(`MESH2BRICK_DATA_DIR`); runs rated 4 or 5 become examples for later runs, and notes
-are passed on as feedback. `llm.tasks` selects `group_steps`, `write_step_text` and
-the opt-in `choose_part` (replacements for parts LEGO does not make in a colour, with
-`parts.availability: report`).
+[docs/benchmarks.md](docs/benchmarks.md)). A rating is 1 to 5 stars, **5 = best**
+(1 = unusable, 3 = okay). Ratings stay on your computer (`MESH2BRICK_DATA_DIR`); runs
+rated 4 or 5 become examples for later runs, and notes are passed on as feedback.
+`llm.tasks` selects `group_steps`, `write_step_text` and the opt-in `choose_part`
+(replacements for parts LEGO does not make in a colour, with `parts.availability: report`).
 
 ## Example gallery
 

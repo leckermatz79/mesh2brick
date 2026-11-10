@@ -6,6 +6,18 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-10 - Rating scale documented
+
+`mesh2brick feedback --help`, README.md and README.de.md state the rating scale: 1 to 5 stars,
+5 = best (1 = unusable, 3 = okay); runs rated 4 or 5 become examples for later runs (issue #29,
+ROADMAP item 6, the last 1.x item).
+
+### Changed
+- `feedback --rate` and the `feedback` command help name the scale; a test checks it independent of
+  the terminal width.
+- Tests: the LLM pipeline test places the model once and reuses it, so a time cap that fires while
+  the laptop sleeps cannot make it fail (issue #30).
+
 ## [1.6.0] - 2026-11-10 - Better part estimate in inspect
 
 The part estimate of `inspect` (and of the start of `convert`) retraces what legolization does

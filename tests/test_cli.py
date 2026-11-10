@@ -37,6 +37,16 @@ def test_help_runs_as_module() -> None:
     assert "place" in result.stdout
 
 
+def test_feedback_help_states_the_rating_scale() -> None:
+    """Roadmap 6: the scale is 1-5 stars, 5 = best (issue #29)."""
+    # A fixed width, so the option panel wraps the same on every terminal.
+    result = runner.invoke(app, ["feedback", "--help"], env={"COLUMNS": "120"})
+    assert result.exit_code == 0
+    text = " ".join(result.output.replace("\u2502", " ").split())
+    assert "The scale is 1 to 5 stars, 5 = best." in text
+    assert "Stars from 1 to 5, 5 = best" in text
+
+
 def test_version() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
