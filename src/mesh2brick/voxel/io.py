@@ -3,7 +3,8 @@
 """Voxel grid files.
 
 * ``.npz`` - mesh2brick's own lossless format (occupancy, colours, cell
-  size, origin). Use it to hand a grid from ``voxelize`` to ``place``.
+  size, origin and, since 2.0, the flat tops; older files read without
+  them). Use it to hand a grid from ``voxelize`` to ``place``.
 * ``.npy`` - a single ``int16`` array of LDraw colour codes, ``-1`` = empty,
   axes ``(x, y, z)`` with z up. This is exactly what legolization's
   ``VoxelGrid.from_npy`` reads (one voxel = one brick by default).
@@ -18,7 +19,7 @@ Reading ``.npy``/``.vox`` goes through the backend (it owns the palette).
 from __future__ import annotations
 
 import struct
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import numpy as np
 
@@ -37,16 +38,18 @@ _VOX_VERSION: Final = 150
 def save_npz(grid: VoxelGrid, path: Path) -> Path:
     """Write ``grid`` losslessly (compressed) and return ``path``."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    arrays: dict[str, np.ndarray[Any, Any]] = {
+        "schema": np.asarray(NPZ_SCHEMA, dtype=np.int32),
+        "occupancy": grid.occupancy,
+        "color": grid.color,
+        "height_unit": np.asarray(grid.height_unit),
+        "pitch_mm": np.asarray(grid.pitch_mm, dtype=np.float64),
+        "origin_mm": np.asarray(grid.origin_mm, dtype=np.float64),
+    }
+    if grid.flat is not None:
+        arrays["flat"] = grid.flat
     with path.open("wb") as handle:
-        np.savez_compressed(
-            handle,
-            schema=np.int32(NPZ_SCHEMA),
-            occupancy=grid.occupancy,
-            color=grid.color,
-            height_unit=np.str_(grid.height_unit),
-            pitch_mm=np.float64(grid.pitch_mm),
-            origin_mm=np.asarray(grid.origin_mm, dtype=np.float64),
-        )
+        np.savez_compressed(handle, allow_pickle=False, **arrays)
     return path
 
 
@@ -71,6 +74,7 @@ def load_npz(path: Path) -> VoxelGrid:
             height_unit="brick" if unit == "brick" else "plate",
             pitch_mm=float(data["pitch_mm"]),
             origin_mm=(origin[0], origin[1], origin[2]),
+            flat=data["flat"].astype(np.float32) if "flat" in data else None,
         )
 
 

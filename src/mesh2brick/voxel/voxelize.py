@@ -40,6 +40,7 @@ import trimesh
 from scipy import ndimage
 
 from mesh2brick.voxel.color import apply_colors, model_colors
+from mesh2brick.voxel.flat import flat_tops
 from mesh2brick.voxel.grid import (
     EMPTY,
     LDU_PER_PLATE,
@@ -152,6 +153,12 @@ def voxelize(
         occupancy, min_island_fraction=settings.voxel.min_island_fraction
     )
     warnings.extend(cleanup_notes)
+    flat = flat_tops(
+        np.asarray(mesh.triangles),
+        occupancy,
+        lattice,
+        lego_cell_height_mm=lego_cell_height_mm(unit),
+    )
     # Model colours use the full lattice: surface points in empty border cells
     # (details too thin to fill a cell) still colour their filled neighbours.
     full_color, color_notes = model_colors(
@@ -161,6 +168,7 @@ def voxelize(
     box = _crop_box(occupancy)
     origin = _box_origin(box, lattice)
     occupancy = np.ascontiguousarray(occupancy[box])
+    flat = np.ascontiguousarray(flat[box])
     color = (
         apply_colors(occupancy, settings.color)  # bands follow the cropped height
         if settings.color.mode == "height_bands"
@@ -178,6 +186,7 @@ def voxelize(
         height_unit=unit,
         pitch_mm=lattice.pitch,
         origin_mm=origin,
+        flat=flat,
     )
     report = VoxelizeReport(
         method=method,
@@ -518,6 +527,7 @@ def hollow(grid: VoxelGrid, wall_thickness: int) -> VoxelGrid:
         height_unit=grid.height_unit,
         pitch_mm=grid.pitch_mm,
         origin_mm=grid.origin_mm,
+        flat=None if grid.flat is None else np.where(shell, grid.flat, np.nan),
     )
 
 

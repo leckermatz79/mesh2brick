@@ -56,6 +56,11 @@ class VoxelGrid:
         pitch_mm: model millimetres per stud (horizontal cell size).
         origin_mm: model-space position of the minimum corner of cell
             ``(0, 0, 0)``, in millimetres.
+        flat: ``float32[x, y, z]`` - for top cells whose top the input mesh
+            renders flat (so they may get a tile, :mod:`mesh2brick.voxel.flat`):
+            how far that face lies above the cell's top, in cell layers;
+            ``NaN`` elsewhere. ``None`` when no mesh said so (voxel files):
+            every top counts, at the height of the cells.
     """
 
     occupancy: NDArray[np.bool_]
@@ -63,6 +68,7 @@ class VoxelGrid:
     height_unit: HeightUnit = "brick"
     pitch_mm: float = 8.0
     origin_mm: tuple[float, float, float] = field(default=(0.0, 0.0, 0.0))
+    flat: NDArray[np.float32] | None = None
 
     def __post_init__(self) -> None:
         occupancy = np.asarray(self.occupancy)
@@ -91,6 +97,17 @@ class VoxelGrid:
         if np.any(color[occupancy] < 0):
             msg = "occupied cells need a non-negative LDraw colour code"
             raise ValueError(msg)
+        if self.flat is not None:
+            flat = np.asarray(self.flat, dtype=np.float32)
+            if flat.shape != occupancy.shape:
+                msg = f"flat must have the shape {occupancy.shape}"
+                raise ValueError(msg)
+            if np.any(np.isfinite(flat) & ~occupancy):
+                msg = "flat marks cells that are not occupied"
+                raise ValueError(msg)
+            frozen_flat = flat.copy()
+            frozen_flat.setflags(write=False)
+            object.__setattr__(self, "flat", frozen_flat)
         frozen_occupancy = occupancy.copy()
         frozen_color = color.astype(np.int32, copy=True)
         frozen_occupancy.setflags(write=False)
@@ -142,6 +159,15 @@ class VoxelGrid:
         dz = self.pitch_mm * self.plates_per_cell * LDU_PER_PLATE / LDU_PER_STUD
         return (self.pitch_mm, self.pitch_mm, dz)
 
+    def flat_tops(self) -> NDArray[np.float32]:
+        """:attr:`flat`, or every top cell at the height of the cells (offset 0)."""
+        if self.flat is not None:
+            return self.flat
+        tops = self.occupancy.copy()
+        tops[:, :, :-1] &= ~self.occupancy[:, :, 1:]
+        offset: NDArray[np.float32] = np.where(tops, 0.0, np.nan).astype(np.float32)
+        return offset
+
     @property
     def colors_used(self) -> tuple[int, ...]:
         """Sorted distinct LDraw colour codes of occupied cells."""
@@ -164,6 +190,11 @@ class VoxelGrid:
             and self.origin_mm == other.origin_mm
             and np.array_equal(self.occupancy, other.occupancy)
             and np.array_equal(self.color, other.color)
+            and (
+                np.array_equal(self.flat, other.flat, equal_nan=True)
+                if self.flat is not None and other.flat is not None
+                else self.flat is other.flat
+            )
         )
 
     def __hash__(self) -> int:
