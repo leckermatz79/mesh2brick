@@ -208,6 +208,11 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
         "buildable": model.buildable,
         "best_so_far": model.best_so_far,
         "stages": _stages(done.stdout),
+        "notes": [
+            line.strip().removeprefix("note: ")
+            for line in done.stdout.splitlines()
+            if line.strip().startswith("note: ")
+        ],
         "all_files": all(f.is_file() for f in files),
         "bom_total": bom_total,
         "ldraw_parts": LegolizationBackend().verify_ldraw(ldraw),
