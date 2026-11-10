@@ -170,10 +170,11 @@ Danach folgen runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `cho
 | 2026-11-09 | legolization-Issue zu den drei Funden einreichen? | **Ja**, nach deinem Blick auf den Text; mit Halbsatz-Verweis auf #88/#89 (ergänzt). Befehl unter „Offene Kleinigkeiten“. |
 | 2026-11-09 | Schrittbilder großer Modelle: schon gebaute Teile ohne Fugen? | **Ja, aber nur für große Modelle** (über 500 Teile), dazu 110 dpi und die sparsamere Farbpalette; kleine Modelle bleiben wie 1.4. Gewählt auf einer Vergleichsseite (wie 1.4 / unsichtbar sparsamer / ohne Fugen). |
 | 2026-11-10 | Dürfen die Würfel den Zeithinweis verlieren (Roadmap 5)? | **Ja.** Der Hinweis bleibt an die Schwelle von 2.000 erwarteten Teilen gebunden. Die Würfel werden in gut vier Minuten fertig, und ein knappes Zeitbudget führt seit 1.4 nur zu weniger geprüften Zwischenständen, nicht zum Abbruch. |
+| 2026-11-10 | Welcher 2.0-Punkt zuerst: ROADMAP 8 (mehr Dachsteine) oder 9 (Tiles)? | **Erst 9 (Tiles), dann 8.** Reihenfolge in 2.0: 9, 8, 10, 11, 12, 13. Grund: Tiles brauchen keine Änderung an der Platzierung und keine Upstream-Antwort. [ROADMAP.md](../ROADMAP.md) ist angepasst. |
 
 ## Fragen an dich
 
-1. **Welcher 2.0-Punkt zuerst: ROADMAP 8 (mehr Dachsteine) oder 9 (Tiles)?** Einordnung unter „Als Nächstes“. **Standard, wenn keine Antwort kommt:** Ich fange keinen 2.0-Punkt an und frage beim nächsten Mal wieder.
+Keine offenen Fragen (die Reihenfolge in 2.0 ist entschieden: erst Tiles, dann Dachsteine).
 
 ## Offene Kleinigkeiten
 

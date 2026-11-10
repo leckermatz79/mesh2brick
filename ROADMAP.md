@@ -1,7 +1,7 @@
 # mesh2brick – Roadmap after 1.0
 
 Status: draft by the product owner, 2026-11-07; updated 2026-11-07 after Roadmap 2 (item 8 split: its speed part
-moved to 1.x as 1.3.0). Lives in the repo root next to SPEC.md.
+moved to 1.x as 1.3.0) and 2026-11-10 (2.0 order: 9 before 8). Lives in the repo root next to SPEC.md.
 SPEC.md stays the source of truth for *how* we work; this file says *what* comes next and in which order.
 Claude Code: treat each numbered item as a candidate issue. Before starting one, write the acceptance
 criteria into the issue, as in Phases 0–8.
@@ -73,6 +73,10 @@ Metric for every item: surface deviation to the input mesh (and part count) at u
     or our own catalogue-aware placer).
 13. **`choose_part` with real content.** Once items 8–11 give alternatives, the LLM task picks by build
     ergonomics; validated against catalogue and stability as in Phase 7.
+
+Order of work in 2.0 (product owner, 2026-11-10): **9, 8, 10, 11, 12, 13**. Tiles go first because they need no
+change to legolization's placement and no upstream answer; the surface-deviation metric built for item 9 is the
+baseline for 8, 10 and 11.
 
 ---
 
