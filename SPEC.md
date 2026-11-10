@@ -271,6 +271,7 @@ Der Nutzer ist Product Owner. Er kann sagen, ob ein Ergebnis gut aussieht, ob di
 5. **Lücken ehrlich benennen.** Wenn etwas nicht funktioniert oder legolization eine Grenze hat, steht das in `docs/STATUS.md` unter „Bekannte Einschränkungen", mit Einschätzung: Upstream-Fix / eigener Code / akzeptieren.
 6. **Benchmarks pflegen.** `docs/benchmarks.md` bei jeder Änderung an Voxelisierung, Backend-Konfiguration oder eigenen Strategien.
 7. **Nutzerkontext.** Der Nutzer entwickelt in Python, nutzt `uv`, GitHub und Claude Code regelmäßig; Testmodelle kommen aus Fusion 360 (STEP/3MF) und aus dem 3D-Druck-Umfeld (STL). Kurze Rückfragen genügen.
+8. **Releases und GitHub** (2026-11-10, PO). Claude Code darf Release-Seiten für bereits existierende Tags anlegen, mit dem passenden CHANGELOG-Abschnitt als Text. Merge, Tags und alles Upstream (Issues und PRs bei legolization, pyldraw3, trimesh und anderen fremden Projekten) bleiben beim Product Owner; Claude Code bereitet sie vor und übergibt fertige Befehle.
 
 ---
 
