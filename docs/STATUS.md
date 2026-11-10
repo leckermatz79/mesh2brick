@@ -1,12 +1,19 @@
 # Projektstatus
 
-Stand: 2026-11-10 · **1.6.0 – bessere Teileschätzung in `inspect` fertig** ([#28](https://github.com/leckermatz79/mesh2brick/issues/28), ROADMAP Punkt 5) · davor 1.5.0 (kleinere PDFs, [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.5.0)) · Nächster Punkt: **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), [ROADMAP.md](../ROADMAP.md))
+Stand: 2026-11-10 · **Roadmap 7 – Aufräumen fertig** ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) · davor **1.6.0 – bessere Teileschätzung in `inspect`** ([#28](https://github.com/leckermatz79/mesh2brick/issues/28), [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.6.0)) · Nächster Punkt: **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), [ROADMAP.md](../ROADMAP.md))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **`inspect` sagt die Teilezahl jetzt bei allen 15 Testläufen richtig voraus:** Die Burg schätzt es auf 1.718 (1.384–2.242) statt 602; gebaut werden 1.657 Teile. Der angezeigte Bereich ist im Mittel nur noch Faktor 1,78 breit statt 2,2, bei 12 der 15 Läufe Faktor 1,6.
-- **Am Bauen ändert sich nichts:** Teile, Schritte und PDF sind wie in 1.5; die Schätzung dauert weiterhin Millisekunden.
+- **Aufgeräumt (Roadmap 7):** Jede Version seit Phase 0 hat jetzt eine Release-Seite, und der Test, der bei zugeklapptem Laptop gescheitert ist, hängt nicht mehr an der Uhr.
+- **Stand der Software ist 1.6.0:** `inspect` sagt die Teilezahl bei allen 15 Testläufen richtig voraus (Burg: 1.718 geschätzt, 1.657 gebaut), der angezeigte Bereich ist im Mittel Faktor 1,78 breit statt 2,2.
+
+## Erledigt (Roadmap 7, Aufräumen)
+
+- **Alte Release-Seiten:** v0.0.0 bis v0.7.0 haben jetzt je eine [Release-Seite](https://github.com/leckermatz79/mesh2brick/releases) mit ihrem CHANGELOG-Abschnitt, als Vorabversion markiert (Phasen vor 1.0); 1.6.0 bleibt die aktuelle Version. Das Skript dafür liegt in `out/releases/create-old-releases.sh` (nicht im Repo).
+- **trimesh-Bericht:** war schon erledigt ([#2669](https://github.com/mikedh/trimesh/issues/2669)).
+- **Veralteter Eintrag entfernt:** Das legolization-Issue zur Schrittplanung (Entwurf #15–17) stand noch unter „Offene Kleinigkeiten“, ist aber seit 2026-11-09 eingereicht ([#99](https://github.com/hbmartin/legolization/issues/99), noch ohne Antwort).
+- **Der Test, der im Schlafmodus gescheitert ist** (KI-Schicht an und aus beim Herz), hängt nicht mehr an der Uhr. Er hat das Herz zweimal unabhängig gebaut und die Dateien verglichen. Beide Läufe sind aber nur gleich, solange keine Zeitgrenze greift: Die Stabilitätsrechnung bricht einen Lösungsversuch nach 1 bzw. 5 Sekunden ab, und diese Uhr läuft auf dem Mac auch im Schlaf weiter (die Fristen von mesh2brick selbst nicht). Jetzt bauen beide Läufe auf derselben Platzierung auf; geprüft wird, was die KI-Schicht ändert, und das ist genau der Zweck des Tests. Einen „Timing“-Test brauchte es nicht: Nur dieser eine Test vergleicht zwei unabhängige Platzierungen.
 
 ## Erledigt (1.6.0, ROADMAP Punkt 5)
 
@@ -60,9 +67,9 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 5. ~~Roadmap 4 – kleinere PDFs~~ ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)): **fertig in 1.5.0**.
 6. ~~Roadmap 5 – bessere Teileschätzung in `inspect`~~ ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)): **fertig in 1.6.0**, siehe oben.
 7. **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), nächster Punkt): `mesh2brick feedback --help`, README.md und README.de.md nennen die Skala (1–5 Sterne, 5 = am besten).
-8. Roadmap 7 ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
+8. ~~Roadmap 7 – Aufräumen~~ ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)): **fertig**, siehe oben (alte Release-Seiten, Test ohne Uhr-Abhängigkeit).
 
-**Danach 2.0 – Formtreue:** mehr Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89 und #90/#91 sowie trimesh #2669 abwarten.
+**Danach 2.0 – Formtreue:** mehr Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 ## Bekannte Einschränkungen
 
@@ -143,10 +150,11 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | 2026-11-09 | Alle Kerne für die Prüfung? | **Ja, alle bis auf einen.** Keine Einstellung dafür. |
 | 2026-11-09 | legolization-Issue zu den drei Funden einreichen? | **Ja**, nach deinem Blick auf den Text; mit Halbsatz-Verweis auf #88/#89 (ergänzt). Befehl unter „Offene Kleinigkeiten“. |
 | 2026-11-09 | Schrittbilder großer Modelle: schon gebaute Teile ohne Fugen? | **Ja, aber nur für große Modelle** (über 500 Teile), dazu 110 dpi und die sparsamere Farbpalette; kleine Modelle bleiben wie 1.4. Gewählt auf einer Vergleichsseite (wie 1.4 / unsichtbar sparsamer / ohne Fugen). |
+| 2026-11-10 | Dürfen die Würfel den Zeithinweis verlieren (Roadmap 5)? | **Ja.** Der Hinweis bleibt an die Schwelle von 2.000 erwarteten Teilen gebunden. Die Würfel werden in gut vier Minuten fertig, und ein knappes Zeitbudget führt seit 1.4 nur zu weniger geprüften Zwischenständen, nicht zum Abbruch. |
 
 ## Fragen an dich
 
-1. **Zeithinweis bei den Würfeln:** Mit der genaueren Schätzung bekommen STEP-Würfel und Texturwürfel den Hinweis „recommended: --time 20min“ nicht mehr (erwartet 1.930 und 1.940 Teile, die Grenze ist 2.000; sie werden in gut 4 Minuten fertig). Nur Duo mit 48 Noppen bekommt ihn noch. Passt das so? **Standard, wenn keine Antwort kommt:** ja, so lassen.
+Zurzeit keine. Deine Antwort zum Zeithinweis bei den Würfeln steht unter „Deine Entscheidungen“.
 
 ## Offene Kleinigkeiten
 
@@ -154,7 +162,3 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
   `uv run mesh2brick convert tests/fixtures/rocket.blend -o out/rocket-suche`
   `uv run mesh2brick convert tests/fixtures/rocket.blend -o out/rocket-schichten --set steps.sequencing=checked-layers`
   Danach `out/rocket-suche/rocket.pdf` und `out/rocket-schichten/rocket.pdf` nebeneinanderlegen (gemessen: 11 gegen 0 Schritte mit „Halte fest“).
-- **legolization-Issue** (Entwurf #15–17 in [UPSTREAM.md](UPSTREAM.md), Text in `out/upstream/legolization-step-planning.md`), nach deinem Blick auf den Text:
-  `gh issue create --repo hbmartin/legolization --title "Step planning on large hollow models: where the time goes (measurements, two small fixes)" --body-file out/upstream/legolization-step-planning.md`
-- **Ältere Release-Seiten** (v0.0.0 bis v0.7.0) fehlen weiterhin; die Tags existieren, v1.0.0 hat seine Seite (Roadmap 7, #30). Befehl für `v0.0.0`:
-  `awk '/^## \[0.0.0\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md | gh release create v0.0.0 --prerelease --title "v0.0.0 – Phase 0: skeleton" --notes-file -`
