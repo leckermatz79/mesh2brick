@@ -6,12 +6,49 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-10 - Tiles on flat tops (opt-in)
+
+The first 2.0 item (issue #42, ROADMAP item 9, ADR 0020): with `tile` in `parts.categories`, open
+tops that the 3D model has flat (a box's top, a base, a flat detail) get smooth tiles, and the tile
+lies where the model's face is, to the plate. The stairs of rounded shapes keep their studs. On the
+fixtures the cubes, the L-bracket and the two bodies now match their mesh exactly (surface
+deviation 0.83 / 4.05 mm → 0.00 / 0.00 mm, mean / 95th percentile), for 7–16 % more parts; every
+fixture stays one stable piece (docs/benchmarks.md, "Tiles (ROADMAP 9)"). Tiles stay off by default
+until the product owner decides (then 2.0.0).
+
 ### Added
+- Flat tops from the mesh (`voxel/flat.py`): the voxelizer marks top cells whose top face is level
+  and planar in the input mesh (every ray of the cell, at most 1° tilt, heights within 0.1 mm;
+  faces of at least 2 cells, plus border cells at least half covered), with the face's height.
+  Stored in `VoxelGrid.flat` and in `.npz` (older files still load; voxel files count every top).
+- Tile pass after placement (`apply_tiles` in the legolization backend, `place/tiles.py`): a plate
+  becomes a tile of its size (part count unchanged), a brick two plates plus tiles; where the face
+  is a plate lower a brick becomes one plate plus tiles, where it is a plate higher tiles are laid on
+  the part. All nine tile sizes of legolization's catalogue are used (five of them are import-only
+  there); 2 × 3 and 2 × 8 tops get two tiles. Only parts the whitelist allows and LEGO makes in the
+  colour. When a part got heavier, the whole model is checked again while the steps are planned, and
+  the tiles are undone if it would no longer hold together.
+- Settings `parts.tiles: flat | all` (`all`: every open top, the stairs too) and
+  `parts.tiles_on_base` (tiles on the lowest brick layer, default yes).
+- `scripts/compare_previews.py`: two release runs side by side (pictures with parts, tiles,
+  deviation). `scripts/benchmark_release.py` records each run's notes.
 - Shape fidelity metric for the 2.0 series (`mesh2brick.fidelity`, issue #42): the distance of the
   brick model's outer surface (studs included) to the input mesh, area-weighted mean and 95th
   percentile in mm and studs. `scripts/benchmark_fidelity.py` measures finished release runs,
   `scripts/benchmark_release.py` records it per run (column "Deviation mm"); the 1.6 baseline is in
   docs/benchmarks.md, "Shape fidelity baseline".
+
+### Changed
+- legolization's own tile pass is never used (it tiled every open plate, stairs included, never
+  bricks, and only in four sizes); `tile` in `parts.categories` now means mesh2brick's pass.
+- The five import-only tiles of legolization's catalogue (1 × 3, 1 × 6, 1 × 8, 2 × 4, 2 × 6) count as
+  tiles: `catalog list --category tile` shows nine, whitelists apply to them, the PDF names them
+  "Fliese" / Tile.
+- The LLM layer's prompt says what a tile is (no studs, laid on last).
+
+### Fixed
+- `convert` with `llm.enabled` but no API credentials stopped with the SDK's `TypeError`; it now
+  skips the LLM layer with the note "no API credentials: set ANTHROPIC_API_KEY".
 
 ## [1.6.1] - 2026-11-10 - Rating scale documented
 
