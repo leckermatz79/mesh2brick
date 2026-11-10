@@ -206,3 +206,23 @@ def test_real_sender_needs_the_llm_extra(monkeypatch: pytest.MonkeyPatch) -> Non
     with pytest.raises(LlmError, match="llm' extra") as caught:
         anthropic_sender()
     assert caught.value.fatal
+
+
+def test_missing_credentials_are_a_fatal_llm_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    anthropic = pytest.importorskip("anthropic")
+
+    class _NoCredentials:
+        def __init__(self, **_kwargs: Any) -> None:
+            self.messages = self
+
+        def stream(self, **_params: Any) -> Any:
+            msg = '"Could not resolve authentication method. Expected one of api_key"'
+            raise TypeError(msg)
+
+    monkeypatch.setattr(anthropic, "Anthropic", _NoCredentials)
+    send = anthropic_sender()
+    with pytest.raises(LlmError, match="ANTHROPIC_API_KEY") as caught:
+        send({"model": "claude-sonnet-5-5"})
+    assert caught.value.fatal
