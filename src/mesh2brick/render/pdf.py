@@ -88,6 +88,11 @@ HINT_FILL: Final = HexColor("#fff4cc")
 HINT_INK: Final = HexColor("#7a5a00")
 WARN_FILL: Final = HexColor("#fde7e7")
 CATEGORY_ORDER: Final = {"brick": 0, "plate": 1, "tile": 2, "slope": 3}
+COMPACT_MIN_PARTS: Final = 501
+"""Models with at least this many parts get compact step pictures (product
+owner, 2026-11-09: the same boundary as checked layers, ADR 0017/0018)."""
+COMPACT_DPI: Final = 110.0
+"""Step-picture resolution of compact booklets (1.4: 130 for all)."""
 PART_PICTURE_PX: Final = (200, 150)
 UNIT_PICTURE_PX: Final = (240, 180)
 UNIT_ELEVATION: Final = -28.0
@@ -120,6 +125,9 @@ class PdfOptions:
             ``choose_part``).
         date: date printed on the cover (default: today).
         compress: compress page content (tests switch it off to read text).
+        compact: compact step pictures for big models (ADR 0018): earlier
+            parts without joints, :data:`COMPACT_DPI`, octree palette.
+            ``None`` decides by size (:data:`COMPACT_MIN_PARTS`).
     """
 
     language: Language = "de"
@@ -131,6 +139,7 @@ class PdfOptions:
     replacements: Mapping[tuple[str, int], str] = field(default_factory=dict)
     date: dt.date | None = None
     compress: bool = True
+    compact: bool | None = None
 
     def __post_init__(self) -> None:
         if not 1 <= self.steps_per_page <= 4:  # noqa: PLR2004
@@ -496,10 +505,17 @@ class _Booklet:
     def step_pages_(self) -> None:
         layout, model, per_page = self.layout, self.model, self.options.steps_per_page
         frame = layout.picture(layout.panels[0])
-        width, height = _pixels(frame.w, frame.h, self.options.dpi)
+        compact = compact_steps(model, self.options)
+        dpi = min(self.options.dpi, COMPACT_DPI) if compact else self.options.dpi
+        width, height = _pixels(frame.w, frame.h, dpi)
         images = render_step_images(
             model,
-            PreviewOptions(width_px=width, height_px=height),
+            PreviewOptions(
+                width_px=width,
+                height_px=height,
+                faded_edges=not compact,
+                octree_palette=compact,
+            ),
             grow=self.options.grow,
             sub_background="#" + SUB_FILL.hexval()[2:],
         )
@@ -657,6 +673,18 @@ _TILE_HEIGHT: Final = 104.0
 
 
 _PARTS_HEADER: Final = 34.0
+
+
+def compact_steps(model: BrickModel, options: PdfOptions) -> bool:
+    """Whether the booklet of ``model`` gets compact step pictures (ADR 0018).
+
+    Big closed bodies gave 20-23 MB booklets, almost all of it step
+    pictures; compact ones are a third of that. Small models keep the
+    pictures of 1.4.
+    """
+    if options.compact is not None:
+        return options.compact
+    return model.part_count >= COMPACT_MIN_PARTS
 
 
 def _tiles_per_page(box: _Box) -> int:

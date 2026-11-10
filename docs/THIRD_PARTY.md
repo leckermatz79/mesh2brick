@@ -41,7 +41,8 @@ All are GPL-3.0-compatible.
 ## Development tools (dependency group `dev`)
 
 ruff (MIT), mypy (MIT), pytest (MIT), pytest-cov (MIT), pre-commit (MIT),
-scipy-stubs (BSD-3-Clause), types-PyYAML (Apache-2.0).
+scipy-stubs (BSD-3-Clause), types-PyYAML (Apache-2.0), pypdf (BSD-3-Clause; tests read the
+instruction PDFs back, Roadmap 4).
 
 ## Data
 
