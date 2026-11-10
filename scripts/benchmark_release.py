@@ -13,7 +13,10 @@ duplicates), the model is one stable piece. It also records the part estimate
 of ``mesh2brick inspect`` and whether the result falls inside its range
 (Roadmap 5; ``scripts/benchmark_estimate.py`` re-checks it without converting), and
 how many intermediate states were checked for stability ("checked states",
-Roadmap 3) and how many steps need a supporting hand.
+Roadmap 3) and how many steps need a supporting hand. Since 2.0 it measures
+shape fidelity too: the surface deviation of the brick model to the input
+mesh (mean and 95th percentile in mm, ``mesh2brick.fidelity``) and the number
+of tiles (ROADMAP 9).
 
 The STEP case is built on the fly (a small castle of boxes, see
 ``castle_step``) and converted with ``--config examples/mesh2brick.yaml``,
@@ -45,6 +48,7 @@ KB_PER_STEP_WARN = 40.0
 (1.4: 43-75 kB; with the compact step pictures of 1.5 about 20-30 kB,
 docs/benchmarks.md "PDF size (Roadmap 4)")."""
 WARN_MIN_PARTS = 501
+CASTLE_CONFIG = ROOT / "examples" / "mesh2brick.yaml"
 
 
 def castle_step() -> str:
@@ -99,7 +103,7 @@ def main() -> None:
             "label": "castle.step (generated), --config",
             "path": castle,
             "public": True,
-            "config": ROOT / "examples" / "mesh2brick.yaml",
+            "config": CASTLE_CONFIG,
         }
     )
     for text in args.local:
@@ -135,7 +139,9 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     from mesh2brick.config import load_settings  # noqa: PLC0415
     from mesh2brick.inspection import inspect_file  # noqa: PLC0415
     from mesh2brick.model import BrickModel  # noqa: PLC0415
+    from mesh2brick.pipeline import shape_deviation  # noqa: PLC0415
     from mesh2brick.steps.coverage import coverage  # noqa: PLC0415
+    from mesh2brick.voxel.io import load_npz  # noqa: PLC0415
 
     path: Path = case["path"]
     target = out / (case.get("name") or path.stem)
@@ -164,6 +170,9 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
         "seconds": round(seconds, 1),
         "exit": done.returncode,
         "dir": str(target),
+        "source": str(path),
+        "config": str(case["config"]) if case.get("config") else None,
+        "set": overrides,
     }
     if done.returncode != 0:
         row["error"] = done.stderr.strip().splitlines()[-1:]
@@ -184,7 +193,13 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     with (target / f"{name}.bom.csv").open(encoding="utf-8", newline="") as handle:
         bom_total = sum(int(row["quantity"]) for row in csv.DictReader(handle))
     checks = coverage(model)
+    started = time.perf_counter()
+    grid = load_npz(target / f"{name}.grid.npz")
+    deviation = shape_deviation(path, settings, model, grid)
     row |= {
+        "deviation": deviation.as_dict(),
+        "deviation_s": round(time.perf_counter() - started, 1),
+        "tiles": sum(1 for part in model.parts if part.category == "tile"),
         "parts": model.part_count,
         "steps": model.step_count,
         "checked_states": checks.checked,
@@ -215,14 +230,22 @@ def _stages(stdout: str) -> dict[str, float]:
     return {name: float(seconds) for name, seconds in stages}
 
 
+def _deviation(row: dict[str, Any]) -> str:
+    found = row.get("deviation")
+    if not found:
+        return "-"
+    return f"{found['mean_mm']:.2f} / {found['p95_mm']:.2f}"
+
+
 def _print_table(rows: list[dict[str, Any]]) -> None:
     print()
     print(
         "| Input | Parts | Steps | Checked states | Need a hand | Colours "
         "| One stable piece | Files + BOM + LDraw ok "
-        "| PDF MB | kB per step | Time s | Estimate | In range |"
+        "| PDF MB | kB per step | Time s | Estimate | In range "
+        "| Deviation mm (mean / p95) | Tiles |"
     )
-    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     big = [
         r
         for r in rows
@@ -248,7 +271,8 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
             f"| {'yes' if checks else 'NO'} "
             f"| {row['pdf_mb']} | {row['kb_per_step']} | {row['seconds']:.0f} "
             f"| {expected:,} ({low:,}-{high:,}) "
-            f"| {'yes' if low <= row['parts'] <= high else 'NO'} |"
+            f"| {'yes' if low <= row['parts'] <= high else 'NO'} "
+            f"| {_deviation(row)} | {row.get('tiles', 0)} |"
         )
     if ranges := [(r["parts"], *r["estimate"]) for r in rows if not r["exit"]]:
         inside = sum(1 for parts, low, _, high in ranges if low <= parts <= high)

@@ -905,3 +905,61 @@ thick), by the size of the bottom layer's largest piece: below 1,000 studs 0.15 
   Shells above 500,000 plate cells fall back to 4 cells per part (0.6–1.6); a sphere of 128 studs
   (1.1 million cells, 320,000 shell plate cells) is still estimated exactly in 1.3 s, random noise
   of the same shell size in about 1.2 s. The 1.5 fallback applied above 400,000 *solid* cells.
+
+## Shape fidelity baseline (2.0, 2026-11-10)
+
+The metric of the 2.0 series (ROADMAP: "surface deviation to the input mesh, and part count, at
+unchanged stability"), issue #42. `mesh2brick.fidelity` measures how far the **outside of the brick
+model** lies from the mesh it was made from:
+
+- in real LEGO millimetres (8 mm per stud, 3.2 mm per plate), so every model size compares;
+- only faces towards the air around the model (the cavity of a hollow model does not count);
+- **studs included** with their real size (4.8 mm wide, 1.7 mm high); tiles and the sloped columns
+  of slopes have none, slopes are sampled on their sloped face;
+- sampled about every 2 mm, each sample weighted by the area it stands for, and measured exactly to
+  the nearest triangle of the input mesh (unsigned; overlapping shells such as the bunny's ellipsoids
+  count as they are). Voxel inputs (`heart.vox`) are compared with their own cells.
+
+Reported: the area-weighted **mean** and **95th percentile** ("95 % of the surface is at most this
+far away"), in mm and studs. The metric is one-sided: it says how far the parts stick out or fall
+short where there are parts, not whether a thin detail of the mesh is missing (a candidate for
+ROADMAP 10/11, which add material).
+
+Baseline: the 1.6 models (placement unchanged since 1.5), from the saved results of the 1.5
+release run without converting again:
+`uv run python scripts/benchmark_fidelity.py --results out/release-1.5 --local samples/Duo_Duolingo.3mf`.
+"Without studs" is the same model with every stud removed: the most tiles could ever win.
+`scripts/benchmark_release.py` records the numbers per run from now on (column "Deviation mm").
+
+| Input | Parts | Mean mm | p95 mm | Mean studs | p95 studs | Without studs: mean / p95 mm | s |
+|---|---:|---:|---:|---:|---:|---|---:|
+| `bunny_lowpoly.stl` | 873 | 2.04 | 4.50 | 0.254 | 0.562 | 1.96 / 4.39 | 2.4 |
+| `cube_10mm.step` / `.stl` | 1,952 | 0.83 | 4.05 | 0.104 | 0.506 | 0.54 / 3.20 | 2.2 |
+| `heart.vox` | 12 | 0.08 | 0.85 | 0.010 | 0.106 | 0.00 / 0.00 | 0.0 |
+| `l_bracket.stl` | 153 | 0.60 | 4.05 | 0.075 | 0.506 | 0.39 / 3.20 | 0.8 |
+| `rocket.blend` | 263 | 1.46 | 3.18 | 0.182 | 0.398 | 1.45 / 3.18 | 3.2 |
+| `sphere_r10.stl` | 1,499 | 2.35 | 4.82 | 0.294 | 0.603 | 2.05 / 4.57 | 2.6 |
+| `textured_cube.obj` | 2,280 | 0.83 | 4.05 | 0.104 | 0.506 | 0.54 / 3.20 | 2.3 |
+| `toadstool.obj` | 1,239 | 2.03 | 4.58 | 0.254 | 0.572 | 1.95 / 4.46 | 4.6 |
+| `torus.stl` | 552 | 1.95 | 4.48 | 0.244 | 0.560 | 1.91 / 4.46 | 2.8 |
+| `two_bodies.step` | 606 | 0.66 | 3.20 | 0.083 | 0.400 | 0.62 / 3.20 | 0.5 |
+| `vertex_colors.ply` | 1,519 | 2.36 | 4.85 | 0.295 | 0.607 | 2.06 / 4.53 | 2.6 |
+| `castle.step` (generated), `--config` | 1,657 | 3.31 | 8.00 | 0.414 | 1.000 | 3.27 / 8.00 | 7.5 |
+| Duo @32 (local only) | 1,025 | 1.86 | 4.23 | 0.233 | 0.529 | 1.85 / 4.23 | 26.0 |
+| Duo @48 (local only) | 2,308 | 1.76 | 4.29 | 0.220 | 0.536 | – | 32.7 |
+
+**Reading:**
+
+- **Boxes** (cubes, L-bracket) lie closest on average (0.6–0.8 mm), but their 95th percentile is
+  4.05 mm: the top is one plate (3.2 mm) above the mesh, because 32 studs of height are 26.7 bricks
+  and the voxels round to 27, and the studs on it add up to 1.7 mm. Without studs it would be the
+  plate alone (3.20 mm).
+- **Round shapes** (sphere, bunny, torus, toadstool, Duo): 1.8–2.4 mm on average, 4.2–4.9 mm at the
+  95th percentile; that is the voxel stairs (half a stud wide, a brick high). Studs make up only
+  0.04–0.3 mm of it, on the sphere the most (its many stair tops).
+- **Castle:** 3.31 / 8.00 mm. Its boxes overlap, so the STEP mesh is not watertight and voxelization
+  falls back to "every cell the surface touches": the walls stand one stud proud on two sides.
+  A voxelization matter, not one of the parts (note for later, no issue yet).
+- **Heart** (voxel input, compared with its own cells): only the studs, 0.08 / 0.85 mm.
+- **Cost:** 0.5–7.5 s per fixture (Duo with its 2.1 million triangles 26–33 s), against 4–260 s
+  for the conversion; it runs in the release benchmark, not in `convert`.

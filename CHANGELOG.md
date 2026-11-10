@@ -6,6 +6,13 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+### Added
+- Shape fidelity metric for the 2.0 series (`mesh2brick.fidelity`, issue #42): the distance of the
+  brick model's outer surface (studs included) to the input mesh, area-weighted mean and 95th
+  percentile in mm and studs. `scripts/benchmark_fidelity.py` measures finished release runs,
+  `scripts/benchmark_release.py` records it per run (column "Deviation mm"); the 1.6 baseline is in
+  docs/benchmarks.md, "Shape fidelity baseline".
+
 ## [1.6.1] - 2026-11-10 - Rating scale documented
 
 `mesh2brick feedback --help`, README.md and README.de.md state the rating scale: 1 to 5 stars,

@@ -34,6 +34,9 @@ MAX_STEP_TEXT_CHARS: Final = 200
 MM_PER_STUD: Final = 8.0
 MM_PER_PLATE: Final = 3.2
 STUD_HEIGHT_MM: Final = 1.7
+NO_STUD_CATEGORIES: Final = frozenset({"tile", "slope", "voxel"})
+"""Part families without studs on top unless ``PlacedPart.studs`` says where
+(slopes carry their stud row there; ``voxel`` is the stand-in of grid previews)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +91,15 @@ class PlacedPart:
         if self.step < 0:
             msg = f"part {self.part} has negative step {self.step}"
             raise ValueError(msg)
+
+    @property
+    def top_studs(self) -> frozenset[tuple[int, int]]:
+        """``(x, y)`` columns with a stud on top of this part."""
+        if self.studs is not None:
+            return frozenset(self.studs)
+        if self.category in NO_STUD_CATEGORIES:
+            return frozenset()
+        return frozenset((x, y) for x, y, _ in self.cells)
 
     @property
     def bounds(self) -> tuple[Cell, Cell]:
