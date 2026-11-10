@@ -8,6 +8,7 @@ layer on and off both give valid outputs, and the cost of the run is logged.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from dataclasses import replace
@@ -26,7 +27,9 @@ from mesh2brick.model import BrickModel, BuildStep, ColorInfo
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from mesh2brick.backends.protocols import Placement
     from mesh2brick.pipeline import ConvertResult
+    from mesh2brick.voxel.grid import VoxelGrid
 
 RANGE = re.compile(r"steps (\d+) to (\d+)")
 
@@ -184,8 +187,28 @@ def test_settings_validate_llm_options() -> None:
 # ------------------------------------------------------------------ pipeline (acceptance)
 @pytest.mark.ldraw
 @pytest.mark.slow
-def test_convert_with_and_without_llm(tmp_path: Path, fixtures_dir: Path) -> None:
+def test_convert_with_and_without_llm(
+    tmp_path: Path, fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mesh2brick.backends.legolization import LegolizationBackend  # noqa: PLC0415
     from mesh2brick.pipeline import convert  # noqa: PLC0415
+
+    # Both runs share one placement. Two placements of the same grid are only
+    # equal while no time cap fires (LP attempt limits, step-search budgets),
+    # and a sleeping or busy laptop can make one fire: the 1.6.0 release gate
+    # failed here once with the lid closed. What this test checks is what the
+    # LLM layer changes, not whether legolization repeats itself.
+    place = LegolizationBackend.place
+    placed: list[Placement] = []
+
+    def place_once(
+        self: LegolizationBackend, grid: VoxelGrid, settings: Settings, **kwargs: Any
+    ) -> Placement:
+        if not placed:
+            placed.append(place(self, grid, settings, **kwargs))
+        return copy.deepcopy(placed[0])
+
+    monkeypatch.setattr(LegolizationBackend, "place", place_once)
 
     def run(enabled: bool, claude: ScriptedClaude | None = None) -> ConvertResult:
         settings = load_settings(
@@ -224,6 +247,7 @@ def test_convert_with_and_without_llm(tmp_path: Path, fixtures_dir: Path) -> Non
     assert saved.steps[0].section == "Unten"
     assert (tmp_path / "on" / "heart.pdf").stat().st_size > 0
     assert improved.bom.total == model.part_count
+    assert len(placed) == 1  # placed once, used twice
 
 
 def test_llm_layer_is_skipped_when_the_time_limit_is_near() -> None:
