@@ -1,58 +1,51 @@
 # Projektstatus
 
-Stand: 2026-11-09 · **1.5.0 – kleinere PDFs bei großen Modellen fertig** ([#27](https://github.com/leckermatz79/mesh2brick/issues/27), ROADMAP Punkt 4) · davor 1.4.0 (Stabilitätsprüfung für große Modelle, [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.4.0)) · Nächster Punkt: **Roadmap 5 – bessere Teileschätzung in `inspect`** ([#28](https://github.com/leckermatz79/mesh2brick/issues/28), [ROADMAP.md](../ROADMAP.md))
+Stand: 2026-11-10 · **1.6.0 – bessere Teileschätzung in `inspect` fertig** ([#28](https://github.com/leckermatz79/mesh2brick/issues/28), ROADMAP Punkt 5) · davor 1.5.0 (kleinere PDFs, [Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.5.0)) · Nächster Punkt: **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), [ROADMAP.md](../ROADMAP.md))
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **Jede Anleitung der Testmodelle ist jetzt kleiner als 10 MB:** Texturwürfel 23,2 → 9,6 MB, Würfel 20,4 → 6,4 MB, Burg 19,4 → 5,1 MB. Fast das ganze PDF waren die Schrittbilder; bei großen Modellen sind die schon gebauten Teile darin jetzt ruhige Flächen mit Noppen, aber ohne Fugen, wie du es auf der Vergleichsseite gewählt hast. Dadurch springen die neuen Teile mehr ins Auge, und das PDF ist auch schneller fertig.
-- **Kleine Modelle bis 500 Teile sehen genau aus wie in 1.4**, Seite für Seite pixelgleich.
+- **`inspect` sagt die Teilezahl jetzt bei allen 15 Testläufen richtig voraus:** Die Burg schätzt es auf 1.718 (1.384–2.242) statt 602; gebaut werden 1.657 Teile. Der angezeigte Bereich ist im Mittel nur noch Faktor 1,78 breit statt 2,2, bei 12 der 15 Läufe Faktor 1,6.
+- **Am Bauen ändert sich nichts:** Teile, Schritte und PDF sind wie in 1.5; die Schätzung dauert weiterhin Millisekunden.
 
-| Gleiche Schrittseite des Texturwürfels: links 1.4, rechts 1.5 (große Modelle) |
-|---|
-| ![Schrittseite vorher und nachher](gallery/roadmap4-compact-steps.png) |
+## Erledigt (1.6.0, ROADMAP Punkt 5)
 
-## Erledigt (1.5.0, ROADMAP Punkt 4)
+- **Erst geprüft, ob deine Idee reicht (ausgehöhltes Gitter plus Plattenanteil):** Nur das ausgehöhlte Gitter zu füllen, macht es bei Kästen schlechter (Würfel Faktor 3,1 daneben). Den Ausschlag gibt eine andere Stelle, die ich an den gespeicherten Ergebnissen von 1.5 und mit legolizations eigener Messung gefunden habe (Zahlen in [benchmarks.md](benchmarks.md), „Part estimate“, Begründung in ADR 0019):
+  - legolization rechnet in Plattenhöhe. Einen Stein setzt es nur, wo drei Platten übereinander durchgehend gleichfarbig gefüllt sind, sonst Platten. Das bilde ich jetzt genau nach (die Aushöhlung ist Zelle für Zelle dieselbe wie bei legolization; ein Test prüft das). Damit stimmt schon die erste Kachelung: zwei Körper 236 = 236 Teile.
+  - Die großen Abweichungen entstehen danach: Was nach dem Kacheln nicht zusammenhängt, baut legolization aus kleinen Platten neu. Burg: 581 Teile in 20 losen Gruppen, danach 1.653. Würfel: 910 in 5 Gruppen, danach 1.952.
+  - Wo das passiert, sieht man dem Modell vorher an: Flächen, die nur einen Stein hoch sind und weder darüber noch darunter etwas haben (Burghof, Duos Sockel, eine Tischplatte), werden immer drei Lagen kleiner Platten. Dünne Böden hohler Körper werden auch neu gebaut. Bis etwa 30 × 30 Noppen mischt legolization sie mal zu kleinen Steinen zurück, mal bleiben sie Platten (vorher nicht absehbar, an fünf hohlen Testkästen nachgemessen); breitere blieben immer Platten.
+- **Die neue Schätzung** zählt diese Flächen extra, statt alles mit festen Faktoren zu multiplizieren. Wo legolizations Ergebnis selbst schwankt (hohle Böden bis etwa 30 × 30 Noppen), ist der Bereich breiter, sonst schmal.
+- **Zeithinweis** („recommended: --time 20min“ ab 2.000 erwarteten Teilen): Er erscheint bei den Testmodellen nur noch bei Duo mit 48 Noppen (erwartet 2.342). Hinweis zu deiner Vorgabe: In 1.5 erschien er außer bei Duo 48 auch bei den beiden Würfeln und beim Texturwürfel (geschätzt 2.246). Die werden aber in gut 4 Minuten fertig und brauchen ihn nicht; jetzt fehlt er dort. Neue Modelle mit Hinweis gibt es nicht.
 
-- **Erst gemessen, wo die Bytes liegen:** Bei großen Modellen sind 85–95 % des PDFs die Schrittbilder; Teilebilder, Deckblatt, Text und Schriften zusammen nur 0,4–1,3 MB. Ein Schrittbild wird so groß, wie viel Fläche das Modell darin bedeckt, und die Bytes stecken in den Kanten: Fugen zwischen den Teilen und Noppenränder.
-- **Die Hebel einzeln gemessen** (Zahlen in [benchmarks.md](benchmarks.md), „PDF size“, Begründung in ADR 0018):
-  - a) Eine andere Farbpalette (Octree statt Median-Cut) spart 27–42 % ohne sichtbaren Unterschied (höchstens eine Farbstufe). Bessere Kompression bringt kaum etwas (unter 2 %). Ohne Kantenglättung wären es zwei Drittel weniger, aber mit treppigen, dickeren Fugen.
-  - b) Mit 110 statt 130 dpi wird es ein Fünftel kleiner; ein Teil ist immer noch klar zu erkennen.
-  - c) Vektorgrafik statt Bild wäre 6–15-mal **größer**. Sie lohnt sich nur bei ein oder zwei Teilen und fällt deshalb weg.
-  - d) Ohne Fugen auf den schon gebauten Teilen halbiert sich ein Bild, und das neue Teil sticht heraus. Ohne deren Noppen wäre es noch kleiner, aber dann könntest du keine Position mehr abzählen; das habe ich verworfen.
-- **Deine Entscheidung (Vergleichsseite):** d) nur für große Modelle, dazu a) und b). Nur so kommt der Texturwürfel mit seinem zweifarbigen Muster unter 10 MB; a) und b) allein hätten bei ihm 13 MB ergeben.
-- **Damit es nicht wieder wächst:** Der Release-Benchmark zeigt kB pro Schritt und warnt ab 40 kB bei großen Modellen (1.4: 43–75 kB, jetzt 21–29 kB); ein Test begrenzt die Größe eines Schrittbilds.
-
-| Abnahme (Issue #27) | Ergebnis |
+| Abnahme (Issue #28) | Ergebnis |
 |---|---|
-| Texturwürfel, Würfel und Burg unter 10 MB; Kugel und Vertex-Modell deutlich darunter | **ja**: 9,56 / 6,39 / 5,11 MB; Kugel 4,39, Vertex-Modell 5,58 MB |
-| Neues Teil in jedem Schritt klar erkennbar (A4, 100 % und Druck); Vorher-/Nachher-Seite je Testmodell | **ja**, Seiten zum Vergleichen in `out/pdf-size/vorher-nachher/` (eine je Modell) |
-| Kleine Modelle: PDF nicht größer, Seiten pixelgleich | **ja**: Herz 0,29, L-Winkel 1,22, Rakete 1,19 MB wie 1.4, alle Schrittseiten pixelgleich |
-| Text bleibt Vektor; Teilebilder, Callouts, Deckblatt unverändert | **ja** |
-| PDF-Zeit höchstens +50 % | **schneller**: Texturwürfel 52 → 31 s, Würfel 42 → 26 s, Kugel 43 → 24 s |
-| Alle unter 5 Minuten, Teile und Schritte unverändert, Seitenzahl gleich | **ja**: längster Fall 261 s, Teile, Schritte und Seiten wie 1.4 |
-| Tests: Größen-Obergrenze je Schrittbild (künstliches großes Modell), Rundreise mit pypdf | **ja** |
+| 15 von 15 Testläufen im angezeigten Bereich | **ja** (1.5: 14 von 15, die Burg lag daneben) |
+| Bereich im Mittel enger als heute (Faktor 2,2) | **ja**: Faktor 1,78; 12 von 15 Läufen 1,6, Duo 48 Faktor 2,0, zwei Körper 3,9 |
+| `inspect` nicht spürbar langsamer | **ja**: Schätzung 0,3–43 ms statt 0,1–33 ms; `inspect` dauert 2,5–15 s |
+| Ersatzrechnung für sehr große Gitter bleibt oder wird begründet ersetzt | **ersetzt, begründet**: Sie zählt jetzt die Schale statt des vollen Körpers (ab 500.000 Plattenzellen). Die Rechnung läuft nur noch über die Schale, deshalb rechnen viel größere Modelle genau, etwa eine Kugel mit 128 Noppen in 1,3 s. |
+| Keine Änderung an Platzierung, Schritten oder PDF | **ja**, nur `voxel/estimate.py` und die Ausgabe von `inspect`/`convert` |
+| Gegenprobe an Daten, auf die nichts abgestimmt ist | **ja**: Duo bei 20 cm (799 Teile; 536–871), Rakete bei 30 cm (376; 341–541) und alle Testmodelle (Tisch, zweifarbiger Kasten, fünf hohle Kästen) liegen im Bereich |
 
-## Messwerte 1.5 (in Klammern 1.4)
+## Schätzung 1.6 (in Klammern 1.5)
 
-| Modell | Teile | Schritte | PDF | PDF-Zeit | Umwandlung gesamt |
-|---|---|---|---|---|---|
-| Herz | 12 | 7 | 0,29 MB (0,29) | 0 s | 4 s (4 s) |
-| L-Winkel | 153 | 37 | 1,22 MB (1,22) | 3 s | 30 s (29 s) |
-| Rakete (`.blend`) | 263 | 42 | 1,19 MB (1,19) | 3 s | 19 s (19 s) |
-| Torus | 552 | 74 | 1,98 MB (4,11) | 5 s | 33 s (36 s) |
-| Zwei Körper (STEP) | 606 | 83 | 2,24 MB (4,22) | 6 s | 163 s (166 s) |
-| Hase | 873 | 126 | 2,62 MB (5,59) | 9 s | 121 s (125 s) |
-| Duo (32, nur lokal) | 1.025 | 153 | 3,74 MB (6,99) | 11 s | 128 s (139 s) |
-| Fliegenpilz | 1.239 | 178 | 3,88 MB (7,61) | 16 s | 250 s (259 s) |
-| Kugel | 1.499 | 207 | 4,39 MB (10,11) | 24 s | 261 s (280 s) |
-| Vertex-Modell (PLY) | 1.519 | 212 | 5,58 MB (9,91) | 24 s | 260 s (281 s) |
-| STEP-Burg (`--config`) | 1.657 | 234 | 5,11 MB (19,35) | 19 s | 251 s (265 s) |
-| STEP-Würfel | 1.952 | 274 | 6,39 MB (20,36) | 26 s | 250 s (265 s) |
-| Texturwürfel | 2.280 | 327 | 9,56 MB (23,22) | 31 s | 245 s (266 s) |
-| Duo (48, nur lokal, 20 min) | 2.308 | 324 | 7,61 MB (16,43) | 37 s | 1.151 s (1.189 s) |
+| Modell | Teile | Schätzung | Bereich | Im Bereich |
+|---|---|---|---|---|
+| Herz | 12 | 12 (16) | 10–16 (11–24) | ja |
+| L-Winkel | 153 | 153 (213) | 130–207 (148–328) | ja |
+| Rakete (`.blend`) | 263 | 299 (291) | 254–404 (202–448) | ja |
+| Torus | 552 | 599 (515) | 509–809 (356–792) | ja |
+| Zwei Körper (STEP) | 606 | 633 (541) | 300–1.154 (374–832) | ja |
+| Hase | 873 | 670 (658) | 570–905 (455–1.012) | ja |
+| Duo (32, nur lokal) | 1.025 | 907 (757) | 753–1.224 (524–1.164) | ja |
+| Fliegenpilz | 1.239 | 1.281 (1.222) | 1.089–1.729 (846–1.880) | ja |
+| Kugel | 1.499 | 1.587 (1.746) | 1.349–2.142 (1.209–2.686) | ja |
+| Vertex-Modell (PLY) | 1.519 | 1.587 (1.747) | 1.349–2.142 (1.210–2.688) | ja |
+| STEP-Burg (`--config`) | 1.657 | 1.718 (602) | 1.384–2.242 (417–926) | **ja** (1.5: nein) |
+| STEP-/STL-Würfel | 1.952 | 1.930 (2.246) | 1.548–2.513 (1.555–3.456) | ja |
+| Texturwürfel | 2.280 | 1.940 (2.246) | 1.556–2.526 (1.555–3.456) | ja |
+| Duo (48, nur lokal) | 2.308 | 2.342 (2.423) | 1.740–3.478 (1.678–3.728) | ja |
 
-Alle stabil und aus einem Stück; Dateien, Teilelisten und LDraw-Prüfung bestehen. Die Stabilitätsprüfung nutzt die frei gewordene PDF-Zeit nicht zusätzlich (ihr Zeitpolster richtet sich nach der Teilezahl), deshalb sind große Umwandlungen etwas kürzer.
+Die Teilezahlen sind die des 1.5-Laufs; 1.6 ändert am Bauen nichts. Neu gerechnet ohne Umwandlung: `uv run python scripts/benchmark_estimate.py --results out/release-1.5` (Sekunden).
 
 ## Als Nächstes
 
@@ -60,13 +53,13 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 **1.x – große Modelle möglich machen** (keine neuen Steinarten):
 
-1. ~~Roadmap 1 – Größe in Zentimetern~~ ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): **fertig**, siehe oben.
-2. ~~Roadmap 2 – harte Zeitgrenze~~ ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)): **fertig**, siehe oben.
-3. ~~Löserreihenfolge + Dachsteine wieder an~~ (ROADMAP Punkt 8, [#34](https://github.com/leckermatz79/mesh2brick/issues/34)): **fertig in 1.3.0**, siehe oben.
-4. ~~Roadmap 3 – Stabilitätsprüfung auch für große Modelle~~ ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)): **fertig in 1.4.0**, siehe oben.
-5. ~~Roadmap 4 – kleinere PDFs~~ ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)): **fertig in 1.5.0**, siehe oben.
-6. **Roadmap 5 – bessere Teileschätzung in `inspect`** ([#28](https://github.com/leckermatz79/mesh2brick/issues/28), nächster Punkt): 15 von 15 Testläufen im angezeigten Bereich.
-7. Roadmap 6 ([#29](https://github.com/leckermatz79/mesh2brick/issues/29)) – Bewertungsskala (1–5, 5 = am besten) in Hilfe und README.
+1. ~~Roadmap 1 – Größe in Zentimetern~~ ([#24](https://github.com/leckermatz79/mesh2brick/issues/24)): **fertig**.
+2. ~~Roadmap 2 – harte Zeitgrenze~~ ([#25](https://github.com/leckermatz79/mesh2brick/issues/25)): **fertig**.
+3. ~~Löserreihenfolge + Dachsteine wieder an~~ (ROADMAP Punkt 8, [#34](https://github.com/leckermatz79/mesh2brick/issues/34)): **fertig in 1.3.0**.
+4. ~~Roadmap 3 – Stabilitätsprüfung auch für große Modelle~~ ([#26](https://github.com/leckermatz79/mesh2brick/issues/26)): **fertig in 1.4.0**.
+5. ~~Roadmap 4 – kleinere PDFs~~ ([#27](https://github.com/leckermatz79/mesh2brick/issues/27)): **fertig in 1.5.0**.
+6. ~~Roadmap 5 – bessere Teileschätzung in `inspect`~~ ([#28](https://github.com/leckermatz79/mesh2brick/issues/28)): **fertig in 1.6.0**, siehe oben.
+7. **Roadmap 6 – Bewertungsskala dokumentiert** ([#29](https://github.com/leckermatz79/mesh2brick/issues/29), nächster Punkt): `mesh2brick feedback --help`, README.md und README.de.md nennen die Skala (1–5 Sterne, 5 = am besten).
 8. Roadmap 7 ([#30](https://github.com/leckermatz79/mesh2brick/issues/30)) – Aufräumen: trimesh-Bericht (erledigt, [#2669](https://github.com/mikedh/trimesh/issues/2669)), optional alte Release-Seiten.
 
 **Danach 2.0 – Formtreue:** mehr Dachsteine, Tiles, runde Teile, SNOT (Roadmap 8–13). Upstream: Antworten auf legolization #88/#89 und #90/#91 sowie trimesh #2669 abwarten.
@@ -94,7 +87,7 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 | Der schnellere Rechenweg und das Mitlesen der Zwischenstände sind lokale Eingriffe in legolization (UPSTREAM #2 und #5). Ändert legolization diese Stellen, meldet mesh2brick das beim Start. | bei Upstream vorschlagen (#5), wenn #88/#89 Antwort haben |
 | Große geschlossene Körper (Würfel, der die ganze 32-Noppen-Box füllt) brauchen für die Platzierung etwa 3 Minuten; den Rest der 5 Minuten verwenden sie für die Prüfung. Auf einem langsameren Laptop bleibt weniger für die Prüfung oder sie werden an der 5-Minuten-Grenze abgeschnitten (bestes stabiles Modell bis dahin), statt länger zu dauern. | Standard bleibt 32 Noppen |
 | Der Texturwürfel liegt mit 9,6 MB knapp unter 10 MB; ein noch größerer geschlossener Körper bei 32 Noppen kann darüber liegen. Der Release-Benchmark warnt dann (kB pro Schritt). | akzeptieren; bei Bedarf 100 dpi für sehr große Modelle |
-| Die Teileschätzung von `inspect` ist grob (Bereich etwa Faktor 2) und liegt bei dünnen, großen Platten zu niedrig. | `convert` gibt die genaue Zahl; Roadmap 5 |
+| Die Teileschätzung von `inspect` hängt an legolizations Verhalten. Bei hohlen Böden bis etwa 30 × 30 Noppen baut legolization den Boden mal aus Platten, mal aus kleinen Steinen; dort ist der Bereich breiter (zwei Körper: Faktor 3,9). Nach einem legolization-Update kann sie danebenliegen. | `convert` gibt die genaue Zahl; nach Updates `scripts/benchmark_estimate.py` laufen lassen |
 | Spitze Formen werden mit `--size` etwas niedriger als gewünscht: Eine Spitze, die nicht einmal eine halbe Zelle füllt, fällt weg (dieselbe Regel wie bei allen dünnen Details). Rakete: 38,4 statt 40 cm, ihr fehlen oben 2 Lagen der Nasenspitze. Duo trifft die Höhe auf einen halben Stein genau. `inspect` zeigt die echte Höhe vorher. | akzeptieren; eigener Code (Größe nachregeln), falls es stört |
 | `.blend`: Blender muss installiert sein. Die Tests mit echtem Blender laufen nur hier auf dem Mac; die automatischen Tests auf GitHub nutzen einen Blender-Ersatz. Verknüpfte Bibliotheken müssen vom Ordner der Datei aus erreichbar sein. | akzeptieren |
 | glTF mit Draco-Kompression kann trimesh nicht lesen. | bei Bedarf; in Blender ohne Kompression exportieren |
@@ -153,7 +146,7 @@ Was kommt und in welcher Reihenfolge, steht in [ROADMAP.md](../ROADMAP.md) (von 
 
 ## Fragen an dich
 
-Zurzeit keine. Deine Antwort zur Optik der Schrittbilder (Roadmap 4) steht unter „Deine Entscheidungen“.
+1. **Zeithinweis bei den Würfeln:** Mit der genaueren Schätzung bekommen STEP-Würfel und Texturwürfel den Hinweis „recommended: --time 20min“ nicht mehr (erwartet 1.930 und 1.940 Teile, die Grenze ist 2.000; sie werden in gut 4 Minuten fertig). Nur Duo mit 48 Noppen bekommt ihn noch. Passt das so? **Standard, wenn keine Antwort kommt:** ja, so lassen.
 
 ## Offene Kleinigkeiten
 

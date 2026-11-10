@@ -818,3 +818,90 @@ parts-list totals and strict LDraw re-reads pass; no warning above 40 kB per ste
 - **The PDF takes 40–50 % less time** for big models; conversions finish 9–21 s earlier, because
   the step checks keep their time (the export reserve depends on the part count, not on the PDF).
   Checked states move by a few between runs (sphere 172 instead of 180, cube 123 instead of 126).
+
+## Part estimate (Roadmap 5, 2026-11-10)
+
+Issue #28, ADR 0019. Measured on the 15 runs of the 1.5 release (`out/release-1.5`: the saved voxel
+grid and the placed parts of every input), without converting again; then legolization's own
+telemetry on three of them, and seven small synthetic models placed with `mesh2brick place` to test
+the rules on shapes they were not tuned on. `uv run python scripts/benchmark_estimate.py --results
+out/release-1.5` prints the table below in seconds.
+
+**Why the fixed factors could not work.** The 1.5 estimate filled the *solid* grid with the
+largest bricks and took 0.9 / 1.3 / 2.0 times that. Placed parts were 0.93–1.76 times the fill,
+except the castle (3.58). Taking the hollow shell instead (suggested in the issue) makes it worse
+for boxes (cube 3.13, two bodies 2.57), because what decides the count is somewhere else:
+
+- **legolization works on plates.** It hollows at plate resolution and builds a brick only where a
+  column is filled in one colour across a whole three-plate slab; the rest becomes plates (curved
+  surfaces leave many such partial slabs). Retracing exactly that — the hollowing is identical to
+  legolization's `core_mask` on all 14 grids and wall 1–3 — and filling each layer largest-first
+  gives the count of legolization's first tiling: two bodies 236 = 236; organic models 0.88–1.27 of
+  the final count.
+- **Joining rebuilds.** What the first tiling leaves in separate pieces is joined by rebuilding the
+  area from 1 × 1 plates and merging them at random (telemetry `place.tiled` → `place.connected`):
+
+  | Model | Tiled parts | Pieces | After joining | Final |
+  |---|---:|---:|---:|---:|
+  | castle | 581 | 20 | 1,653 | 1,657 |
+  | STEP cube | 910 | 5 | 1,952 | 1,952 |
+  | two bodies | 236 | 2 | 1,711 | 606 (final merge wins it back as small bricks) |
+
+- **Where it happens** can be read off the grid: areas one cell high with nothing above or below
+  (castle courtyard, Duo's base: 197 plates where the fill puts 31 bricks, a table top) always
+  become three layers of plates, 0.66–0.81 parts per cell (1 stud × 1 brick). Hollow floors at most
+  `wall` cells thick are always rebuilt too; up to about 30 × 30 studs they end up as small bricks
+  (0.18–0.24 parts per cell) or stay plates (0.52–0.82), wider ones stayed plates (0.66–0.87). Which of
+  the two happens is not a matter of width alone (the 24-stud box: bricks when 10 cells high, plates
+  when 27 high), so the estimate does not try to predict it:
+
+  | Hollow box (studs, 10 high unless noted) | Bottom layer | Placed | Floor rebuilt as | Parts per floor cell |
+  |---|---:|---:|---|---:|
+  | 16 × 12, 8 high, two colours ("seam") | 192 | 77 | not rebuilt (floor 96 studs) | – |
+  | 18 × 18 | 324 | 255 | small bricks | 0.24 |
+  | 24 × 24 | 576 | 348 | small bricks | 0.18 |
+  | 24 × 24, 27 high | 576 | 950 | plates | 0.52 |
+  | 28 × 28 | 784 | 1,466 | plates | 0.82 |
+  | 32 × 32 | 1,024 | 1,629 | plates | 0.69 |
+  | STEP cube 32 × 32 × 27 | 1,024 | 1,952 | plates | 0.71 |
+
+  A colour seam alone (two bodies of different colours side by side) is not a reason: the
+  two-colour box was joined at no extra cost.
+
+**The new estimate** (`voxel/estimate.py`): the plate-level fill outside rebuilt areas
+× 0.85 / 1.0 / 1.35, plus per rebuilt cell 0.55 / 0.7 / 0.9 for thin areas (one cell high, pieces
+above 16 studs) and, for a weak floor (at least 150 studs of the bottom layer at most `wall` cells
+thick), by the size of the bottom layer's largest piece: below 1,000 studs 0.15 / 0.45 / 0.9
+(either outcome), from 1,000 studs 0.55 / 0.7 / 0.9 (plates).
+
+| Input | Parts | 1.5 estimate | New estimate | In range | Width | Thin cells | Floor cells |
+|---|---:|---|---|---|---:|---:|---:|
+| `bunny_lowpoly.stl` | 873 | 658 (455–1,012) | 670 (570–905) | yes | 1.59 | 0 | 0 |
+| `cube_10mm.step` / `.stl` | 1,952 | 2,246 (1,555–3,456) | 1,930 (1,548–2,513) | yes | 1.62 | 0 | 2,048 |
+| `heart.vox` | 12 | 16 (11–24) | 12 (10–16) | yes | 1.60 | 0 | 0 |
+| `l_bracket.stl` | 153 | 213 (148–328) | 153 (130–207) | yes | 1.59 | 0 | 0 |
+| `rocket.blend` | 263 | 291 (202–448) | 299 (254–404) | yes | 1.59 | 0 | 0 |
+| `sphere_r10.stl` | 1,499 | 1,746 (1,209–2,686) | 1,587 (1,349–2,142) | yes | 1.59 | 0 | 0 |
+| `textured_cube.obj` | 2,280 | 2,246 (1,555–3,456) | 1,940 (1,556–2,526) | yes | 1.62 | 0 | 2,048 |
+| `toadstool.obj` | 1,239 | 1,222 (846–1,880) | 1,281 (1,089–1,729) | yes | 1.59 | 0 | 0 |
+| `torus.stl` | 552 | 515 (356–792) | 599 (509–809) | yes | 1.59 | 0 | 0 |
+| `two_bodies.step` | 606 | 541 (374–832) | 633 (300–1,154) | yes | 3.85 | 0 | 1,024 |
+| `vertex_colors.ply` | 1,519 | 1,747 (1,210–2,688) | 1,587 (1,349–2,142) | yes | 1.59 | 0 | 0 |
+| `castle.step` (generated), `--config` | 1,657 | **602 (417–926)** | 1,718 (1,384–2,242) | yes | 1.62 | 476 | 1,225 |
+| Duo @32 (local only) | 1,025 | 757 (524–1,164) | 907 (753–1,224) | yes | 1.63 | 225 | 34 |
+| Duo @48 (local only) | 2,308 | 2,423 (1,678–3,728) | 2,342 (1,740–3,478) | yes | 2.00 | 0 | 1,080 |
+
+- **15 of 15 inside the range** (1.5: 14), the range on average a factor **1.78** wide instead of
+  2.22: 1.59–1.63 for every model without a mid-sized hollow floor, 2.0 for Duo at 48 studs and 3.85
+  for two bodies. The expected value is within 0.88–1.30 of the placed count for all 15 runs.
+- **Not tuned on:** Duo at 20 cm (799 parts; 646, 536–871) and the rocket at 30 cm (376; 401,
+  341–541) from Roadmap 1, and the synthetic seam (77; 76, 65–103), table (317; 297, 235–383) and
+  boxes (18: 255; 174–705, 24: 348; 295–1,231, 24 high: 950; 469–1,507,
+  28: 1,466; 392–1,660, 32: 1,629; 1,317–2,146) are all inside.
+- **Time advice** ("recommended: --time 20min" above 2,000 expected parts): among the test models
+  only Duo at 48 studs (expected 2,342). The STEP cube and the textured cube had it in 1.5 (expected
+  2,246) and lose it; they finish in about 250 s.
+- **Speed:** the estimate takes 0.3–43 ms per test model (1.5: 0.1–33 ms), `inspect` takes 2.5–15 s.
+  Shells above 500,000 plate cells fall back to 4 cells per part (0.6–1.6); a sphere of 128 studs
+  (1.1 million cells, 320,000 shell plate cells) is still estimated exactly in 1.3 s, random noise
+  of the same shell size in about 1.2 s. The 1.5 fallback applied above 400,000 *solid* cells.
