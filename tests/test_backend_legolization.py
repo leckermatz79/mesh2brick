@@ -181,7 +181,8 @@ def test_settings_translation(backend: LegolizationBackend) -> None:
     config = backend.pipeline_config(settings, height_unit="brick")
     assert (config.strategy, config.seed) == ("greedy", 7)
     assert (config.shell_studs, config.shell_plates) == (3, 9)
-    assert (config.slopes, config.tiles) == (False, True)
+    # legolization's own tile pass stays off: mesh2brick tiles flat tops itself.
+    assert (config.slopes, config.tiles) == (False, False)
     assert config.instructions.target_step_size == 5
     assert config.instructions.subassemblies is False
     assert config.repair_config.max_rounds == 4
@@ -481,7 +482,8 @@ def test_restricted_catalog_keeps_import_parts() -> None:
     }
     assert placeable == {"3005", "3024"}
     assert "plate_2x16" in catalog.parts  # import-only parts stay
-    assert len(placeable_parts()) == 29
+    # 29 parts legolization places, plus its five import-only tiles (ROADMAP 9).
+    assert len(placeable_parts()) == 34
 
 
 def test_ldraw_specs_match_legolization_cells() -> None:

@@ -32,6 +32,9 @@ parts:
   exclude: []           # blacklist, e.g. [3008, 3007]; 3005 and 3024 are always needed
   max_parts: 5000
   availability: exclude # parts LEGO does not make in a model colour: exclude | split | report
+  tiles: flat           # with tile in categories: flat = tiles only where the 3D model is flat
+                        # (box tops, bases) | all = on every open top, stairs of round shapes too
+  tiles_on_base: true   # tiles also on the lowest brick layer (a base, a courtyard)
 placement:
   backend: legolization
   strategy: kollsker    # passed to the backend (also: luo, greedy, bond, fast, smga, beauty)

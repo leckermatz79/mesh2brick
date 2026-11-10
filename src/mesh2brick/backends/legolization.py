@@ -41,6 +41,7 @@ import re
 import time
 import types
 import warnings
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Final, cast
@@ -50,7 +51,7 @@ import numpy as np
 from legolization import MeshOptions, PipelineConfig, run
 from legolization import VoxelGrid as LegoGrid
 from legolization import pipeline as _lego_pipeline
-from legolization.catalog import Catalog, default_catalog
+from legolization.catalog import Catalog, Category, default_catalog
 from legolization.color import Palette, default_palette
 from legolization.graph import ConnectionGraph
 from legolization.instructions.bom import bill_of_materials
@@ -86,6 +87,7 @@ from mesh2brick.catalog.whitelist import (
 )
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.place.split import choose_split
+from mesh2brick.place.tiles import flat_top_plates, tile_cover
 from mesh2brick.steps.balance import (
     STEP_SPREAD,
     largest_step,
@@ -101,7 +103,8 @@ from mesh2brick.steps.hanging import attach_hanging
 from mesh2brick.steps.plan import PlanStep
 from mesh2brick.steps.regroup import merge_ranges
 from mesh2brick.steps.structure import Structure
-from mesh2brick.voxel.grid import EMPTY, VoxelGrid
+from mesh2brick.voxel.flat import top_cells
+from mesh2brick.voxel.grid import EMPTY, PLATES_PER_BRICK, VoxelGrid
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -113,6 +116,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from mesh2brick.config import Settings, StepsConfig
+    from mesh2brick.model import Cell
     from mesh2brick.voxel.color import ColorQuantizer
     from mesh2brick.voxel.grid import HeightUnit
 
@@ -309,11 +313,32 @@ only serve LDraw import and stay untouched."""
 FILLER_PARTS: Final = frozenset({"3005", "3024"})
 
 
+def is_finishing_tile(part: Any) -> bool:
+    """One of legolization's tiles it lists for import only (``special``).
+
+    Its catalogue has tiles 1 x 3, 1 x 6, 1 x 8, 2 x 4 and 2 x 6 with full
+    geometry but places only 1 x 1, 1 x 2, 1 x 4 and 2 x 2; mesh2brick's tile
+    pass uses all nine (ROADMAP 9, ADR 0020).
+    """
+    return (
+        part.category is Category.SPECIAL
+        and part.key.startswith("tile_")
+        and part.height_plates == 1
+        and not part.top_connectors
+        and part.mount_normal is None
+    )
+
+
+def part_category(part: Any) -> str:
+    """mesh2brick's family of a legolization part (finishing tiles are tiles)."""
+    return "tile" if is_finishing_tile(part) else str(part.category.value)
+
+
 def placeable_parts() -> tuple[PlaceablePart, ...]:
-    """Parts legolization can place, one entry per LDraw number."""
+    """Parts legolization or the tile pass can place, one per LDraw number."""
     found: dict[str, PlaceablePart] = {}
     for part in default_catalog().parts.values():
-        category = part.category.value
+        category = part_category(part)
         if category in PLACEABLE_CATEGORIES and part.ldraw_part not in found:
             found[part.ldraw_part] = PlaceablePart(
                 part=part.ldraw_part,
@@ -331,7 +356,7 @@ def placement_footprint(part: str) -> tuple[int, int, int]:
         BackendError: if ``part`` is not placeable.
     """
     for entry in default_catalog().parts.values():
-        if entry.ldraw_part == part and entry.category.value in PLACEABLE_CATEGORIES:
+        if entry.ldraw_part == part and part_category(entry) in PLACEABLE_CATEGORIES:
             cells = entry.occupied_cells
             sides = sorted(
                 (
@@ -667,6 +692,321 @@ def _place_exact(
             except CollisionError:
                 return None
     return None
+
+
+# ---------------------------------------------------------------- tiles (ROADMAP 9)
+TILE_CHECK_BASE_S: Final = 10.0
+TILE_CHECK_PER_PART_S: Final = 0.02
+"""Changes that make parts heavier are followed by a stability check of the
+whole model, while the steps are planned (measured: 3 s for 189 parts, 14 s
+for 776, 33 s for 1,682, 65 s for 2,209). With less time left than
+:func:`tile_check_s` only the changes that make parts lighter are made; a
+check that runs longer than that eats into the time kept for the export."""
+_TILES_UNCHECKED_NOTE: Final = (
+    "tiles skipped: the time limit stopped the stability check, so the tiles "
+    "could not be checked either (raise placement.time_limit_s)"
+)
+_TILES_UNDONE_NOTE: Final = (
+    "tiles undone: with them the model would no longer hold together"
+)
+_MASS_EPS: Final = 1e-9
+
+
+def tile_check_s(parts: int) -> float:
+    """Seconds to keep for the stability check after the tile pass."""
+    return TILE_CHECK_BASE_S + TILE_CHECK_PER_PART_S * parts
+
+
+@dataclass(frozen=True, slots=True)
+class _Tiling:
+    """What the tile pass did in :meth:`LegolizationBackend.place`.
+
+    ``check`` is the running stability check of the tiled model (``None``:
+    not needed); ``before`` the layout to go back to if it fails.
+    """
+
+    notes: tuple[str, ...] = ()
+    before: Layout | None = None
+    check: Future[StabilityReport] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _Steps:
+    """A step plan with its pre-assembly units, check flags and notes."""
+
+    plan: InstructionPlan
+    units: dict[int, int]
+    checked: tuple[bool, ...] | bool
+    notes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TileReport:
+    """What :func:`apply_tiles` changed."""
+
+    plates: int = 0
+    """Plates swapped for a tile of the same size (part count unchanged)."""
+    split_plates: int = 0
+    """Plates without a tile of their size, covered by two or more tiles."""
+    lowered: int = 0
+    """Bricks rebuilt as a plate plus tiles: the face is a plate below the
+    voxel top, so the smooth top lands where the model has it."""
+    bricks: int = 0
+    """Bricks rebuilt as two plates plus tiles (the face at the voxel top)."""
+    topped: int = 0
+    """Bricks and plates that keep their place and get tiles on top: the face
+    is a plate above the voxel top."""
+    added: int = 0
+    """Parts added by splits and rebuilds."""
+    kept: int = 0
+    """Flat, open tops that keep their studs: no fitting tile (or plate) in the
+    part's colour, or a split tile would rest on nothing."""
+    unchecked: int = 0
+    """Flat, open tops that keep their studs because their tiles would make the
+    part heavier and there was no time left to check stability again."""
+    heavier: bool = False
+    """Some part became heavier (two plates plus a tile weigh more than the
+    brick, an added tile weighs something): stability must be checked again."""
+
+    @property
+    def tiled(self) -> int:
+        """Parts that got a smooth top."""
+        changed = (self.plates, self.split_plates, self.lowered, self.bricks)
+        return sum(changed) + self.topped
+
+    def summary(self) -> str:
+        """One line for the user."""
+        kinds = (
+            (self.plates, "plate(s) -> tile"),
+            (self.split_plates, "plate(s) -> 2+ tiles"),
+            (self.lowered, "brick(s) -> plate + tile (top one plate lower)"),
+            (self.bricks, "brick(s) -> 2 plates + tile"),
+            (self.topped, "part(s) with a tile on top (top one plate higher)"),
+        )
+        done = [f"{count} {what}" for count, what in kinds if count] or ["none"]
+        text = "tiles on flat tops: " + ", ".join(done)
+        if self.added:
+            text += f" (+{self.added} parts)"
+        if self.kept:
+            text += f"; {self.kept} flat top(s) keep their studs (no fitting tile)"
+        if self.unchecked:
+            text += (
+                f"; {self.unchecked} flat top(s) keep their studs (no time to check "
+                "stability with them; raise placement.time_limit_s)"
+            )
+        return text
+
+
+def apply_tiles(
+    layout: Layout,
+    flat: Mapping[Cell, float],
+    *,
+    allowed: frozenset[str] | None = None,
+    produced: Callable[[str, int], bool | None] = produced_in,
+    base: bool = True,
+    heavier: bool = True,
+) -> TileReport:
+    """Give the open bricks and plates whose top lies in ``flat`` a smooth top.
+
+    ``flat`` maps plate cells to how far the flat face lies above them, in
+    plates (:func:`~mesh2brick.place.tiles.flat_top_plates`). A part qualifies
+    when every cell of its top layer is in it and nothing sits on it; its
+    tiles go where the face is, rounded to a plate and at most one plate from
+    the part's top:
+
+    * face at the top: a plate becomes a tile of its size (several tiles when
+      that size does not exist and each rests on something), a brick two
+      plates of its size plus tiles;
+    * one plate lower: a brick becomes a plate plus tiles (a plate stays at
+      its height and becomes a tile);
+    * one plate higher: tiles are laid on the part.
+
+    Only parts in ``allowed`` (LDraw numbers, ``None``: any) that LEGO makes in
+    the part's colour are used; ``base=False`` leaves the lowest brick layer
+    alone; ``heavier=False`` makes only changes that do not add weight (they
+    need no new stability check). Changes ``layout`` in place.
+    """
+    tiles = _tile_sizes(layout.catalog, allowed)
+    counts = dict.fromkeys(
+        (
+            "plates",
+            "split_plates",
+            "lowered",
+            "bricks",
+            "topped",
+            "added",
+            "kept",
+            "unchecked",
+        ),
+        0,
+    )
+    gained = False
+    for brick in list(layout):
+        part = layout.part_of(brick)
+        if part.category not in (Category.PLATE, Category.BRICK):
+            continue
+        if _rect_dims(part) is None:
+            continue
+        cells = layout.cells_of(brick)
+        top = max(c[2] for c in cells)
+        if not base and top < PLATES_PER_BRICK:
+            continue
+        roof = [c for c in cells if c[2] == top]
+        if any(c not in flat for c in roof) or any(
+            layout.brick_at((x, y, top + 1)) is not None for x, y, _ in roof
+        ):
+            continue
+        face = sum(flat[c] for c in roof) / len(roof)
+        outcome = _smooth_top(
+            layout,
+            brick,
+            roof=roof,
+            rise=max(-1, min(1, round(face))),
+            tiles=tiles,
+            allowed=allowed,
+            produced=produced,
+            heavier=heavier,
+        )
+        counts[outcome.kind] += 1
+        counts["added"] += outcome.added
+        gained = gained or outcome.heavier
+    return TileReport(**counts, heavier=gained)
+
+
+def _tile_sizes(
+    catalog: Catalog, allowed: frozenset[str] | None
+) -> dict[tuple[int, int], tuple[str, str]]:
+    """``(small, big)`` -> (part key, LDraw number) of every usable tile."""
+    sizes: dict[tuple[int, int], tuple[str, str]] = {}
+    for key, part in sorted(catalog.parts.items()):
+        if part.category is not Category.TILE and not is_finishing_tile(part):
+            continue
+        dims = _rect_dims(part)
+        if dims is None or (allowed is not None and part.ldraw_part not in allowed):
+            continue
+        sizes.setdefault((dims[0], dims[1]), (key, part.ldraw_part))
+    return sizes
+
+
+def _plate_like(
+    layout: Layout,
+    part: Any,
+    colour: int,
+    allowed: frozenset[str] | None,
+    produced: Callable[[str, int], bool | None],
+) -> str | None:
+    """Key of the plate with ``part``'s footprint, if allowed and made in ``colour``."""
+    width, length, _ = _rect_dims(part) or (0, 0, 0)
+    plate = layout.catalog.rect_key(width, length, 1, category=Category.PLATE)
+    if plate is None:
+        return None
+    number = layout.catalog[plate].ldraw_part
+    if (allowed is not None and number not in allowed) or produced(
+        number, colour
+    ) is False:
+        return None
+    return str(plate)
+
+
+@dataclass(frozen=True, slots=True)
+class _Outcome:
+    kind: str
+    added: int = 0
+    heavier: bool = False
+
+
+def _smooth_top(
+    layout: Layout,
+    brick: PlacedBrick,
+    *,
+    roof: list[Cell],
+    rise: int,
+    tiles: dict[tuple[int, int], tuple[str, str]],
+    allowed: frozenset[str] | None,
+    produced: Callable[[str, int], bool | None],
+    heavier: bool = True,
+) -> _Outcome:
+    """Give one open part a smooth top ``rise`` plates from its top (-1, 0, 1).
+
+    Without ``heavier`` a change that adds weight is left out (``unchecked``).
+    """
+    colour = brick.colour_code
+    part = layout.part_of(brick)
+    is_plate = part.category is Category.PLATE
+    rise = max(rise, 0) if is_plate else rise  # a plate cannot go lower
+    xs = sorted({c[0] for c in roof})
+    ys = sorted({c[1] for c in roof})
+    axis = 0 if len(xs) >= len(ys) else 1
+    along, across = (xs, ys) if axis == 0 else (ys, xs)
+    usable = {
+        size: key
+        for size, (key, ldraw) in tiles.items()
+        if produced(ldraw, colour) is not False
+    }
+    cover = tile_cover(len(along), len(across), usable.keys())
+    if cover is None:
+        return _Outcome("kept")
+    top = roof[0][2]
+    tile_layer = top + rise
+
+    def cells(piece_along: range, piece_across: range) -> frozenset[Cell]:
+        return frozenset(
+            (along[a], across[c], tile_layer)
+            if axis == 0
+            else (across[c], along[a], tile_layer)
+            for a in piece_along
+            for c in piece_across
+        )
+
+    plan: list[tuple[str, frozenset[Cell], int]] = [
+        (
+            usable[piece.footprint],
+            cells(
+                range(piece.along, piece.along + piece.length),
+                range(piece.across, piece.across + piece.width),
+            ),
+            tile_layer,
+        )
+        for piece in cover
+    ]
+    keep = rise > 0  # the part stays and carries the tiles
+    if is_plate and not keep:
+        if len(plan) > 1 and not all(
+            any(layout.brick_at((x, y, top - 1)) is not None for x, y, _ in target)
+            for _, target, _ in plan
+        ):
+            return _Outcome("kept")
+        kind = "plates" if len(plan) == 1 else "split_plates"
+    elif keep:
+        kind = "topped"
+    else:
+        plate = _plate_like(layout, part, colour, allowed, produced)
+        if plate is None:
+            return _Outcome("kept")
+        plan = [
+            (plate, frozenset((x, y, z) for x, y, _ in roof), z)
+            for z in range(brick.layer, tile_layer)
+        ] + plan
+        kind = "lowered" if rise < 0 else "bricks"
+    before = 0.0 if keep else part.mass_g
+    after = sum(layout.catalog[key].mass_g for key, _, _ in plan)
+    gains = after > before + _MASS_EPS
+    if gains and not heavier:
+        return _Outcome("unchecked")
+    if not keep:
+        layout.remove(brick.brick_id)
+    placed: list[int] = []
+    for key, target, z in plan:
+        new = _place_exact(layout, key, target, z, colour)
+        if new is None:
+            layout.remove_many(placed)
+            if not keep:
+                layout.add(
+                    brick.part_key, brick.x, brick.y, brick.layer, brick.yaw, colour
+                )
+            return _Outcome("kept")
+        placed.append(new)
+    return _Outcome(kind, added=len(placed) - (0 if keep else 1), heavier=gains)
 
 
 # ---------------------------------------------------------------- joint pattern
@@ -1078,6 +1418,16 @@ class LegolizationBackend:
         layout = state.layout
         resolve_ignore_colours(layout)  # states before the final merge have them
         stability = _report(layout, state.stability)
+        tiling = self._tile_tops(
+            layout,
+            grid,
+            settings=settings,
+            config=config,
+            allowed=allowed,
+            stability=stability,
+            deadline=deadline,
+        )
+        early.extend(tiling.notes)
         if availability == "split":
             report = split_unavailable(layout)
             if report.replaced and stability.checked:
@@ -1093,18 +1443,18 @@ class LegolizationBackend:
                     f"{len(report.unresolved)} part(s) could not be replaced by "
                     "existing shorter parts; see the parts list"
                 )
-        plan, notes, kind = self._plan(layout, config, settings, deadline)
-        plan, units, refined = refine_plan(
-            layout, plan, settings.steps, checked=kind == "searched"
-        )
-        checked: tuple[bool, ...] | bool = kind == "searched"
-        if kind == "checked-layers":
-            reserve = LLM_RESERVE_S if settings.llm.enabled else 0.0
-            plan, checked, check_notes = self._check_steps(
-                layout, plan, config, None if deadline is None else deadline - reserve
-            )
-            refined.extend(check_notes)
-        notes = [*allowed.notes, *early, *notes, *refined]
+        steps = self._steps(layout, config, settings, deadline)
+        if tiling.check is not None and tiling.before is not None:
+            tiled = tiling.check.result()
+            if stability.buildable and not tiled.buildable:
+                layout.replace_with(tiling.before)
+                early = [n for n in early if n not in tiling.notes]
+                early.append(_TILES_UNDONE_NOTE)
+                steps = self._steps(layout, config, settings, deadline)
+            else:
+                stability = tiled
+        plan, units, checked = steps.plan, steps.units, steps.checked
+        notes = [*allowed.notes, *early, *steps.notes]
         native = _Native(layout=layout, plan=plan, checked=checked, units=units)
         return Placement(
             model=to_brick_model(
@@ -1124,6 +1474,79 @@ class LegolizationBackend:
             native=native,
             notes=tuple(notes),
         )
+
+    def _tile_tops(
+        self,
+        layout: Layout,
+        grid: VoxelGrid,
+        *,
+        settings: Settings,
+        config: PipelineConfig,
+        allowed: Whitelist,
+        stability: StabilityReport,
+        deadline: float | None,
+    ) -> _Tiling:
+        """Tiles on the flat tops (ROADMAP 9, ADR 0020).
+
+        When a part got heavier, the whole model is checked again in a thread
+        while the steps are planned (the step planner waits on its own worker
+        processes); :meth:`place` undoes the tiles if the model no longer
+        holds together. With too little time left for that check only the
+        changes that make parts lighter are made; none when the run's own
+        stability check did not finish.
+        """
+        parts = settings.parts
+        if "tile" not in parts.categories:
+            return _Tiling()
+        if not stability.checked:
+            return _Tiling(notes=(_TILES_UNCHECKED_NOTE,))
+        left = (
+            math.inf
+            if deadline is None
+            else deadline - time.monotonic() - export_reserve_s(len(layout))
+        )
+        before = layout.copy()
+        report = apply_tiles(
+            layout,
+            flat_top_plates(_tile_faces(grid, parts.tiles), grid.plates_per_cell),
+            allowed=allowed.parts,
+            base=parts.tiles_on_base,
+            heavier=left >= tile_check_s(len(layout)),
+        )
+        shown = report.tiled or report.kept or report.unchecked
+        notes = (report.summary(),) if shown else ()
+        if not report.tiled or not report.heavier:
+            # Nothing changed, or only lighter parts on the same supports: the
+            # verdict stands (ADR 0020).
+            return _Tiling(notes=notes)
+        self._say(f"{report.summary()}; checking stability again")
+        snapshot = layout.copy()
+        solver = config.solver
+        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tile-check")
+        check = pool.submit(lambda: _report(snapshot, analyze(snapshot, solver)))
+        pool.shutdown(wait=False)
+        return _Tiling(notes=notes, before=before, check=check)
+
+    def _steps(
+        self,
+        layout: Layout,
+        config: PipelineConfig,
+        settings: Settings,
+        deadline: float | None,
+    ) -> _Steps:
+        """Plan the steps and check them as far as time allows (ADR 0017)."""
+        plan, notes, kind = self._plan(layout, config, settings, deadline)
+        plan, units, refined = refine_plan(
+            layout, plan, settings.steps, checked=kind == "searched"
+        )
+        checked: tuple[bool, ...] | bool = kind == "searched"
+        if kind == "checked-layers":
+            reserve = LLM_RESERVE_S if settings.llm.enabled else 0.0
+            plan, checked, check_notes = self._check_steps(
+                layout, plan, config, None if deadline is None else deadline - reserve
+            )
+            refined.extend(check_notes)
+        return _Steps(plan, units, checked, (*notes, *refined))
 
     def _plan(
         self,
@@ -1367,7 +1790,9 @@ class LegolizationBackend:
             "shell_studs": wall,
             "shell_plates": wall * plates_per_cell,
             "slopes": "preserve" if "slope" in categories else False,
-            "tiles": "tile" in categories,
+            # mesh2brick puts tiles on itself, only on flat tops (_tile_tops);
+            # legolization's own pass would tile every exposed plate.
+            "tiles": False,
             "repair": settings.stability.enabled,
             "repair_config": RepairConfig(
                 max_rounds=settings.stability.max_repair_iterations
@@ -1384,6 +1809,18 @@ class LegolizationBackend:
     def _say(self, message: str) -> None:
         if self._progress is not None:
             self._progress(message)
+
+
+def _tile_faces(grid: VoxelGrid, where: str) -> NDArray[np.float32]:
+    """Flat faces of ``grid`` (``all``: every open top, at the cells' height)."""
+    faces = grid.flat_tops()
+    if where != "all":
+        return faces
+    open_tops = np.where(top_cells(grid.occupancy), 0.0, np.nan)
+    every: NDArray[np.float32] = np.where(np.isfinite(faces), faces, open_tops).astype(
+        np.float32
+    )
+    return every
 
 
 def export_reserve_s(parts: int) -> float:
@@ -1847,7 +2284,7 @@ def to_brick_model(
                 yaw=brick.yaw,
                 cells=tuple(sorted(layout.cells_of(brick))),
                 step=step_of[brick.brick_id],
-                category=str(part.category.value),
+                category=part_category(part),
                 backend_key=brick.part_key,
                 unit=(units or {}).get(brick.brick_id),
                 studs=_stud_columns(layout, brick),

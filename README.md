@@ -89,6 +89,12 @@ uv run mesh2brick catalog show 3001
 uv run mesh2brick convert model.stl -o out/ --set "parts.include=[3001, 3003, 3004]"
 uv run mesh2brick convert model.stl -o out/ --set "parts.exclude=[3008, 3007]"
 
+# Smooth tops: tiles where the 3D model is flat (the top of a box, a base), studs
+# everywhere else. Plates become tiles of the same size, bricks 2 plates + tile; stability
+# is checked again. On the stairs of round shapes too: --set parts.tiles=all; none on the
+# lowest layer: --set parts.tiles_on_base=false
+uv run mesh2brick convert model.stl -o out/ --set "parts.categories=[brick, plate, slope, tile]"
+
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3
 
