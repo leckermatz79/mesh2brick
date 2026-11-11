@@ -30,7 +30,8 @@ RED = 4
 TILES = ("3070b", "3069b", "63864", "2431", "6636", "4162", "3068b", "87079", "69729")
 """Every tile legolization's catalogue has (four placeable, five import-only)."""
 _PARTS = (
-    "3005", "3004", "3622", "3010", "3003", "3002", "3001", "3024", "3023", "3710",
+    "3005", "3004", "3622", "3010", "3009", "3003", "3002", "3001", "3024", "3023",
+    "3623", "3710", "3666", "3460",
     "3022", "3021", "3020", *TILES,
 )  # fmt: skip
 
@@ -322,3 +323,97 @@ def test_a_face_too_little_tileable_keeps_all_its_studs() -> None:
     # Without the rule (1.7.0) the two 1 x 4 would get tiles.
     again = _strip_with_end(("brick_1x3", 8))
     assert apply_tiles(again, _flat((0, 10, 0, 1, 2))).bricks == 2
+
+
+# ------------------------------------------------------------------ cuts (#46)
+def _courtyard(below: tuple[tuple[str, int], ...]) -> Any:
+    """A 1 x 6 courtyard plate (layer 1) running under a 1 x 2 wall at x 4..5.
+
+    ``below`` are the 1 x N plates of layer 0 (key, x): they hold the cut or not.
+    """
+    layout = _layout_with(*((key, x, 0, 0, 0) for key, x in below))
+    layout.add("plate_1x6", 0, 0, 1, 0, RED)
+    layout.add("brick_1x2", 4, 0, 2, 0, RED)  # the wall
+    return layout
+
+
+def test_a_part_under_a_wall_is_cut_at_the_wall() -> None:
+    layout = _courtyard((("plate_1x8", 0),))
+    report = apply_tiles(layout, _flat((0, 6, 0, 1, 1)), split=True)
+    assert (report.cut, report.cut_moved, report.cut_loose) == (1, 0, 0)
+    assert report.heavier  # a cut always gets the stability check
+    layer1 = sorted(
+        (min(c[0] for c in layout.cells_of(b)), layout.part_of(b).ldraw_part)
+        for b in layout
+        if b.layer == 1
+    )
+    assert layer1 == [
+        (0, "2431"),
+        (4, "3023"),
+    ]  # tile 1 x 4, plate 1 x 2 under the wall
+
+
+def test_a_cut_nothing_holds_moves_one_stud_into_the_face() -> None:
+    # Below, two 1 x 4 plates meet exactly at the wall: nothing spans x 3 | 4.
+    layout = _courtyard((("plate_1x4", 0), ("plate_1x4", 4)))
+    report = apply_tiles(layout, _flat((0, 6, 0, 1, 1)), split=True)
+    assert (report.cut, report.cut_moved) == (1, 1)
+    layer1 = sorted(
+        (min(c[0] for c in layout.cells_of(b)), layout.part_of(b).ldraw_part)
+        for b in layout
+        if b.layer == 1
+    )
+    assert layer1 == [
+        (0, "63864"),
+        (3, "3623"),
+    ]  # tile 1 x 3, plate 1 x 3 (one stud in)
+    # The moved cut leaves 3 of the 4 open cells tileable: below 85 %, so a
+    # face rule keeps all its studs.
+    again = _courtyard((("plate_1x4", 0), ("plate_1x4", 4)))
+    kept = apply_tiles(again, _flat((0, 6, 0, 1, 1)), split=True, min_share=0.85)
+    assert (kept.tiled, kept.faces_kept) == (0, 1)
+
+
+def test_a_part_that_would_be_loose_after_any_cut_stays_whole() -> None:
+    layout = _courtyard((("plate_1x3", 0), ("plate_1x1", 3), ("plate_1x4", 4)))
+    report = apply_tiles(layout, _flat((0, 6, 0, 1, 1)), split=True)
+    assert (report.cut, report.cut_loose) == (0, 1)
+    assert "left whole" in report.summary()
+    assert sum(1 for b in layout if layout.part_of(b).ldraw_part == "3666") == 1
+
+
+def test_without_split_partial_tops_keep_their_studs() -> None:
+    layout = _courtyard((("plate_1x8", 0),))
+    report = apply_tiles(layout, _flat((0, 6, 0, 1, 1)))
+    assert report.tiled == 0
+
+
+def test_a_brick_under_a_wall_is_cut_and_the_model_still_stands() -> None:
+    from legolization.stability.solver import SolverConfig, analyze  # noqa: PLC0415
+
+    layout = _layout_with(
+        ("plate_1x8", 0, 0, 0, 0),
+        ("brick_1x6", 0, 0, 1, 0),  # layers 1..3, under the wall at x 4..5
+        ("brick_1x2", 4, 0, 4, 0),  # the wall
+    )
+    report = apply_tiles(layout, _flat((0, 6, 0, 1, 3)), split=True)
+    assert report.cut == 1
+    by_layer = Counter(
+        (b.layer, layout.part_of(b).ldraw_part) for b in layout if b.layer >= 1
+    )
+    # Outside a 1 x 2 brick keeps the wall; inside 2 plates 1 x 4 and a tile.
+    assert by_layer == {
+        (1, "3004"): 1, (1, "3710"): 1, (2, "3710"): 1, (3, "2431"): 1,
+        (4, "3004"): 1,
+    }  # fmt: skip
+    assert analyze(layout, SolverConfig()).stable
+
+
+def test_a_face_a_plate_higher_gets_tiles_on_the_open_part_only() -> None:
+    layout = _courtyard((("plate_1x8", 0),))
+    report = apply_tiles(layout, _flat((0, 6, 0, 1, 1), rise=0.8), split=True)
+    assert (report.topped, report.cut) == (1, 0)
+    on_top = [
+        b for b in layout if b.layer == 2 and layout.part_of(b).ldraw_part == "2431"
+    ]
+    assert len(on_top) == 1  # one 1 x 4 tile on the open part; the plate stays whole

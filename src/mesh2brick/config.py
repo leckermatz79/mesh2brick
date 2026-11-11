@@ -184,6 +184,11 @@ class PartsConfig(_Section):
     """A flat face gets tiles only when at least this share of its open top
     can (product owner, 2026-11-11, issue #44); otherwise all of it keeps its
     studs instead of looking patchy (0 = tile whatever can be tiled)."""
+    tiles_split: bool = True
+    """Split parts that reach past the edge of a flat face (or under another
+    part) at the edge first, so whole faces can be tiled (product owner,
+    2026-11-11, issue #46): outside they keep their studs, inside they get
+    plates and tiles; each cut stays held by a part above or below."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:

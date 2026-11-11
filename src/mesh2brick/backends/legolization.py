@@ -89,8 +89,11 @@ from mesh2brick.catalog.whitelist import (
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.place.split import choose_split
 from mesh2brick.place.tiles import (
+    Column,
+    cut_band,
     flat_faces,
     flat_top_plates,
+    rect_cover,
     tile_cover,
     tiled_faces,
 )
@@ -701,13 +704,16 @@ def _place_exact(
 
 
 # ---------------------------------------------------------------- tiles (ROADMAP 9)
-TILE_CHECK_BASE_S: Final = 10.0
-TILE_CHECK_PER_PART_S: Final = 0.02
-"""Changes that make parts heavier are followed by a stability check of the
-whole model, while the steps are planned (measured: 3 s for 189 parts, 14 s
-for 776, 33 s for 1,682, 65 s for 2,209). With less time left than
-:func:`tile_check_s` only the changes that make parts lighter are made; a
-check that runs longer than that eats into the time kept for the export."""
+TILE_CHECK_BASE_S: Final = 5.0
+TILE_CHECK_PER_PART_S: Final = 0.01
+"""Changes that make parts heavier (or cut parts) are followed by a stability
+check of the whole model, while the steps are planned (measured: 3 s for 189
+parts, 14 s for 776, 33 s for 1,682, 65 s for 2,209). With less time left
+than :func:`tile_check_s` only the changes that make parts lighter are made.
+The value is about half the measured time: a check that runs longer eats into
+the time kept for the export, which has room for it (20 s + 0.03 s per part
+kept, the PDF needs about 0.012 s per part). 0.02 s per part left the castle
+without tiles in one of two runs (issue #46)."""
 _TILES_UNCHECKED_NOTE: Final = (
     "tiles skipped: the time limit stopped the stability check, so the tiles "
     "could not be checked either (raise placement.time_limit_s)"
@@ -716,6 +722,10 @@ _TILES_UNDONE_NOTE: Final = (
     "tiles undone: with them the model would no longer hold together"
 )
 _MASS_EPS: Final = 1e-9
+TILE_PARTS_GUIDE: Final = 0.15
+"""Tiles that add more parts than this share of the model are reported, not
+taken back (product owner, 2026-11-11, issue #46: a guide, judged on the
+picture)."""
 
 
 def tile_check_s(parts: int) -> float:
@@ -779,12 +789,20 @@ class TileReport:
     """Flat faces that keep all their studs: less than ``min_share`` of their
     open top could get tiles (issue #44)."""
     min_share: float = 0.0
+    cut: int = 0
+    """Parts split at the edge of a face (issue #46): the part outside keeps
+    its studs, the part inside gets plates and tiles."""
+    cut_moved: int = 0
+    """Of :attr:`cut`, those whose cut moved one stud into the face, because
+    nothing above or below held the pieces together at the first cut."""
+    cut_loose: int = 0
+    """Parts left whole: they would only be loosely laid in after any cut."""
 
     @property
     def tiled(self) -> int:
         """Parts that got a smooth top."""
         changed = (self.plates, self.split_plates, self.lowered, self.bricks)
-        return sum(changed) + self.topped
+        return sum(changed) + self.topped + self.cut
 
     def summary(self) -> str:
         """One line for the user."""
@@ -794,6 +812,7 @@ class TileReport:
             (self.lowered, "brick(s) -> plate + tile (top one plate lower)"),
             (self.bricks, "brick(s) -> 2 plates + tile"),
             (self.topped, "part(s) with a tile on top (top one plate higher)"),
+            (self.cut, "part(s) split at the edge of the face"),
         )
         done = [f"{count} {what}" for count, what in kinds if count] or ["none"]
         text = "tiles on flat tops: " + ", ".join(done)
@@ -805,6 +824,13 @@ class TileReport:
             text += (
                 f"; {self.unchecked} flat top(s) keep their studs (no time to check "
                 "stability with them; raise placement.time_limit_s)"
+            )
+        if self.cut_moved:
+            text += f"; {self.cut_moved} cut(s) moved one stud in to stay held"
+        if self.cut_loose:
+            text += (
+                f"; {self.cut_loose} part(s) left whole (a cut would leave them "
+                "loosely laid in)"
             )
         if self.faces_kept:
             text += (
@@ -823,6 +849,7 @@ def apply_tiles(
     base: bool = True,
     heavier: bool = True,
     min_share: float = 0.0,
+    split: bool = False,
 ) -> TileReport:
     """Give the open bricks and plates whose top lies in ``flat`` a smooth top.
 
@@ -841,7 +868,12 @@ def apply_tiles(
 
     Face by face (cells side by side in one layer, issue #44): a face gets its
     tiles only when the parts that can be smoothed cover at least
-    ``min_share`` of its open top; otherwise all of it keeps its studs.
+    ``min_share`` of its open top; otherwise all of it keeps its studs. With
+    ``split`` (issue #46), a part whose top lies only partly on the face (it
+    reaches past the face's edge or under another part) is split at the edge
+    first: outside it keeps its studs, inside it gets plates and tiles; a cut
+    must stay held by a part above or below reaching across it, else it moves
+    one stud into the face, else the part stays whole.
 
     Only parts in ``allowed`` (LDraw numbers, ``None``: any) that LEGO makes in
     the part's colour are used; ``base=False`` leaves the lowest brick layer
@@ -868,17 +900,25 @@ def apply_tiles(
         cells = layout.cells_of(brick)
         top = max(c[2] for c in cells)
         roof = [c for c in cells if c[2] == top]
-        if any(c not in flat for c in roof) or any(
-            layout.brick_at((x, y, top + 1)) is not None for x, y, _ in roof
-        ):
+        inside = [
+            c
+            for c in roof
+            if c in flat and layout.brick_at((c[0], c[1], top + 1)) is None
+        ]
+        whole = len(inside) == len(roof)
+        if not inside or not (whole or split):
             continue
-        face = sum(flat[c] for c in roof) / len(roof)
+        if len({face_of[c] for c in inside}) > 1:
+            continue
+        face = sum(flat[c] for c in inside) / len(inside)
+        rise = max(-1, min(1, round(face)))
+        planner = _plan_top if whole else _plan_cut
         plans.append(
-            _plan_top(
+            planner(
                 layout,
                 brick,
-                roof=roof,
-                rise=max(-1, min(1, round(face))),
+                roof=roof if whole else inside,
+                rise=rise,
                 tiles=tiles,
                 allowed=allowed,
                 produced=produced,
@@ -901,6 +941,7 @@ def apply_tiles(
         outcome = _apply_top(layout, plan)
         counts[outcome.kind] += 1
         counts["added"] += outcome.added
+        counts["cut_moved"] += plan.moved and outcome.kind == "cut"
         gained = gained or outcome.heavier
     return TileReport(
         plates=counts["plates"],
@@ -915,6 +956,9 @@ def apply_tiles(
         faces=len(chosen),
         faces_kept=len(open_cells) - len(chosen),
         min_share=min_share,
+        cut=counts["cut"],
+        cut_moved=counts["cut_moved"],
+        cut_loose=counts["loose"],
     )
 
 
@@ -975,6 +1019,9 @@ class _TopPlan:
     keep: bool = False
     """The part stays and carries the tiles (face a plate higher)."""
     heavier: bool = False
+    """The change adds weight or cuts a part: stability is checked again."""
+    moved: bool = False
+    """A cut moved one stud into the face to stay held (issue #46)."""
 
 
 def _plan_top(
@@ -1057,6 +1104,162 @@ def _plan_top(
     if gains and not heavier:
         return _TopPlan(brick, tuple(roof), "unchecked")
     return _TopPlan(brick, tuple(roof), kind, tuple(steps), keep, gains)
+
+
+def _plan_cut(  # noqa: PLR0911 - every way a cut can fail, spelled out
+    layout: Layout,
+    brick: PlacedBrick,
+    *,
+    roof: list[Cell],
+    rise: int,
+    tiles: dict[tuple[int, int], tuple[str, str]],
+    allowed: frozenset[str] | None,
+    produced: Callable[[str, int], bool | None],
+    heavier: bool = True,
+) -> _TopPlan:
+    """Plan a cut at the edge of a flat face (issue #46).
+
+    ``roof`` holds the part's open top cells on the face; the rest of its top
+    reaches past the face or lies under another part. Where the face is a
+    plate higher, tiles are laid on those cells and the part stays whole.
+    Otherwise the part is cut: outside, parts of its family and height keep
+    the studs; inside, plates (bricks only) and tiles as in :func:`_plan_top`.
+    The pieces must stay held together by a part above or below reaching
+    across the cut; if none does, the cut moves one stud into the face; if
+    that does not help, the part stays whole (``loose``).
+    """
+    colour = brick.colour_code
+    top = roof[0][2]
+    columns = {(x, y) for x, y, _ in layout.cells_of(brick)}
+    inner = {(x, y) for x, y, _ in roof}
+    usable = {
+        size: key
+        for size, (key, ldraw) in tiles.items()
+        if produced(ldraw, colour) is not False
+    }
+    if rise > 0:  # the face is a plate higher: tiles on the part, no cut
+        cover = rect_cover(inner, usable.keys())
+        if cover is None:
+            return _TopPlan(brick, tuple(roof), "kept")
+        if not heavier:
+            return _TopPlan(brick, tuple(roof), "unchecked")
+        steps = tuple(
+            (usable[size], frozenset((x, y, top + 1) for x, y in cells), top + 1)
+            for size, cells in cover
+        )
+        return _TopPlan(brick, tuple(roof), "topped", steps, keep=True, heavier=True)
+    moved = False
+    if not _held_across(layout, brick, columns, inner):
+        inner -= cut_band(inner, columns - inner)
+        moved = True
+        if not inner or not _held_across(layout, brick, columns, inner):
+            return _TopPlan(brick, tuple(roof), "loose")
+    pieces = _cut_steps(
+        layout, brick, columns, inner, rise=rise, usable=usable, allowed=allowed,
+        produced=produced,
+    )  # fmt: skip
+    if pieces is None:
+        return _TopPlan(brick, tuple(roof), "kept")
+    if not heavier:
+        return _TopPlan(brick, tuple(roof), "unchecked")
+    tiled = tuple(c for c in roof if (c[0], c[1]) in inner)
+    return _TopPlan(brick, tiled, "cut", pieces, heavier=True, moved=moved)
+
+
+def _held_across(
+    layout: Layout, brick: PlacedBrick, columns: set[Column], inner: set[Column]
+) -> bool:
+    """A part right below or above ``brick`` covers columns on both sides."""
+    cells = layout.cells_of(brick)
+    outer = columns - inner
+    for z in (min(c[2] for c in cells) - 1, max(c[2] for c in cells) + 1):
+
+        def ids(cols: set[Column], layer: int = z) -> set[int]:
+            return {
+                found.brick_id
+                for x, y in cols
+                if (found := layout.brick_at((x, y, layer))) is not None
+            }
+
+        if ids(inner) & ids(outer):
+            return True
+    return False
+
+
+def _cut_steps(
+    layout: Layout,
+    brick: PlacedBrick,
+    columns: set[Column],
+    inner: set[Column],
+    *,
+    rise: int,
+    usable: dict[tuple[int, int], str],
+    allowed: frozenset[str] | None,
+    produced: Callable[[str, int], bool | None],
+) -> tuple[tuple[str, frozenset[Cell], int], ...] | None:
+    """The parts that replace ``brick`` when cut along ``inner`` (``None``: none)."""
+    part = layout.part_of(brick)
+    colour = brick.colour_code
+    is_plate = part.category is Category.PLATE
+    cells = layout.cells_of(brick)
+    bottom, top = brick.layer, max(c[2] for c in cells)
+    lookups: dict[str, Any] = {
+        "colour": colour, "allowed": allowed, "produced": produced
+    }  # fmt: skip
+    same = _rect_keys(layout, part.category, part.height_plates, **lookups)
+    outside = rect_cover(columns - inner, same.keys())
+    tile_layer = top if is_plate else top + rise
+    plates = _rect_keys(layout, Category.PLATE, 1, **lookups)
+    stack = rect_cover(inner, plates.keys()) if tile_layer > bottom else []
+    cover = rect_cover(inner, usable.keys())
+    if outside is None or stack is None or cover is None:
+        return None
+    if is_plate and not all(
+        any(layout.brick_at((x, y, top - 1)) is not None for x, y in piece)
+        for _, piece in cover
+    ):
+        return None
+    steps = [
+        (
+            same[size],
+            frozenset((x, y, z) for x, y in piece for z in range(bottom, top + 1)),
+            bottom,
+        )
+        for size, piece in outside
+    ]
+    steps += [
+        (plates[size], frozenset((x, y, z) for x, y in piece), z)
+        for z in range(bottom, tile_layer)
+        for size, piece in stack
+    ]
+    steps += [
+        (usable[size], frozenset((x, y, tile_layer) for x, y in piece), tile_layer)
+        for size, piece in cover
+    ]
+    return tuple(steps)
+
+
+def _rect_keys(
+    layout: Layout,
+    family: Any,
+    height: int,
+    *,
+    colour: int,
+    allowed: frozenset[str] | None,
+    produced: Callable[[str, int], bool | None],
+) -> dict[tuple[int, int], str]:
+    """``(small, big)`` -> key of the usable rectangle parts of one family."""
+    found: dict[tuple[int, int], str] = {}
+    for key, entry in sorted(layout.catalog.parts.items()):
+        dims = _rect_dims(entry)
+        if entry.category is not family or dims is None or dims[2] != height:
+            continue
+        if allowed is not None and entry.ldraw_part not in allowed:
+            continue
+        if produced(entry.ldraw_part, colour) is False:
+            continue
+        found.setdefault((dims[0], dims[1]), key)
+    return found
 
 
 def _apply_top(layout: Layout, plan: _TopPlan) -> _Outcome:
@@ -1584,9 +1787,17 @@ class LegolizationBackend:
             base=parts.tiles_on_base,
             heavier=left >= tile_check_s(len(layout)),
             min_share=parts.tiles_min_share,
+            split=parts.tiles_split,
         )
         shown = report.tiled or report.kept or report.unchecked or report.faces_kept
-        notes = (report.summary(),) if shown else ()
+        notes: tuple[str, ...] = (report.summary(),) if shown else ()
+        if report.added > TILE_PARTS_GUIDE * len(before):
+            share = report.added / len(before)
+            guide = (
+                f"tiles add {report.added} parts (+{share:.1%}, more than the "
+                f"{TILE_PARTS_GUIDE:.0%} guide)"
+            )
+            notes = (*notes, guide)
         if not report.tiled or not report.heavier:
             # Nothing changed, or only lighter parts on the same supports: the
             # verdict stands (ADR 0020).
