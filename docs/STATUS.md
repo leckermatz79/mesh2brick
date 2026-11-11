@@ -1,12 +1,12 @@
 # Projektstatus
 
-Stand: 2026-11-10 · **1.7.0 – Fliesen auf flachen Oberseiten** ([#42](https://github.com/leckermatz79/mesh2brick/issues/42), ROADMAP Punkt 9, der erste 2.0-Punkt) · davor 1.6.1 (Bewertungsskala, damit war 1.x fertig) · Nächster Schritt: **deine drei Antworten unten**, dann ROADMAP 8 (mehr Dachsteine)
+Stand: 2026-11-11 · **1.7.0 – Fliesen auf flachen Oberseiten** ([#42](https://github.com/leckermatz79/mesh2brick/issues/42), ROADMAP Punkt 9, der erste 2.0-Punkt) · davor 1.6.1 (Bewertungsskala, damit war 1.x fertig) · Nächster Schritt: Merge und Tag 1.7.0, dann die **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)), danach ROADMAP 8 (mehr Dachsteine)
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
 - **Wo das 3D-Modell flach ist, legt mesh2brick auf Wunsch glatte Fliesen, und zwar genau auf die Höhe der Fläche:** Würfel, L-Winkel und die zwei Körper treffen ihr 3D-Modell damit exakt (Abweichung 0,00 mm statt im Mittel 0,66–0,83 mm), Kugel, Hase und Fliegenpilz behalten wie gewünscht ihre Noppen.
-- **Alle Testmodelle bleiben ein stabiles Stück**, die Kästen brauchen 7–16 % mehr Teile; eingeschaltet wird es mit `tile` in `parts.categories`, standardmäßig bleibt es aus, bis du entscheidest (Frage 1 mit Bildern).
+- **Alle Testmodelle bleiben ein stabiles Stück**, die Kästen brauchen 7–16 % mehr Teile; eingeschaltet wird es mit `tile` in `parts.categories`. Standardmäßig bleibt es aus, weil die Burg fleckig wirkt (deine Entscheidung 2026-11-11); das soll die 85-%-Regel in [#44](https://github.com/leckermatz79/mesh2brick/issues/44) beheben.
 
 ## Erledigt (1.7.0, ROADMAP Punkt 9)
 
@@ -17,7 +17,7 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 - **Stabilität:** Wo ein Teil schwerer wird (2 Platten + Fliese wiegen mehr als der Stein, eine aufgelegte Fliese wiegt etwas), prüft mesh2brick das ganze Modell neu, parallel zur Schrittplanung; hält es nicht mehr, werden die Fliesen zurückgenommen. Wird alles nur leichter, bleibt das Urteil von vorher stehen. Ist zu wenig Zeit, macht es nur die leichteren Umbauten und sagt, wie viele Oberseiten ihre Noppen behalten.
 - **Darstellung:** Fliesen ohne Noppen in Vorschau, Schrittbildern und Teilekasten, in der Teileliste „Fliese 2 × 4“ mit BrickLink-/Rebrickable-Nummer (87079 usw.), als letzter Schritt aufgelegt. Die KI-Schicht weiß, was eine Fliese ist.
 - **Einstellungen:** `parts.tiles: flat` (nur flache Flächen) oder `all` (auch Treppen), `parts.tiles_on_base: true/false` (unterste Lage). README (de/en) und Beispiel-Config erklären es.
-- **Nebenbei behoben:** Mit eingeschalteter KI-Schicht, aber ohne API-Schlüssel ist `convert` bisher abgestürzt; jetzt wird die KI-Schicht übersprungen und der Lauf sagt „no API credentials: set ANTHROPIC_API_KEY“. Aufgefallen, weil in dieser Sitzung kein Schlüssel gesetzt war. Deshalb steht ein Live-Test der Schritttexte mit Fliesen noch aus; ein Test prüft, dass Claude die Teile als „Fliese 2 × 4 (en: Tile …)“ und den Hinweis „Fliesen ohne Noppen, zuletzt auflegen“ bekommt.
+- **Nebenbei behoben:** Mit eingeschalteter KI-Schicht, aber ohne API-Schlüssel ist `convert` bisher abgestürzt; jetzt wird die KI-Schicht übersprungen und der Lauf sagt „no API credentials: set ANTHROPIC_API_KEY“. Aufgefallen, weil in meiner Sitzung kein Schlüssel gesetzt war. Den Live-Test der Schritttexte mit Fliesen hast du gemacht (L-Winkel, 177 Teile, 39 von 39 Schritttexten, keine Probleme, 6,5 Cent); dazu prüft ein Test, dass Claude die Teile als „Fliese 2 × 4 (en: Tile …)“ und den Hinweis „Fliesen ohne Noppen, zuletzt auflegen“ bekommt.
 - **Begründung mit Zahlen:** [ADR 0020](adr/0020-tiles-on-flat-tops.md) (die Nummer 0019 war schon vergeben). Ein Upstream-Vorschlag an legolization (Maske für `apply_tiles`, auch Steine, alle Fliesengrößen) steht als Kandidat #18 in [UPSTREAM.md](UPSTREAM.md); nichts in Punkt 9 wartet darauf, die Frage „Fork oder Warten“ stellt sich hier also nicht.
 
 | Abnahme (Issue #42) | Ergebnis |
@@ -50,7 +50,8 @@ Bilder für jedes Modell (links 1.6, rechts mit Fliesen): `out/tiles/vorher-nach
 
 ## Als Nächstes
 
-**ROADMAP 8 – mehr Dachsteine** (Reihenfolge in 2.0 nach deiner Entscheidung: 9, 8, 10, 11, 12, 13). Die Messgröße von heute ist die Grundlinie dafür: Bei runden Formen machen die Voxeltreppen 1,8–2,4 mm Abweichung aus, Noppen nur 0,04–0,3 mm; Dachsteine an den Treppenkanten sind dort der Hebel. Hängt Punkt 8 an einer Änderung in legolization, steht die Frage „Fork oder Warten“ an (deine Entscheidung, vereinbart am 2026-11-07). Danach runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `choose_part` (Roadmap 10–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
+1. **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44), deine Vorgabe vom 2026-11-11): Eine flache Fläche wird nur gefliest, wenn mindestens 85 % ihrer freiliegenden Oberseite fliesbar sind; sonst behält die ganze Fläche ihre Noppen. Abnahme: du an Vergleichsbildern von Burg und Duo. Überzeugt es, gehen Fliesen standardmäßig an und es wird 2.0.0.
+2. **ROADMAP 8 – mehr Dachsteine** (Reihenfolge in 2.0: 9, dann #44, dann 8, 10, 11, 12, 13). Die Messgröße von heute ist die Grundlinie dafür: Bei runden Formen machen die Voxeltreppen 1,8–2,4 mm Abweichung aus, Noppen nur 0,04–0,3 mm; Dachsteine an den Treppenkanten sind dort der Hebel. Hängt Punkt 8 an einer Änderung in legolization, steht die Frage „Fork oder Warten“ an (deine Entscheidung, vereinbart am 2026-11-07). Danach runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `choose_part` (Roadmap 10–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelheiten in [CHANGELOG.md](../CHANGELOG.md) und in den [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap).
 
@@ -71,7 +72,7 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Fliesen liegen nur auf Teilen, deren ganze Oberseite unter der flachen Fläche liegt. Wo Teile über den Rand der Fläche reichen, bleiben Noppen: bei der Burg die Turmränder (ihr offenes STEP-Netz wird eine Noppe zu breit voxelisiert), bei Duo der gebogene Sockelrand; dort stehen die aufgelegten Fliesen eine Platte über den Randteilen. | eigener Code, falls es stört (Randteile aufteilen) |
+| Fliesen liegen nur auf Teilen, deren ganze Oberseite unter der flachen Fläche liegt. Wo Teile über den Rand der Fläche reichen, bleiben Noppen: bei der Burg die Turmränder (ihr offenes STEP-Netz wird eine Noppe zu breit voxelisiert), bei Duo der gebogene Sockelrand; dort stehen die aufgelegten Fliesen eine Platte über den Randteilen. Deshalb sind Fliesen standardmäßig aus. | eigener Code: 85-%-Regel ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)) |
 | Fliesen nur auf waagerechten Flächen. Schräge, aber ebene Flächen (ein Dach) behalten Noppen. | ROADMAP 8 (Dachsteine) |
 | Kleine Modelle mit vielen umgebauten Steinen brauchen etwas länger, weil legolizations Schrittsuche mehr Teile sieht (L-Winkel 30 → 36 s). | akzeptieren |
 | Liegt eine flache Fläche mehr als eine Platte von der Voxel-Oberkante entfernt, kommt die Fliese nur eine Platte näher (nur bei der Burg, 32 von 375 Fliesenfeldern). Platten werden nie tiefer gelegt. | akzeptieren |
@@ -139,14 +140,15 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | 2026-11-09 | Schrittbilder großer Modelle: schon gebaute Teile ohne Fugen? | **Ja, aber nur für große Modelle** (über 500 Teile), dazu 110 dpi und die sparsamere Farbpalette; kleine Modelle bleiben wie 1.4. Gewählt auf einer Vergleichsseite (wie 1.4 / unsichtbar sparsamer / ohne Fugen). |
 | 2026-11-10 | Dürfen die Würfel den Zeithinweis verlieren (Roadmap 5)? | **Ja.** Der Hinweis bleibt an die Schwelle von 2.000 erwarteten Teilen gebunden. Die Würfel werden in gut vier Minuten fertig, und ein knappes Zeitbudget führt seit 1.4 nur zu weniger geprüften Zwischenständen, nicht zum Abbruch. |
 | 2026-11-10 | Welcher 2.0-Punkt zuerst: ROADMAP 8 (mehr Dachsteine) oder 9 (Tiles)? | **Erst 9 (Tiles), dann 8.** Reihenfolge in 2.0: 9, 8, 10, 11, 12, 13. Grund: Tiles brauchen keine Änderung an der Platzierung und keine Upstream-Antwort. [ROADMAP.md](../ROADMAP.md) ist angepasst. |
+| 2026-11-11 | Fliesen standardmäßig an (ROADMAP 9)? | **Vorerst aus, Release 1.7.0 wie im PR.** Grund: An der Burg wirkt das Ergebnis fleckig (Turmränder und Teilflächen behalten Noppen). Einschalten mit `tile` in `parts.categories`. |
+| 2026-11-11 | Fliesen auch auf Treppen runder Formen? | **Nein.** `parts.tiles: flat` bleibt Standard (`all` nur auf Wunsch). |
+| 2026-11-11 | Unterste Lage (Sockel) ohne Fliesen? | **Nein, der Sockel bekommt Fliesen** (`parts.tiles_on_base: true` bleibt Standard). |
+| 2026-11-11 | Was kommt vor ROADMAP 8? | **Ein eigenes Issue ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)):** Eine flache Fläche wird nur gefliest, wenn mindestens 85 % ihrer freiliegenden Oberseite fliesbar sind, sonst behält die ganze Fläche Noppen. Abnahme an Burg und Duo per Vergleichsbild durch dich. Überzeugt es, gehen Fliesen standardmäßig an und es wird 2.0.0. |
+| 2026-11-11 | KI-Live-Test mit Fliesen (offen aus ROADMAP 9) | **Von dir gemacht:** L-Winkel mit Fliesen, 177 Teile, 39 von 39 Schritttexten, keine Probleme, 6,5 Cent. |
 
 ## Fragen an dich
 
-Bilder liegen in `out/tiles/vorher-nachher/` (links / rechts, darunter Teile, Fliesen und Abweichung).
-
-1. **Fliesen standardmäßig an?** Bilder: `fliesen/` (alle Testmodelle, links 1.6, rechts mit Fliesen; am deutlichsten `cube_10mm.png`, `two_bodies.png`, `castle.png`, `Duo_Duolingo-32.png`). Dafür: Kästen glatt und exakt, alle stabil, Zeit fast gleich. Dagegen: 7–16 % mehr Teile auf Kästen, Duos Sockel wird fleckig (Frage 3). **Mein Vorschlag: an** (dann wird es 2.0.0; ich ändere eine Zeile). **Standard, wenn keine Antwort kommt:** aus, Release 1.7.0.
-2. **Fliesen auch auf Treppen runder Formen?** Bilder: `treppen/` (Kugel, Hase, Fliegenpilz). Kostet 88–181 Teile mehr und bringt praktisch nichts für die Form (Kugel 2,35 → 2,35 mm). **Standard: nein** (einschaltbar mit `--set parts.tiles=all`).
-3. **Unterste Lage (Sockel) ohne Fliesen?** Bilder: `sockel/` (Burg, Duo). Ohne Sockel-Fliesen bleibt der Burghof mit Noppen (13 statt 99 Fliesen) und Duo bekommt gar keine; mit ihnen ist Duos Sockel fleckig, weil nur die inneren Teile ganz auf der flachen Ringfläche liegen. **Standard: Sockel bekommt Fliesen** (abschaltbar mit `--set parts.tiles_on_base=false`).
+Keine offenen Fragen. Deine Antworten vom 2026-11-11 stehen unter „Deine Entscheidungen“; die Vergleichsbilder bleiben in `out/tiles/vorher-nachher/` liegen.
 
 ## Offene Kleinigkeiten
 

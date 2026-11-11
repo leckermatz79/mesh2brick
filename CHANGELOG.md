@@ -14,7 +14,9 @@ lies where the model's face is, to the plate. The stairs of rounded shapes keep 
 fixtures the cubes, the L-bracket and the two bodies now match their mesh exactly (surface
 deviation 0.83 / 4.05 mm → 0.00 / 0.00 mm, mean / 95th percentile), for 7–16 % more parts; every
 fixture stays one stable piece (docs/benchmarks.md, "Tiles (ROADMAP 9)"). Tiles stay off by default
-until the product owner decides (then 2.0.0).
+(product owner, 2026-11-11: on the castle the result looks patchy, tower rims and parts of faces keep
+their studs); a rule that tiles a face only when at least 85 % of it can be tiled comes next (issue
+#44), and with it tiles on by default and 2.0.0.
 
 ### Added
 - Flat tops from the mesh (`voxel/flat.py`): the voxelizer marks top cells whose top face is level
