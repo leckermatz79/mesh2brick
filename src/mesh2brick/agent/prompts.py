@@ -27,7 +27,10 @@ How the model is described below: x runs from left to right and y from front to 
 back, in studs; height is counted in plates from the bottom (a brick is 3 plates \
 high). Parts in a colour have keys like [3001/4] (LDraw part number / LDraw \
 colour code). Sub-assemblies are built separately on the table and attached to \
-the main model in their own step."""
+the main model in their own step. Tiles (German "Fliese") are plates without \
+studs: they make a top smooth, nothing is attached on them, and they are put \
+on last where they sit, so a step text says to lay them on top ("Lege die \
+Fliesen oben auf")."""
 
 MODEL: Final = """\
 # The model

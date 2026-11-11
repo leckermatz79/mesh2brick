@@ -182,10 +182,10 @@ def _slope_2x1(studs: tuple[tuple[int, int], ...] | None) -> BrickModel:
 
 
 def test_slope_wedge_falls_from_the_stud_row_to_a_half_plate_lip() -> None:
-    from mesh2brick.render.preview import LIP_PLATES, _slope_faces  # noqa: PLC0415
+    from mesh2brick.render.preview import LIP_PLATES, slope_faces  # noqa: PLC0415
 
     model = _slope_2x1(((0, 1),))
-    wedge = _slope_faces(model.parts[0])
+    wedge = slope_faces(model.parts[0])
     assert wedge is not None
     sloped, faces = wedge
     assert sloped == {(0, 0, 0), (0, 0, 1), (0, 0, 2)}  # the stud cell stays a box
@@ -193,7 +193,7 @@ def test_slope_wedge_falls_from_the_stud_row_to_a_half_plate_lip() -> None:
     heights = {float(y): float(z) for _, y, z in top.corners}
     assert heights == {1.0: 3.0, 0.0: LIP_PLATES}
     assert any(f.outward == (0.0, -1.0, 0.0) for f in faces)  # the lip faces -y
-    assert _slope_faces(_slope_2x1(None).parts[0]) is None  # no stud data: a box
+    assert slope_faces(_slope_2x1(None).parts[0]) is None  # no stud data: a box
 
 
 def test_slopes_are_drawn_as_wedges() -> None:

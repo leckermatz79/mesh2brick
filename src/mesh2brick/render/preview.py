@@ -30,7 +30,14 @@ from matplotlib.colors import to_rgb
 from matplotlib.figure import Figure
 from PIL import Image
 
-from mesh2brick.model import BrickModel, BuildStep, Cell, ColorInfo, PlacedPart
+from mesh2brick.model import (
+    NO_STUD_CATEGORIES,
+    BrickModel,
+    BuildStep,
+    Cell,
+    ColorInfo,
+    PlacedPart,
+)
 from mesh2brick.voxel.grid import LDU_PER_PLATE, LDU_PER_STUD
 
 if TYPE_CHECKING:
@@ -59,7 +66,6 @@ _DPI: Final = 100
 STEP_IMAGE_COLORS: Final = 64
 """Palette size for step images: flat shading needs few colours, and a
 palette PNG is ~3x smaller, which keeps big instruction PDFs small."""
-_NO_STUD_CATEGORIES: Final = frozenset({"tile", "slope", "voxel"})
 _SCALE: Final = np.array([1.0, 1.0, STUDS_PER_PLATE])
 
 # Face normal -> brightness (fake directional light).
@@ -473,7 +479,7 @@ def _scene(  # noqa: PLR0915 - one pass over faces, edges and studs
     base = _part_colours(model, index, highlight, background)
     low, owner, studded = _lattice(model, index, cells, owner_of_cell)
     occupied = owner >= 0
-    wedges = {pos: _slope_faces(model.parts[i]) for pos, i in enumerate(index)}
+    wedges = {pos: slope_faces(model.parts[i]) for pos, i in enumerate(index)}
     sloped = _sloped_mask(wedges, occupied, low)
     view = camera.toward_viewer
 
@@ -552,7 +558,7 @@ def _lattice(
 
 
 def _sloped_mask(
-    wedges: dict[int, tuple[set[Cell], list[_Face]] | None],
+    wedges: dict[int, tuple[set[Cell], list[SlopeFace]] | None],
     occupied: NDArray[np.bool_],
     low: NDArray[np.int64],
 ) -> NDArray[np.bool_]:
@@ -566,7 +572,7 @@ def _sloped_mask(
 
 
 def _wedge_polygons(
-    wedges: dict[int, tuple[set[Cell], list[_Face]] | None],
+    wedges: dict[int, tuple[set[Cell], list[SlopeFace]] | None],
     base: NDArray[np.float64],
     camera: Camera,
 ) -> list[Polygons]:
@@ -614,12 +620,12 @@ def _stud_cells(
             columns = set(part.studs)
             flags.extend((x, y) in columns for x, y, _ in part.cells)
         else:
-            flags.extend([part.category not in _NO_STUD_CATEGORIES] * len(part.cells))
+            flags.extend([part.category not in NO_STUD_CATEGORIES] * len(part.cells))
     return np.asarray(flags, dtype=bool).reshape(len(cells))
 
 
 @dataclass(frozen=True, slots=True)
-class _Face:
+class SlopeFace:
     """One planar face of a slope wedge, in unit-cell coordinates."""
 
     corners: NDArray[np.float64]
@@ -631,7 +637,7 @@ class _Face:
     """Which edges (corner i to i+1) get a dark strip."""
 
 
-def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
+def slope_faces(part: PlacedPart) -> tuple[set[Cell], list[SlopeFace]] | None:
     """Cells of a slope's sloped columns and the faces that replace them.
 
     The slope falls from full height at the stud row (``part.studs``) to a
@@ -673,7 +679,7 @@ def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
         vector[k] = value
         return (vector[0], vector[1], vector[2])
 
-    faces: list[_Face] = []
+    faces: list[SlopeFace] = []
     for column in sorted(low):
         a0, b0 = column[axis], column[across]
         a1, b1 = a0 + 1, b0 + 1
@@ -689,9 +695,8 @@ def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
             point(a0, b1, height(a0)),
         ]
         ends = (first, last) if sign > 0 else (last, first)  # at a0, at a1
-        faces.append(
-            _Face(np.asarray(top), (0, 0, 1), key, (outer0, ends[1], outer1, ends[0]))
-        )
+        edges = (outer0, ends[1], outer1, ends[0])
+        faces.append(SlopeFace(np.asarray(top), (0, 0, 1), key, edges))
         for b, outer, out in ((b0, outer0, -1.0), (b1, outer1, 1.0)):
             if outer:
                 side = [
@@ -701,7 +706,7 @@ def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
                     point(a0, b, height(a0)),
                 ]
                 faces.append(
-                    _Face(np.asarray(side), unit(across, out), key, (True,) * 4)
+                    SlopeFace(np.asarray(side), unit(across, out), key, (True,) * 4)
                 )
         if last:
             lip = [
@@ -711,7 +716,7 @@ def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
                 point(a_low, b0, z0 + LIP_PLATES),
             ]
             faces.append(
-                _Face(np.asarray(lip), unit(axis, float(sign)), key, (True,) * 4)
+                SlopeFace(np.asarray(lip), unit(axis, float(sign)), key, (True,) * 4)
             )
         bottom = [
             point(a0, b0, z0),
@@ -719,7 +724,7 @@ def _slope_faces(part: PlacedPart) -> tuple[set[Cell], list[_Face]] | None:
             point(a1, b1, z0),
             point(a0, b1, z0),
         ]
-        faces.append(_Face(np.asarray(bottom), (0, 0, -1), key, (True,) * 4))
+        faces.append(SlopeFace(np.asarray(bottom), (0, 0, -1), key, (True,) * 4))
     sloped = {
         (x, y, z) for x, y in low for z in range(z0, z1) if (x, y, z) in set(part.cells)
     }

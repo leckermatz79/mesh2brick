@@ -16,6 +16,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+import numpy as np
 import platformdirs
 
 from mesh2brick.backends.legolization import (
@@ -46,6 +47,7 @@ from mesh2brick.export.bom import (
     build_bom,
     write_boms,
 )
+from mesh2brick.fidelity import grid_mesh, lego_frame, surface_deviation
 from mesh2brick.ingest import load_model, supported_suffixes
 from mesh2brick.render.pdf import PdfOptions, write_instructions
 from mesh2brick.render.preview import PreviewOptions, render_png, render_preview
@@ -65,6 +67,7 @@ if TYPE_CHECKING:
     from mesh2brick.backends.legolization import Piece
     from mesh2brick.backends.protocols import Placement, StabilityReport
     from mesh2brick.config import Settings
+    from mesh2brick.fidelity import SurfaceDeviation
     from mesh2brick.model import BrickModel
     from mesh2brick.render.text import Language
     from mesh2brick.voxel.color import ColorQuantizer
@@ -483,6 +486,29 @@ def _grid(
         msg = "voxelization produced no cells; make the model bigger (e.g. --size 30cm)"
         raise ValueError(msg)
     return result.grid
+
+
+def shape_deviation(
+    source: Path, settings: Settings, model: BrickModel, grid: VoxelGrid
+) -> SurfaceDeviation:
+    """How far ``model``'s surface lies from the mesh in ``source`` (2.0 metric).
+
+    ``grid`` is the voxel grid the model was placed from (it fixes where the
+    mesh sits); ``settings.input`` must be those of the conversion. Voxel
+    inputs are compared with their own cells.
+
+    Raises:
+        mesh2brick.ingest.IngestError: for unreadable input.
+    """
+    if source.suffix.lower() in VOXEL_SUFFIXES:
+        vertices, faces = grid_mesh(grid)
+    else:
+        mesh = load_model(source, settings.input).mesh
+        vertices = np.asarray(mesh.vertices, dtype=np.float64)
+        faces = np.asarray(mesh.faces, dtype=np.int64)
+    return surface_deviation(
+        model, lego_frame(vertices, grid.origin_mm, grid.pitch_mm), faces
+    )
 
 
 @dataclass(frozen=True, slots=True)

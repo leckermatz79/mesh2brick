@@ -358,7 +358,8 @@ def anthropic_sender(*, timeout_s: float = 600.0) -> Sender:
     not hit HTTP timeouts; the SDK retries rate limits and server errors.
 
     Raises:
-        LlmError: (fatal) if the ``anthropic`` package is not installed.
+        LlmError: (fatal) if the ``anthropic`` package is not installed; the
+            sender raises it (fatal) for missing or rejected credentials.
     """
     try:
         import anthropic  # noqa: PLC0415 - optional extra
@@ -388,5 +389,11 @@ def anthropic_sender(*, timeout_s: float = 600.0) -> Sender:
             raise LlmError(f"API error {error.status_code}: {error.message}") from error
         except anthropic.APIConnectionError as error:
             raise LlmError(f"cannot reach the API: {error}", fatal=True) from error
+        except TypeError as error:
+            # The SDK finds no credentials only when it builds the request.
+            if "authentication method" not in str(error):
+                raise
+            msg = "no API credentials: set ANTHROPIC_API_KEY (see README)"
+            raise LlmError(msg, fatal=True) from error
 
     return send

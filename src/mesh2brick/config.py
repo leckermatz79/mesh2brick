@@ -172,6 +172,14 @@ class PartsConfig(_Section):
     of placement for the whole model, ``split`` replaces each by shorter parts
     of the same colour after placement and re-checks stability, ``report``
     only flags them in the parts list."""
+    tiles: Literal["flat", "all"] = "flat"
+    """Where tiles go when ``tile`` is in ``categories`` (ROADMAP 9, ADR 0020):
+    ``flat`` only on open tops the input mesh renders flat (a box's top, a
+    base, a flat detail), ``all`` on every open top, the stairs of rounded
+    shapes included. Plates become tiles of the same size, bricks two plates
+    plus tiles; stability is checked again."""
+    tiles_on_base: bool = True
+    """Tiles also on the lowest brick layer (a base plate, a courtyard)."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:

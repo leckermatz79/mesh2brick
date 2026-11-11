@@ -905,3 +905,143 @@ thick), by the size of the bottom layer's largest piece: below 1,000 studs 0.15 
   Shells above 500,000 plate cells fall back to 4 cells per part (0.6–1.6); a sphere of 128 studs
   (1.1 million cells, 320,000 shell plate cells) is still estimated exactly in 1.3 s, random noise
   of the same shell size in about 1.2 s. The 1.5 fallback applied above 400,000 *solid* cells.
+
+## Shape fidelity baseline (2.0, 2026-11-10)
+
+The metric of the 2.0 series (ROADMAP: "surface deviation to the input mesh, and part count, at
+unchanged stability"), issue #42. `mesh2brick.fidelity` measures how far the **outside of the brick
+model** lies from the mesh it was made from:
+
+- in real LEGO millimetres (8 mm per stud, 3.2 mm per plate), so every model size compares;
+- only faces towards the air around the model (the cavity of a hollow model does not count);
+- **studs included** with their real size (4.8 mm wide, 1.7 mm high); tiles and the sloped columns
+  of slopes have none, slopes are sampled on their sloped face;
+- sampled about every 2 mm, each sample weighted by the area it stands for, and measured exactly to
+  the nearest triangle of the input mesh (unsigned; overlapping shells such as the bunny's ellipsoids
+  count as they are). Voxel inputs (`heart.vox`) are compared with their own cells.
+
+Reported: the area-weighted **mean** and **95th percentile** ("95 % of the surface is at most this
+far away"), in mm and studs. The metric is one-sided: it says how far the parts stick out or fall
+short where there are parts, not whether a thin detail of the mesh is missing (a candidate for
+ROADMAP 10/11, which add material).
+
+Baseline: the 1.6 models (placement unchanged since 1.5), from the saved results of the 1.5
+release run without converting again:
+`uv run python scripts/benchmark_fidelity.py --results out/release-1.5 --local samples/Duo_Duolingo.3mf`.
+"Without studs" is the same model with every stud removed: the most tiles could ever win.
+`scripts/benchmark_release.py` records the numbers per run from now on (column "Deviation mm").
+
+| Input | Parts | Mean mm | p95 mm | Mean studs | p95 studs | Without studs: mean / p95 mm | s |
+|---|---:|---:|---:|---:|---:|---|---:|
+| `bunny_lowpoly.stl` | 873 | 2.04 | 4.50 | 0.254 | 0.562 | 1.96 / 4.39 | 2.4 |
+| `cube_10mm.step` / `.stl` | 1,952 | 0.83 | 4.05 | 0.104 | 0.506 | 0.54 / 3.20 | 2.2 |
+| `heart.vox` | 12 | 0.08 | 0.85 | 0.010 | 0.106 | 0.00 / 0.00 | 0.0 |
+| `l_bracket.stl` | 153 | 0.60 | 4.05 | 0.075 | 0.506 | 0.39 / 3.20 | 0.8 |
+| `rocket.blend` | 263 | 1.46 | 3.18 | 0.182 | 0.398 | 1.45 / 3.18 | 3.2 |
+| `sphere_r10.stl` | 1,499 | 2.35 | 4.82 | 0.294 | 0.603 | 2.05 / 4.57 | 2.6 |
+| `textured_cube.obj` | 2,280 | 0.83 | 4.05 | 0.104 | 0.506 | 0.54 / 3.20 | 2.3 |
+| `toadstool.obj` | 1,239 | 2.03 | 4.58 | 0.254 | 0.572 | 1.95 / 4.46 | 4.6 |
+| `torus.stl` | 552 | 1.95 | 4.48 | 0.244 | 0.560 | 1.91 / 4.46 | 2.8 |
+| `two_bodies.step` | 606 | 0.66 | 3.20 | 0.083 | 0.400 | 0.62 / 3.20 | 0.5 |
+| `vertex_colors.ply` | 1,519 | 2.36 | 4.85 | 0.295 | 0.607 | 2.06 / 4.53 | 2.6 |
+| `castle.step` (generated), `--config` | 1,657 | 3.31 | 8.00 | 0.414 | 1.000 | 3.27 / 8.00 | 7.5 |
+| Duo @32 (local only) | 1,025 | 1.86 | 4.23 | 0.233 | 0.529 | 1.85 / 4.23 | 26.0 |
+| Duo @48 (local only) | 2,308 | 1.76 | 4.29 | 0.220 | 0.536 | – | 32.7 |
+
+**Reading:**
+
+- **Boxes** (cubes, L-bracket) lie closest on average (0.6–0.8 mm), but their 95th percentile is
+  4.05 mm: the top is one plate (3.2 mm) above the mesh, because 32 studs of height are 26.7 bricks
+  and the voxels round to 27, and the studs on it add up to 1.7 mm. Without studs it would be the
+  plate alone (3.20 mm).
+- **Round shapes** (sphere, bunny, torus, toadstool, Duo): 1.8–2.4 mm on average, 4.2–4.9 mm at the
+  95th percentile; that is the voxel stairs (half a stud wide, a brick high). Studs make up only
+  0.04–0.3 mm of it, on the sphere the most (its many stair tops).
+- **Castle:** 3.31 / 8.00 mm. Its boxes overlap, so the STEP mesh is not watertight and voxelization
+  falls back to "every cell the surface touches": the walls stand one stud proud on two sides.
+  A voxelization matter, not one of the parts (note for later, no issue yet).
+- **Heart** (voxel input, compared with its own cells): only the studs, 0.08 / 0.85 mm.
+- **Cost:** 0.5–7.5 s per fixture (Duo with its 2.1 million triangles 26–33 s), against 4–260 s
+  for the conversion; it runs in the release benchmark, not in `convert`.
+
+## Tiles (ROADMAP 9, 2026-11-10)
+
+Issue #42, ADR 0020. All runs: `scripts/benchmark_release.py` with
+`--set "parts.categories=[brick, plate, slope, tile]"` and Duo at 32 studs (`--local`), on the
+development laptop. "1.6" is the 1.5 release run (`out/release-1.5`, placement unchanged since),
+its deviation from "Shape fidelity baseline" above. Run-to-run noise: models without a single tile
+vary by up to ±5 % in time and ±10 % in checked states between runs (sphere 158–172 of 207).
+
+**legolization's own pass** (`apply_tiles`, `tile` in `parts.categories` up to now; laptop on
+battery for this run, 0–7 % slower than the others):
+
+| Input | Tiles | Where | Deviation mean / p95 mm (1.6) |
+|---|---:|---|---|
+| sphere, vertex-colour sphere | 184, 172 | on the level stairs | 2.35 / 4.82, 2.36 / 4.85 (same) |
+| toadstool, bunny, torus | 117, 61, 56 | on the stairs | same within 0.01 mm |
+| Duo @32 | 93 | stairs and base | 1.86 / 4.23 (same) |
+| castle | 69 | courtyard plates only, patchy (1 × 1, 1 × 2, 1 × 4, 2 × 2) | 3.32 / 8.00 (3.31 / 8.00) |
+| rocket, L-bracket | 9, 1 | stray plates | same |
+| cubes, textured cube, two bodies, heart | 0 | – (their tops are bricks) | same |
+
+It never touches bricks, only knows four tile sizes, and tiles stairs as readily as box tops: no
+model got closer to its mesh. Every model stayed one stable piece; the cubes ran into the time limit
+on battery (best so far, no intermediate state checked), which the later runs on mains power did not.
+
+**mesh2brick's pass** (flat tops from the mesh, tiles where the face is; final code):
+
+| Input | Tiles | How | Parts 1.6 → tiles | Deviation mean / p95 mm, 1.6 → tiles | One stable piece | Time s 1.6 → tiles | Checked states 1.6 → tiles | PDF MB |
+|---|---:|---|---|---|---|---|---|---:|
+| `bunny_lowpoly.stl` | 0 | – | 873 → 873 | 2.04 / 4.50 → 2.04 / 4.50 | yes | 120 → 122 (+1 %) | 126/126 → 126/126 | 2.62 |
+| `cube_10mm.step` | 139 | 118 brick(s) -> plate + tile, a plate lower | 1,952 → 2,091 (+139, +7 %) | 0.83 / 4.05 → 0.00 / 0.00 | yes | 250 → 248 (-1 %) | 123/274 → 124/294 | 6.38 |
+| `cube_10mm.stl` | 139 | 118 brick(s) -> plate + tile, a plate lower | 1,952 → 2,091 (+139, +7 %) | 0.83 / 4.05 → 0.00 / 0.00 | yes | 249 → 247 (-1 %) | 123/274 → 125/294 | 6.38 |
+| `heart.vox` | 2 | 2 brick(s) -> 2 plates + tile | 12 → 16 (+4, +33 %) | 0.08 / 0.85 → 0.06 / 0.00 | yes | 4 → 4 (+2 %) | 7/7 → 9/9 | 0.34 |
+| `l_bracket.stl` | 24 | 12 brick(s) -> plate + tile, a plate lower | 153 → 177 (+24, +16 %) | 0.60 / 4.05 → 0.00 / 0.00 | yes | 30 → 36 (+20 %) | 37/37 → 40/40 | 1.29 |
+| `rocket.blend` | 0 | – | 263 → 263 | 1.46 / 3.18 → 1.46 / 3.18 | yes | 18 → 18 (-4 %) | 42/42 → 42/42 | 1.19 |
+| `sphere_r10.stl` | 0 | – | 1,499 → 1,499 | 2.35 / 4.82 → 2.35 / 4.82 | yes | 261 → 260 (-0 %) | 172/207 → 181/207 | 4.39 |
+| `textured_cube.obj` | 186 | 173 brick(s) -> plate + tile, a plate lower | 2,280 → 2,466 (+186, +8 %) | 0.83 / 4.05 → 0.00 / 0.00 | yes | 245 → 242 (-1 %) | 125/327 → 127/354 | 9.83 |
+| `toadstool.obj` | 0 | – | 1,239 → 1,239 | 2.03 / 4.58 → 2.03 / 4.58 | yes | 250 → 250 (+0 %) | 178/178 → 178/178 | 3.88 |
+| `torus.stl` | 0 | – | 552 → 552 | 1.95 / 4.48 → 1.95 / 4.48 | yes | 33 → 33 (-2 %) | 74/74 → 74/74 | 1.98 |
+| `two_bodies.step` | 96 | 74 part(s) with a tile on top, a plate higher | 606 → 702 (+96, +16 %) | 0.66 / 3.20 → 0.00 / 0.00 | yes | 163 → 177 (+9 %) | 83/83 → 97/97 | 2.44 |
+| `vertex_colors.ply` | 0 | – | 1,519 → 1,519 | 2.36 / 4.85 → 2.36 / 4.85 | yes | 260 → 260 (+0 %) | 156/212 → 154/212 | 5.58 |
+| `castle.step` (generated), `--config` | 99 | 76 plate(s) -> tile, 5 plate(s) -> 2+ tiles, 6 brick(s) -> plate + tile, a plate lower, 1 brick(s) -> 2 plates + tile | 1,657 → 1,676 (+19, +1 %) | 3.31 / 8.00 → 3.25 / 8.00 | yes | 251 → 250 (-0 %) | 151/234 → 142/236 | 5.09 |
+| Duo @32 (local only) | 22 | 21 part(s) with a tile on top, a plate higher | 1,025 → 1,047 (+22, +2 %) | 1.86 / 4.23 → 1.81 / 4.23 | yes | 128 → 134 (+5 %) | 153/153 → 156/156 | 3.79 |
+
+**Variants** (same command; tiles and parts are what the final code places, times and checked states
+of these two runs come from the first version, which checked stability before planning):
+
+| Variant | Input | Tiles | Parts (1.6 → variant) | Deviation mean / p95 mm |
+|---|---|---:|---|---|
+| `parts.tiles=all` (stairs too) | sphere | 86 | 1,499 → 1,665 (+166) | 2.35 / 4.79 (default rule: 2.35 / 4.82) |
+| | toadstool | 107 | 1,239 → 1,420 (+181) | 2.01 / 4.51 (2.03 / 4.58) |
+| | bunny | 55 | 873 → 961 (+88) | 2.03 / 4.47 (2.04 / 4.50) |
+| | castle | 149 | 1,657 → 1,738 (+81) | 3.20 / 8.00 (3.25 / 8.00) |
+| `parts.tiles_on_base=false` | castle | 13 | 1,657 → 1,671 (+14) | 3.23 / 8.00 |
+| | Duo @32 | 0 | 1,025 → 1,025 | 1.86 / 4.23 (with base: 1.81 / 4.23) |
+
+**Reading:**
+
+- **Boxes now match their mesh**: cubes, textured cube, L-bracket and two bodies 0.00 / 0.00 mm
+  (1.6: 0.66–0.83 / 3.20–4.05). Studs gone, and the tiles lie where the face is: the cubes and the
+  L-bracket are 26.7 bricks high, so a brick under the face becomes one plate plus a tile (the top one
+  plate lower than the voxels); the two bodies are 13.3 bricks high, so the bricks get a tile on top.
+- **Round shapes are untouched** with the default rule (sphere, bunny, toadstool, torus, rocket,
+  vertex-colour sphere: 0 tiles). Tiles on their stairs (`parts.tiles=all`) cost 88–181 parts and
+  move the deviation by at most 0.07 mm: the stairs are a voxel matter, not a stud matter.
+- **Castle**: courtyard, wall, tower and keep tops get 99 tiles; its p95 stays at 8 mm because of
+  the voxelization (open STEP mesh, see "Shape fidelity baseline"). **Duo**: only the base ring is
+  flat (22 tiles laid on it); without base tiles Duo gets none.
+- **Stability, time, PDF:** every run is one stable piece. Time against 1.6 −4 % to +9 %, except the
+  L-bracket: 30 → 36 s (+20.4 %), its 24 extra parts go through legolization's step search, which
+  models up to 500 parts use. Big models check about as many intermediate states as in 1.6 (cube
+  124 of 294, castle 142 of 236); the textured cube's PDF is 9.83 MB (below 10 MB; 1.6: 9.56 MB).
+  `inspect`'s estimate still contains every count (14 of 14, without a tile term).
+- **Castle towers and Duo's base keep part of their studs:** a part gets tiles only when its whole
+  top lies under the flat face. The castle's voxels stand a stud beyond the towers (open mesh), and
+  Duo's base ring has a curved edge, so the parts along those edges keep their studs; on Duo the
+  tiles laid on the inner parts stand a plate above them.
+- **First version for comparison** (two plates + tile under every face, stability checked before
+  the steps): textured cube +359 parts, 304 s (4 s over the limit), PDF 10.3 MB, no intermediate
+  state checked; castle and cube without checked states; Duo 164 s. Hence ADR 0020's two changes:
+  tiles where the face is (textured cube +186 parts, 244 s, 9.8 MB) and the check beside the step
+  planning (Duo 138 s, castle 135 checked states).
