@@ -6,7 +6,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from mesh2brick.place.tiles import TilePiece, flat_top_plates, tile_cover
+from mesh2brick.place.tiles import (
+    TilePiece,
+    flat_faces,
+    flat_top_plates,
+    tile_cover,
+    tiled_faces,
+)
 
 SIZES = frozenset(
     {(1, 1), (1, 2), (1, 3), (1, 4), (1, 6), (1, 8), (2, 2), (2, 4), (2, 6)}
@@ -47,3 +53,18 @@ def test_flat_tops_map_to_the_top_plate_with_the_face_height() -> None:
     assert np.isclose(found[(0, 0, 5)], -1.0)
     assert found[(1, 0, 8)] == 0.0
     assert flat_top_plates(flat, 1).keys() == {(0, 0, 1), (1, 0, 2)}
+
+
+def test_flat_faces_join_side_by_side_cells_of_one_layer() -> None:
+    cells = [(0, 0, 2), (1, 0, 2), (3, 0, 2), (0, 0, 5), (1, 1, 2)]
+    faces = flat_faces(cells)
+    assert faces[(0, 0, 2)] == faces[(1, 0, 2)] == faces[(1, 1, 2)]
+    assert len({faces[(0, 0, 2)], faces[(3, 0, 2)], faces[(0, 0, 5)]}) == 3
+
+
+def test_a_face_is_tiled_from_the_share_on() -> None:
+    open_cells = {0: 10, 1: 10, 2: 10}
+    tileable = {0: 9, 1: 8, 2: 10}
+    assert tiled_faces(open_cells, tileable, 0.85) == {0, 2}
+    assert tiled_faces(open_cells, tileable, 0.0) == {0, 1, 2}
+    assert tiled_faces({0: 20}, {0: 17}, 0.85) == {0}  # exactly 85 %

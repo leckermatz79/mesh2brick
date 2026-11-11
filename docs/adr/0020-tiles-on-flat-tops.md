@@ -91,3 +91,22 @@ Measured on all fixtures (docs/benchmarks.md, "Tiles (ROADMAP 9)"):
   stay at the voxel top. On the fixtures that never happens. Faces more than a plate away come one
   plate closer: only on the castle (32 of 375 tile cells), whose open STEP mesh is voxelized by
   "every cell the surface touches" and so stands up to a cell too high.
+
+## Amendment (2026-11-11, issue #44): a face is tiled completely or not at all
+
+The product owner kept tiles off by default in 1.7.0 because the castle looked patchy: tower rims
+and parts of faces kept their studs next to tiled parts (a part gets tiles only when its whole top
+lies under the flat face). His rule: **a flat face is tiled only if at least 85 % of its open top
+can be tiled; otherwise the whole face keeps its studs.**
+
+- A *face* is a set of flat plate cells side by side in one layer (the faces of `voxel/flat.py`,
+  border cells included). Its *open top* is the cells with nothing on them; *tileable* are those
+  under parts the pass can smooth (whole top in the face, a fitting tile and plate in the colour,
+  support for split tiles, time for the check where a part gets heavier).
+- The pass first plans every part without changing anything, then counts per face and carries out
+  the plans of the faces at or above the share (`parts.tiles_min_share`, default 0.85; 0 gives the
+  1.7.0 behaviour). The run's note says how many faces kept their studs.
+- Measured (docs/benchmarks.md, "Tile share per face (issue #44)"): the boxes keep all their tiles
+  (every face 100 %); the castle (courtyard 69 %, keep roof 53 %, walls 30 %, towers 0–8 %) and Duo's
+  base (51 %, 33 %) get none, always because parts reach past the edge of the face. Splitting those
+  parts at the edge would be the next step if the product owner wants these faces smooth.

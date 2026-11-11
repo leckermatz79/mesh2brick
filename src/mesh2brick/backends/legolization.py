@@ -41,6 +41,7 @@ import re
 import time
 import types
 import warnings
+from collections import Counter
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -87,7 +88,12 @@ from mesh2brick.catalog.whitelist import (
 )
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.place.split import choose_split
-from mesh2brick.place.tiles import flat_top_plates, tile_cover
+from mesh2brick.place.tiles import (
+    flat_faces,
+    flat_top_plates,
+    tile_cover,
+    tiled_faces,
+)
 from mesh2brick.steps.balance import (
     STEP_SPREAD,
     largest_step,
@@ -767,6 +773,12 @@ class TileReport:
     heavier: bool = False
     """Some part became heavier (two plates plus a tile weigh more than the
     brick, an added tile weighs something): stability must be checked again."""
+    faces: int = 0
+    """Flat faces that got their tiles."""
+    faces_kept: int = 0
+    """Flat faces that keep all their studs: less than ``min_share`` of their
+    open top could get tiles (issue #44)."""
+    min_share: float = 0.0
 
     @property
     def tiled(self) -> int:
@@ -788,11 +800,16 @@ class TileReport:
         if self.added:
             text += f" (+{self.added} parts)"
         if self.kept:
-            text += f"; {self.kept} flat top(s) keep their studs (no fitting tile)"
+            text += f"; {self.kept} flat top(s) cannot get tiles (no fitting tile)"
         if self.unchecked:
             text += (
                 f"; {self.unchecked} flat top(s) keep their studs (no time to check "
                 "stability with them; raise placement.time_limit_s)"
+            )
+        if self.faces_kept:
+            text += (
+                f"; {self.faces_kept} flat face(s) keep all their studs (less than "
+                f"{self.min_share:.0%} of them could get tiles)"
             )
         return text
 
@@ -805,6 +822,7 @@ def apply_tiles(
     produced: Callable[[str, int], bool | None] = produced_in,
     base: bool = True,
     heavier: bool = True,
+    min_share: float = 0.0,
 ) -> TileReport:
     """Give the open bricks and plates whose top lies in ``flat`` a smooth top.
 
@@ -821,26 +839,26 @@ def apply_tiles(
       its height and becomes a tile);
     * one plate higher: tiles are laid on the part.
 
+    Face by face (cells side by side in one layer, issue #44): a face gets its
+    tiles only when the parts that can be smoothed cover at least
+    ``min_share`` of its open top; otherwise all of it keeps its studs.
+
     Only parts in ``allowed`` (LDraw numbers, ``None``: any) that LEGO makes in
     the part's colour are used; ``base=False`` leaves the lowest brick layer
     alone; ``heavier=False`` makes only changes that do not add weight (they
     need no new stability check). Changes ``layout`` in place.
     """
+    if not base:
+        flat = {c: v for c, v in flat.items() if c[2] >= PLATES_PER_BRICK}
     tiles = _tile_sizes(layout.catalog, allowed)
-    counts = dict.fromkeys(
-        (
-            "plates",
-            "split_plates",
-            "lowered",
-            "bricks",
-            "topped",
-            "added",
-            "kept",
-            "unchecked",
-        ),
-        0,
+    face_of = flat_faces(flat)
+    open_cells: Counter[int] = Counter(
+        face
+        for (x, y, z), face in face_of.items()
+        if layout.brick_at((x, y, z)) is not None
+        and layout.brick_at((x, y, z + 1)) is None
     )
-    gained = False
+    plans: list[_TopPlan] = []
     for brick in list(layout):
         part = layout.part_of(brick)
         if part.category not in (Category.PLATE, Category.BRICK):
@@ -849,28 +867,55 @@ def apply_tiles(
             continue
         cells = layout.cells_of(brick)
         top = max(c[2] for c in cells)
-        if not base and top < PLATES_PER_BRICK:
-            continue
         roof = [c for c in cells if c[2] == top]
         if any(c not in flat for c in roof) or any(
             layout.brick_at((x, y, top + 1)) is not None for x, y, _ in roof
         ):
             continue
         face = sum(flat[c] for c in roof) / len(roof)
-        outcome = _smooth_top(
-            layout,
-            brick,
-            roof=roof,
-            rise=max(-1, min(1, round(face))),
-            tiles=tiles,
-            allowed=allowed,
-            produced=produced,
-            heavier=heavier,
+        plans.append(
+            _plan_top(
+                layout,
+                brick,
+                roof=roof,
+                rise=max(-1, min(1, round(face))),
+                tiles=tiles,
+                allowed=allowed,
+                produced=produced,
+                heavier=heavier,
+            )
         )
+    tileable: Counter[int] = Counter()
+    for plan in plans:
+        if plan.steps:
+            tileable[face_of[plan.roof[0]]] += len(plan.roof)
+    chosen = tiled_faces(open_cells, tileable, min_share)
+    counts: Counter[str] = Counter()
+    gained = False
+    for plan in plans:
+        if not plan.steps:
+            counts[plan.kind] += 1
+            continue
+        if face_of[plan.roof[0]] not in chosen:
+            continue
+        outcome = _apply_top(layout, plan)
         counts[outcome.kind] += 1
         counts["added"] += outcome.added
         gained = gained or outcome.heavier
-    return TileReport(**counts, heavier=gained)
+    return TileReport(
+        plates=counts["plates"],
+        split_plates=counts["split_plates"],
+        lowered=counts["lowered"],
+        bricks=counts["bricks"],
+        topped=counts["topped"],
+        added=counts["added"],
+        kept=counts["kept"],
+        unchecked=counts["unchecked"],
+        heavier=gained,
+        faces=len(chosen),
+        faces_kept=len(open_cells) - len(chosen),
+        min_share=min_share,
+    )
 
 
 def _tile_sizes(
@@ -915,7 +960,24 @@ class _Outcome:
     heavier: bool = False
 
 
-def _smooth_top(
+@dataclass(frozen=True, slots=True)
+class _TopPlan:
+    """How one open part gets a smooth top (nothing changed yet).
+
+    ``steps`` are the parts to place (key, cells, layer); empty when the part
+    keeps its studs, with ``kind`` saying why (``kept`` or ``unchecked``).
+    """
+
+    brick: PlacedBrick
+    roof: tuple[Cell, ...]
+    kind: str
+    steps: tuple[tuple[str, frozenset[Cell], int], ...] = ()
+    keep: bool = False
+    """The part stays and carries the tiles (face a plate higher)."""
+    heavier: bool = False
+
+
+def _plan_top(
     layout: Layout,
     brick: PlacedBrick,
     *,
@@ -925,8 +987,8 @@ def _smooth_top(
     allowed: frozenset[str] | None,
     produced: Callable[[str, int], bool | None],
     heavier: bool = True,
-) -> _Outcome:
-    """Give one open part a smooth top ``rise`` plates from its top (-1, 0, 1).
+) -> _TopPlan:
+    """Plan a smooth top ``rise`` plates from the part's top (-1, 0, 1).
 
     Without ``heavier`` a change that adds weight is left out (``unchecked``).
     """
@@ -944,8 +1006,9 @@ def _smooth_top(
         if produced(ldraw, colour) is not False
     }
     cover = tile_cover(len(along), len(across), usable.keys())
+    kept = _TopPlan(brick, tuple(roof), "kept")
     if cover is None:
-        return _Outcome("kept")
+        return kept
     top = roof[0][2]
     tile_layer = top + rise
 
@@ -958,7 +1021,7 @@ def _smooth_top(
             for c in piece_across
         )
 
-    plan: list[tuple[str, frozenset[Cell], int]] = [
+    steps: list[tuple[str, frozenset[Cell], int]] = [
         (
             usable[piece.footprint],
             cells(
@@ -969,44 +1032,52 @@ def _smooth_top(
         )
         for piece in cover
     ]
-    keep = rise > 0  # the part stays and carries the tiles
+    keep = rise > 0
     if is_plate and not keep:
-        if len(plan) > 1 and not all(
+        if len(steps) > 1 and not all(
             any(layout.brick_at((x, y, top - 1)) is not None for x, y, _ in target)
-            for _, target, _ in plan
+            for _, target, _ in steps
         ):
-            return _Outcome("kept")
-        kind = "plates" if len(plan) == 1 else "split_plates"
+            return kept
+        kind = "plates" if len(steps) == 1 else "split_plates"
     elif keep:
         kind = "topped"
     else:
         plate = _plate_like(layout, part, colour, allowed, produced)
         if plate is None:
-            return _Outcome("kept")
-        plan = [
+            return kept
+        steps = [
             (plate, frozenset((x, y, z) for x, y, _ in roof), z)
             for z in range(brick.layer, tile_layer)
-        ] + plan
+        ] + steps
         kind = "lowered" if rise < 0 else "bricks"
     before = 0.0 if keep else part.mass_g
-    after = sum(layout.catalog[key].mass_g for key, _, _ in plan)
+    after = sum(layout.catalog[key].mass_g for key, _, _ in steps)
     gains = after > before + _MASS_EPS
     if gains and not heavier:
-        return _Outcome("unchecked")
-    if not keep:
+        return _TopPlan(brick, tuple(roof), "unchecked")
+    return _TopPlan(brick, tuple(roof), kind, tuple(steps), keep, gains)
+
+
+def _apply_top(layout: Layout, plan: _TopPlan) -> _Outcome:
+    """Carry out :func:`_plan_top`'s plan (undone if a part does not fit)."""
+    brick = plan.brick
+    colour = brick.colour_code
+    if not plan.keep:
         layout.remove(brick.brick_id)
     placed: list[int] = []
-    for key, target, z in plan:
+    for key, target, z in plan.steps:
         new = _place_exact(layout, key, target, z, colour)
         if new is None:
             layout.remove_many(placed)
-            if not keep:
+            if not plan.keep:
                 layout.add(
                     brick.part_key, brick.x, brick.y, brick.layer, brick.yaw, colour
                 )
             return _Outcome("kept")
         placed.append(new)
-    return _Outcome(kind, added=len(placed) - (0 if keep else 1), heavier=gains)
+    added = len(placed) - (0 if plan.keep else 1)
+    return _Outcome(plan.kind, added=added, heavier=plan.heavier)
 
 
 # ---------------------------------------------------------------- joint pattern
@@ -1512,8 +1583,9 @@ class LegolizationBackend:
             allowed=allowed.parts,
             base=parts.tiles_on_base,
             heavier=left >= tile_check_s(len(layout)),
+            min_share=parts.tiles_min_share,
         )
-        shown = report.tiled or report.kept or report.unchecked
+        shown = report.tiled or report.kept or report.unchecked or report.faces_kept
         notes = (report.summary(),) if shown else ()
         if not report.tiled or not report.heavier:
             # Nothing changed, or only lighter parts on the same supports: the

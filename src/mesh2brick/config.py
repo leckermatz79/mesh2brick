@@ -180,6 +180,10 @@ class PartsConfig(_Section):
     plus tiles; stability is checked again."""
     tiles_on_base: bool = True
     """Tiles also on the lowest brick layer (a base plate, a courtyard)."""
+    tiles_min_share: Annotated[float, Field(ge=0.0, le=1.0)] = 0.85
+    """A flat face gets tiles only when at least this share of its open top
+    can (product owner, 2026-11-11, issue #44); otherwise all of it keeps its
+    studs instead of looking patchy (0 = tile whatever can be tiled)."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:

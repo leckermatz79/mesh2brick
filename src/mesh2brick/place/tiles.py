@@ -8,6 +8,10 @@ The arithmetic behind the tile pass (ADR 0020), free of any backend:
   (one tile of the same size if it exists).
 * :func:`flat_top_plates` turns the voxel grid's flat tops into the plate
   layers the parts' tops sit in, with the height of the face.
+* :func:`flat_faces` and :func:`tiled_faces` decide face by face: a face is
+  tiled only when enough of its open top can be (issue #44); a face where
+  only some parts could get tiles keeps all its studs instead of looking
+  patchy.
 
 The backend applies the result: a plate under a flat top becomes a tile of
 the same size; a brick becomes two plates plus tiles (one plate when the face
@@ -25,10 +29,11 @@ import numpy as np
 from mesh2brick.place.split import choose_split
 
 if TYPE_CHECKING:
-    from collections.abc import Collection
+    from collections.abc import Collection, Iterable, Mapping
 
     from numpy.typing import NDArray
 
+Cell = tuple[int, int, int]
 Footprint = tuple[int, int]
 """``(small, big)`` side lengths in studs."""
 
@@ -100,3 +105,44 @@ def flat_top_plates(
         )
         for x, y, z in at
     }
+
+
+def flat_faces(cells: Iterable[Cell]) -> dict[Cell, int]:
+    """Number the faces of flat plate cells: side by side within one layer.
+
+    Cells ``(x, y, layer)`` that touch along a side and share a layer form one
+    face (the faces of :mod:`mesh2brick.voxel.flat`, border cells included);
+    returns the face number of every cell, numbered from 0 in sorted order.
+    """
+    todo = set(cells)
+    face_of: dict[Cell, int] = {}
+    number = -1
+    for start in sorted(todo):
+        if start in face_of:
+            continue
+        number += 1
+        stack = [start]
+        face_of[start] = number
+        while stack:
+            x, y, z = stack.pop()
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                near = (nx, ny, z)
+                if near in todo and near not in face_of:
+                    face_of[near] = number
+                    stack.append(near)
+    return face_of
+
+
+def tiled_faces(
+    open_cells: Mapping[int, int], tileable_cells: Mapping[int, int], min_share: float
+) -> frozenset[int]:
+    """Faces whose tileable share of the open top reaches ``min_share``.
+
+    ``open_cells``: per face, its cells with nothing on them; ``tileable_cells``:
+    per face, those of them under parts that can get a smooth top.
+    """
+    return frozenset(
+        face
+        for face, total in open_cells.items()
+        if total and tileable_cells.get(face, 0) >= min_share * total - 1e-9
+    )

@@ -1045,3 +1045,44 @@ of these two runs come from the first version, which checked stability before pl
   state checked; castle and cube without checked states; Duo 164 s. Hence ADR 0020's two changes:
   tiles where the face is (textured cube +186 parts, 244 s, 9.8 MB) and the check beside the step
   planning (Duo 138 s, castle 135 checked states).
+
+## Tile share per face (issue #44, 2026-11-11)
+
+Product owner's rule (ADR 0020, amendment): a flat face gets tiles only if at least 85 % of its open
+top can be tiled, otherwise all of it keeps its studs. Same command as "Tiles (ROADMAP 9)", mains
+power; "1.7.0" is that section's final run.
+
+| Input | Tiles 1.7.0 → 85 % rule | Faces kept | Parts 1.6 → 1.7.0 → 85 % rule | Deviation mean / p95 mm, 1.7.0 → 85 % rule | One stable piece | Time s 1.6 → 85 % rule |
+|---|---|---:|---|---|---|---|
+| `cube_10mm.step` / `.stl` | 139 → 139 | 0 | 1,952 → 2,091 → 2,091 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 250 → 250 |
+| `textured_cube.obj` | 186 → 186 | 0 | 2,280 → 2,466 → 2,466 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 245 → 244 |
+| `l_bracket.stl` | 24 → 24 | 0 | 153 → 177 → 177 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 30 → 38 |
+| `two_bodies.step` | 96 → 96 | 0 | 606 → 702 → 702 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 163 → 185 |
+| `heart.vox` | 2 → 2 | 5 | 12 → 16 → 16 | 0.06 / 0.00 → 0.06 / 0.00 | yes | 4 → 5 |
+| `castle.step` (generated), `--config` | 99 → **0** | 14 | 1,657 → 1,676 → 1,657 | 3.25 / 8.00 → 3.31 / 8.00 | yes | 251 → 252 |
+| Duo @32 (local only) | 22 → **0** | 2 | 1,025 → 1,047 → 1,025 | 1.81 / 4.23 → 1.86 / 4.23 | yes | 128 → 130 |
+| sphere, vertex sphere, bunny, toadstool, torus, rocket | 0 → 0 | 0 | unchanged | unchanged | yes | ±2 % (bunny 146 s once, 120 s rerun with and without tiles) |
+
+Every face of the castle and Duo stays below 85 %, and always for the same reason: parts that reach
+past the edge of the flat face (shares from the placed layouts, `out/tiles/share`):
+
+| Model | Face | Open cells | Tileable | Not tileable: part reaches past the face |
+|---|---|---:|---:|---:|
+| castle | courtyard | 366 | 254 (69 %) | 112 |
+| castle | keep roof | 60 | 32 (53 %) | 28 |
+| castle | 4 wall tops | 54 each | 16 (30 %) each | 38 each |
+| castle | 4 tower tops | 36 each | 0–3 (0–8 %) | 33–36 each |
+| castle | 4 small courtyard corners | 18 each | 1–13 (6–72 %) | 5–17 |
+| Duo @32 | base ring (two faces) | 78 each | 40 (51 %), 26 (33 %) | 38, 52 |
+
+No fitting tile, colour or time ever was the reason. The castle's voxels stand a stud beyond its
+walls and towers (open STEP mesh, surface voxelization), and Duo's base ring has a curved edge, so
+the bricks and plates along those edges cover flat and non-flat cells at once. Time: the rule plans
+every part before changing any (a few milliseconds); the slower runs above (L-bracket 38 s, two
+bodies 185 s) are run-to-run noise of this run, the bunny without a single tile took 146 s once and
+120 s twice afterwards.
+
+**Reading:** the rule does what it says: no face is half tiled any more. On the fixtures it leaves
+the boxes as in 1.7.0 and takes all tiles off the castle and Duo. To tile those faces, the parts
+along their edges would have to be split at the face's edge (the part inside gets a smooth top, the
+rest keeps studs); that is not part of #44.
