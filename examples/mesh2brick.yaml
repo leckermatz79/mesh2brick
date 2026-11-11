@@ -36,6 +36,7 @@ parts:
                         # (box tops, bases) | all = on every open top, stairs of round shapes too
   tiles_on_base: true   # tiles also on the lowest brick layer (a base, a courtyard)
   tiles_min_share: 0.85 # a flat face gets tiles only if at least this share of it can (else all studs)
+  tiles_split: true     # cut parts at the edge of a flat face (outside studs, inside plate + tile)
 placement:
   backend: legolization
   strategy: kollsker    # passed to the backend (also: luo, greedy, bond, fast, smga, beauty)

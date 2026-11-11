@@ -1086,3 +1086,50 @@ bodies 185 s) are run-to-run noise of this run, the bunny without a single tile 
 the boxes as in 1.7.0 and takes all tiles off the castle and Duo. To tile those faces, the parts
 along their edges would have to be split at the face's edge (the part inside gets a smooth top, the
 rest keeps studs); that is not part of #44.
+
+## Cuts at the edge of flat faces (issue #46, 2026-11-11)
+
+Product owner's option B (ADR 0020, second amendment): a part whose top lies only partly on a flat
+face (past its edge, or under a wall or tower standing on it) is cut at the edge before the 85 %
+rule; every cut must stay held by a part above or below reaching across it (else the cut moves one
+stud into the face, else the part stays whole); +15 % parts is a guide. Same command as "Tiles
+(ROADMAP 9)" (`out/tiles/split`), mains power; the castle was measured again after the time kept
+for the stability check was halved (`out/tiles/split-castle`, see below).
+
+| Input | Tiles #45 → cuts | Parts 1.6 → cuts | Deviation mean / p95 mm | One stable piece | Time s 1.6 → cuts | Checked states |
+|---|---|---|---|---|---|---|
+| `cube_10mm.step` / `.stl` | 139 → 139 | 1,952 → 2,091 (+7.1 %) | 0.00 / 0.00 | yes | 250 → 248 | 123–124 / 294 |
+| `textured_cube.obj` | 186 → 186 | 2,280 → 2,466 (+8.2 %) | 0.00 / 0.00 | yes | 245 → 243 | 126 / 354 |
+| `l_bracket.stl` | 24 → 24 | 153 → 177 (+15.7 %) | 0.00 / 0.00 | yes | 30 → 37 | 40 / 40 |
+| `two_bodies.step` | 96 → 96 | 606 → 702 (+15.8 %) | 0.00 / 0.00 | yes | 163 → 181 | 97 / 97 |
+| `castle.step` (generated), `--config` | 0 → **171** | 1,657 → 1,825 (**+10.1 %**) | 3.31 / 8.00 → 3.17 / 8.00 | yes | 251 → 254 | 135 / 259 |
+| Duo @32 (local only) | 0 → **56** | 1,025 → 1,081 (**+5.5 %**) | 1.86 / 4.23 → 1.72 / 4.23 | yes | 128 → 140 | 161 / 161 |
+| `heart.vox` | 2 → 5 | 12 → 25 (+108 %) | 0.06 / 0.00 → 0.02 / 0.00 | yes | 4 → 5 | 12 / 12 |
+| sphere, vertex sphere, bunny, toadstool, torus, rocket | 0 → 0 | unchanged | unchanged | yes | ±1 % | |
+
+The four boxes are unchanged (no cut needed; their +15.7 % and +15.8 % come from 1.7.0 and are now
+reported against the guide). The heart is a voxel file, where every top counts as flat; it grows from
+12 to 25 parts and leaves `inspect`'s estimate (10–16), the only one of 14 outside.
+
+**Castle** ("tiles on flat tops: 72 plate(s) -> tile, 5 plate(s) -> 2+ tiles, 5 brick(s) -> plate
++ tile, 67 part(s) split at the edge of the face (+168 parts); 19 cut(s) moved one stud in to stay
+held; 17 part(s) left whole; 4 flat face(s) keep all their studs"). Per face, from the same layout:
+
+| Face | Open cells | Parts reaching under a wall/tower | Cuts (moved one stud) | Left whole | Would be loose without the check | Share after cuts | Tiled |
+|---|---:|---:|---:|---:|---:|---:|---|
+| courtyard | 366 | 37 | 32 (12) | 5 | **17** | 90 % | yes |
+| keep roof | 60 | 0 | 2 (0) | 0 | 0 | 100 % | yes |
+| wall tops | 54 each | 4 each | 3–5 (2 each) | 0–2 | 2–4 | 74–93 % | 3 of 4 |
+| tower tops | 36 each | 0 | 4 (0–4) | 0–1 | 0–5 | 69–100 % | 3 of 4 |
+| courtyard corners outside the walls | 18 each | 4–6 | 2–6 | 0–3 | 1–3 | 39–94 % | 2 of 4 |
+
+**Duo**: nothing is cut; its base ring lies a plate above the voxels, so the tiles are laid on the
+open parts and the parts reaching under the figure stay whole (46 parts with tiles on top, +56 parts).
+
+**Time for the check:** with 10 s + 0.02 s per part kept for the stability check (as in #44), the
+castle had too little left in one of two runs (about 40 s after placement) and got no tiles at all
+("80 flat top(s) keep their studs (no time to check stability with them)"). The check runs beside the
+step planning and its measured time is about 0.02 s per part; keeping half of that (5 s + 0.01 s per
+part) is enough, because a longer check only eats into the time kept for the export (20 s + 0.03 s
+per part, the PDF needs about 0.012 s per part). With that the castle got its tiles (254 s, 135
+states checked).

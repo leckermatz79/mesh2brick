@@ -97,7 +97,8 @@ uv run mesh2brick convert modell.stl -o out/ --set "parts.exclude=[3008, 3007]"
 # 2 Platten + Fliese; die Stabilität wird neu geprüft. Auch auf Treppen runder Formen:
 # --set parts.tiles=all; unterste Lage ohne Fliesen: --set parts.tiles_on_base=false. Eine Fläche
 # bekommt nur Fliesen, wenn mindestens 85 % davon fliesbar sind (sonst bleiben alle Noppen):
-# --set parts.tiles_min_share=0.85
+# --set parts.tiles_min_share=0.85. Teile, die über den Rand einer Fläche reichen, werden
+# vorher dort geteilt (aus: --set parts.tiles_split=false)
 uv run mesh2brick convert modell.stl -o out/ --set "parts.categories=[brick, plate, slope, tile]"
 
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
