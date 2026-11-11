@@ -1,14 +1,24 @@
 # Projektstatus
 
-Stand: 2026-11-11 · **1.7.0 – Fliesen auf flachen Oberseiten** ([#42](https://github.com/leckermatz79/mesh2brick/issues/42), ROADMAP Punkt 9, der erste 2.0-Punkt) · davor 1.6.1 (Bewertungsskala, damit war 1.x fertig) · Nächster Schritt: Merge und Tag 1.7.0, dann die **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)), danach ROADMAP 8 (mehr Dachsteine)
+Stand: 2026-11-11 · **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44), noch kein Release) · davor **1.7.0 – Fliesen auf flachen Oberseiten** ([Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.7.0), [#42](https://github.com/leckermatz79/mesh2brick/issues/42)) · Nächster Schritt: **deine Entscheidung unten (Fliesen an oder Randteile aufteilen)**, sonst ROADMAP 8 (mehr Dachsteine)
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **Wo das 3D-Modell flach ist, legt mesh2brick auf Wunsch glatte Fliesen, und zwar genau auf die Höhe der Fläche:** Würfel, L-Winkel und die zwei Körper treffen ihr 3D-Modell damit exakt (Abweichung 0,00 mm statt im Mittel 0,66–0,83 mm), Kugel, Hase und Fliegenpilz behalten wie gewünscht ihre Noppen.
-- **Alle Testmodelle bleiben ein stabiles Stück**, die Kästen brauchen 7–16 % mehr Teile; eingeschaltet wird es mit `tile` in `parts.categories`. Standardmäßig bleibt es aus, weil die Burg fleckig wirkt (deine Entscheidung 2026-11-11); das soll die 85-%-Regel in [#44](https://github.com/leckermatz79/mesh2brick/issues/44) beheben.
+- **Die 85-%-Regel wirkt wie gewünscht: Keine Fläche ist mehr halb gefliest.** Die Kästen bleiben glatt und exakt; Burg und Duo bekommen damit aber **gar keine** Fliesen mehr (sie sehen aus wie in 1.6), weil an jeder ihrer flachen Flächen zu viele Teile über den Rand der Fläche hinausreichen.
+- Ob dich das überzeugt (dann Fliesen an und 2.0.0) oder ob ich zuerst die Randteile aufteilen soll, damit auch Burg und Duo ganze glatte Flächen bekommen, ist deine Entscheidung (Frage unten, mit Bildern).
 
-## Erledigt (1.7.0, ROADMAP Punkt 9)
+## Erledigt (#44, 85-%-Regel, noch kein Release)
+
+- **Regel:** Der Fliesen-Durchlauf plant jetzt erst alle Teile, ohne etwas zu ändern, und zählt dann für jede flache Fläche (zusammenhängende flache Zellen einer Lage): Welcher Anteil ihrer freien Oberseite liegt unter Teilen, die eine Fliese bekommen können? Ab 85 % wird die Fläche gefliest, darunter behält sie alle Noppen. Einstellbar mit `parts.tiles_min_share` (Standard 0,85; 0 = wie 1.7.0). Der Lauf sagt, wie viele Flächen ihre Noppen behalten.
+- **Gemessen** (alle Testmodelle, Fliesen eingeschaltet, Tabelle in [benchmarks.md](benchmarks.md), „Tile share per face“): Würfel, Texturwürfel, L-Winkel, zwei Körper unverändert (gleiche Fliesen, 0,00 mm). Burg 99 → 0 Fliesen, Duo 22 → 0. Alle 14 ein stabiles Stück, Zeit wie 1.7.0 (ein Hasen-Lauf ohne jede Fliese brauchte einmal 146 s, zweimal danach 120 s: Streuung).
+- **Warum Burg und Duo leer ausgehen:** Burghof 69 %, Bergfried-Dach 53 %, Mauerkronen 30 %, Turmdächer 0–8 %, Duos Sockel 51 % und 33 %. Der Grund ist immer derselbe: Teile, die über den Rand der flachen Fläche hinausreichen (die Burg wird eine Noppe zu breit voxelisiert, Duos Sockel hat einen gebogenen Rand). Passende Fliesen, Farben oder Zeit waren nie das Problem.
+- **Bilder:** `out/tiles/vorher-nachher/85prozent/` (links Regel 1.7.0, rechts 85-%-Regel: `castle.png`, `Duo_Duolingo-32.png`, zur Kontrolle `two_bodies.png`).
+
+## Davor: 1.7.0 (ROADMAP Punkt 9)
+
+- Fazit 1.7.0: **Wo das 3D-Modell flach ist, legt mesh2brick auf Wunsch glatte Fliesen, und zwar genau auf die Höhe der Fläche:** Würfel, L-Winkel und die zwei Körper treffen ihr 3D-Modell damit exakt (Abweichung 0,00 mm statt im Mittel 0,66–0,83 mm), Kugel, Hase und Fliegenpilz behalten wie gewünscht ihre Noppen.
+- **Alle Testmodelle bleiben ein stabiles Stück**, die Kästen brauchen 7–16 % mehr Teile; eingeschaltet wird es mit `tile` in `parts.categories`. Standardmäßig bleibt es aus, weil die Burg fleckig wirkt (deine Entscheidung 2026-11-11); das soll die 85-%-Regel in [#44](https://github.com/leckermatz79/mesh2brick/issues/44) beheben.
 
 - **Zuerst die Messgröße für ganz 2.0** (eigener Commit): Wie weit liegt die Außenseite des Steinmodells vom 3D-Modell weg? Gemessen in echten LEGO-Millimetern, Noppen mitgerechnet (4,8 mm breit, 1,7 mm hoch), als Mittel und als „95 % der Oberfläche liegen höchstens so weit weg“, in mm und in Noppen. Grundlinie 1.6: Kästen 0,6–0,8 mm im Mittel (95 %: 4,05 mm, weil die Voxel eine Platte über der Oberseite enden und die Noppen dazukommen), runde Formen 1,8–2,4 mm (95 %: 4,2–4,9 mm, das sind die Voxeltreppen), Burg 3,3 / 8,0 mm. Der Release-Benchmark zeigt die Spalte jetzt immer; Tabelle in [benchmarks.md](benchmarks.md), „Shape fidelity baseline“. Die Messung dauert 0,5–7,5 s pro Modell (Duo 25–33 s).
 - **legolizations eigener Fliesen-Tausch allein** (bisher mit `tile` eingeschaltet) bringt nichts: Er legt Fliesen auf die Treppen (Kugel 184, Fliegenpilz 117, Hase 61), keine einzige auf die Würfel-Oberseiten (dort liegen Steine, die tauscht er nicht) und kennt nur vier Fliesengrößen (Burghof fleckig). Die Abweichung ändert sich bei keinem Modell. Bilder: `out/tiles/vorher-nachher/legolization/`.
@@ -50,7 +60,7 @@ Bilder für jedes Modell (links 1.6, rechts mit Fliesen): `out/tiles/vorher-nach
 
 ## Als Nächstes
 
-1. **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44), deine Vorgabe vom 2026-11-11): Eine flache Fläche wird nur gefliest, wenn mindestens 85 % ihrer freiliegenden Oberseite fliesbar sind; sonst behält die ganze Fläche ihre Noppen. Abnahme: du an Vergleichsbildern von Burg und Duo. Überzeugt es, gehen Fliesen standardmäßig an und es wird 2.0.0.
+1. **Deine Entscheidung zu #44** (Frage unten). Je nach Antwort: Fliesen standardmäßig an und 2.0.0, oder zuerst Randteile aufteilen (eigenes Issue).
 2. **ROADMAP 8 – mehr Dachsteine** (Reihenfolge in 2.0: 9, dann #44, dann 8, 10, 11, 12, 13). Die Messgröße von heute ist die Grundlinie dafür: Bei runden Formen machen die Voxeltreppen 1,8–2,4 mm Abweichung aus, Noppen nur 0,04–0,3 mm; Dachsteine an den Treppenkanten sind dort der Hebel. Hängt Punkt 8 an einer Änderung in legolization, steht die Frage „Fork oder Warten“ an (deine Entscheidung, vereinbart am 2026-11-07). Danach runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `choose_part` (Roadmap 10–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelheiten in [CHANGELOG.md](../CHANGELOG.md) und in den [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap).
@@ -72,7 +82,7 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Fliesen liegen nur auf Teilen, deren ganze Oberseite unter der flachen Fläche liegt. Wo Teile über den Rand der Fläche reichen, bleiben Noppen: bei der Burg die Turmränder (ihr offenes STEP-Netz wird eine Noppe zu breit voxelisiert), bei Duo der gebogene Sockelrand; dort stehen die aufgelegten Fliesen eine Platte über den Randteilen. Deshalb sind Fliesen standardmäßig aus. | eigener Code: 85-%-Regel ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)) |
+| Fliesen liegen nur auf Teilen, deren ganze Oberseite unter der flachen Fläche liegt. Wo Teile über den Rand der Fläche reichen, bleiben Noppen: bei der Burg die Turmränder (ihr offenes STEP-Netz wird eine Noppe zu breit voxelisiert), bei Duo der gebogene Sockelrand; dort stehen die aufgelegten Fliesen eine Platte über den Randteilen. Deshalb sind Fliesen standardmäßig aus. | seit #44 behalten solche Flächen ganz ihre Noppen (statt fleckig); Randteile aufteilen wäre eigener Code (Frage unten) |
 | Fliesen nur auf waagerechten Flächen. Schräge, aber ebene Flächen (ein Dach) behalten Noppen. | ROADMAP 8 (Dachsteine) |
 | Kleine Modelle mit vielen umgebauten Steinen brauchen etwas länger, weil legolizations Schrittsuche mehr Teile sieht (L-Winkel 30 → 36 s). | akzeptieren |
 | Liegt eine flache Fläche mehr als eine Platte von der Voxel-Oberkante entfernt, kommt die Fliese nur eine Platte näher (nur bei der Burg, 32 von 375 Fliesenfeldern). Platten werden nie tiefer gelegt. | akzeptieren |
@@ -148,7 +158,12 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 
 ## Fragen an dich
 
-Keine offenen Fragen. Deine Antworten vom 2026-11-11 stehen unter „Deine Entscheidungen“; die Vergleichsbilder bleiben in `out/tiles/vorher-nachher/` liegen.
+1. **Überzeugt dich die 85-%-Regel?** Bilder: `out/tiles/vorher-nachher/85prozent/` (links Regel 1.7.0, rechts 85-%-Regel). Drei Wege:
+   - **A – so lassen, Fliesen an, 2.0.0:** Kästen glatt und exakt, Burg und Duo wie in 1.6 (nur Noppen, nichts fleckig). Ein Commit plus Release.
+   - **B – erst Randteile aufteilen** (eigenes Issue vor ROADMAP 8): Teile, die über den Rand einer flachen Fläche reichen, werden am Rand geteilt; der innere Teil bekommt die Fliese, der äußere behält Noppen. Dann könnten Burghof, Mauern, Türme, Bergfried und Duos Sockel ganz glatt werden. Kostet mehr Teile; danach wieder Bilder für dich.
+   - **C – Schwelle senken** (z. B. 50 %): Burghof, Bergfried-Dach und ein Teil von Duos Sockel würden gefliest, aber wieder mit Noppen-Inseln am Rand (fleckig).
+
+   **Mein Vorschlag: B**, weil nur so die Burg glatt wird, ohne fleckig zu sein. **Standard, wenn keine Antwort kommt:** A ohne Einschalten, also Fliesen bleiben aus, die Regel kommt ohne Release in `main`, und es geht mit ROADMAP 8 weiter.
 
 ## Offene Kleinigkeiten
 
