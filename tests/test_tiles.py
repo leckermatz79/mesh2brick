@@ -30,7 +30,7 @@ RED = 4
 TILES = ("3070b", "3069b", "63864", "2431", "6636", "4162", "3068b", "87079", "69729")
 """Every tile legolization's catalogue has (four placeable, five import-only)."""
 _PARTS = (
-    "3005", "3004", "3010", "3003", "3002", "3001", "3024", "3023", "3710",
+    "3005", "3004", "3622", "3010", "3003", "3002", "3001", "3024", "3023", "3710",
     "3022", "3021", "3020", *TILES,
 )  # fmt: skip
 
@@ -292,3 +292,33 @@ def test_the_llm_layer_is_told_what_a_tile_is(tiled_box: tuple[Any, Path]) -> No
     assert "(en: Tile" in kinds
     assert "Fliese" in SYSTEM
     assert "without" in SYSTEM
+
+
+def _strip_with_end(last: tuple[str, int]) -> Any:
+    """A 1 x 10 flat strip (x 0..9) whose end part may reach past it (x 10)."""
+    key, x = last
+    return _layout_with(
+        ("brick_1x4", 0, 0, 0, 0), ("brick_1x4", 4, 0, 0, 0), (key, x, 0, 0, 0)
+    )
+
+
+def test_a_face_mostly_tileable_gets_its_tiles() -> None:
+    # 9 of 10 open cells under parts that fit inside the face: 90 %.
+    layout = _strip_with_end(("brick_1x2", 9))
+    layout.add("brick_1x1", 8, 0, 0, 0, RED)
+    report = apply_tiles(layout, _flat((0, 10, 0, 1, 2)), min_share=0.85)
+    assert (report.faces, report.faces_kept) == (1, 0)
+    assert report.bricks == 3  # the two 1 x 4 and the 1 x 1; the 1 x 2 reaches out
+    assert _parts(layout)["3004"] == 1
+
+
+def test_a_face_too_little_tileable_keeps_all_its_studs() -> None:
+    # The 1 x 3 at x 8..10 reaches past the face: only 8 of 10 cells, 80 %.
+    layout = _strip_with_end(("brick_1x3", 8))
+    report = apply_tiles(layout, _flat((0, 10, 0, 1, 2)), min_share=0.85)
+    assert (report.faces, report.faces_kept, report.tiled) == (0, 1, 0)
+    assert _parts(layout) == {"3010": 2, "3622": 1}
+    assert "1 flat face(s) keep all their studs (less than 85%" in report.summary()
+    # Without the rule (1.7.0) the two 1 x 4 would get tiles.
+    again = _strip_with_end(("brick_1x3", 8))
+    assert apply_tiles(again, _flat((0, 10, 0, 1, 2))).bricks == 2

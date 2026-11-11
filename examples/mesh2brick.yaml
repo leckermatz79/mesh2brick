@@ -35,6 +35,7 @@ parts:
   tiles: flat           # with tile in categories: flat = tiles only where the 3D model is flat
                         # (box tops, bases) | all = on every open top, stairs of round shapes too
   tiles_on_base: true   # tiles also on the lowest brick layer (a base, a courtyard)
+  tiles_min_share: 0.85 # a flat face gets tiles only if at least this share of it can (else all studs)
 placement:
   backend: legolization
   strategy: kollsker    # passed to the backend (also: luo, greedy, bond, fast, smga, beauty)

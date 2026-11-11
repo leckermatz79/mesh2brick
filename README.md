@@ -92,7 +92,8 @@ uv run mesh2brick convert model.stl -o out/ --set "parts.exclude=[3008, 3007]"
 # Smooth tops: tiles where the 3D model is flat (the top of a box, a base), studs
 # everywhere else. Plates become tiles of the same size, bricks 2 plates + tile; stability
 # is checked again. On the stairs of round shapes too: --set parts.tiles=all; none on the
-# lowest layer: --set parts.tiles_on_base=false
+# lowest layer: --set parts.tiles_on_base=false. A face gets tiles only if at least 85 % of it
+# can (else it keeps all its studs): --set parts.tiles_min_share=0.85
 uv run mesh2brick convert model.stl -o out/ --set "parts.categories=[brick, plate, slope, tile]"
 
 # Override any setting from mesh2brick.yaml on the command line
