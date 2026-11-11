@@ -1,14 +1,14 @@
 # Projektstatus
 
-Stand: 2026-11-11 · **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44), noch kein Release) · davor **1.7.0 – Fliesen auf flachen Oberseiten** ([Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.7.0), [#42](https://github.com/leckermatz79/mesh2brick/issues/42)) · Nächster Schritt: **deine Entscheidung unten (Fliesen an oder Randteile aufteilen)**, sonst ROADMAP 8 (mehr Dachsteine)
+Stand: 2026-11-11 · **85-%-Regel für Fliesen** ([#44](https://github.com/leckermatz79/mesh2brick/issues/44), in `main`, kein Release) · davor **1.7.0 – Fliesen auf flachen Oberseiten** ([Release](https://github.com/leckermatz79/mesh2brick/releases/tag/v1.7.0)) · Nächster Schritt: **Randteile an flachen Flächen teilen** ([#46](https://github.com/leckermatz79/mesh2brick/issues/46), deine Wahl B), danach ROADMAP 8 (mehr Dachsteine)
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
 - **Die 85-%-Regel wirkt wie gewünscht: Keine Fläche ist mehr halb gefliest.** Die Kästen bleiben glatt und exakt; Burg und Duo bekommen damit aber **gar keine** Fliesen mehr (sie sehen aus wie in 1.6), weil an jeder ihrer flachen Flächen zu viele Teile über den Rand der Fläche hinausreichen.
-- Ob dich das überzeugt (dann Fliesen an und 2.0.0) oder ob ich zuerst die Randteile aufteilen soll, damit auch Burg und Duo ganze glatte Flächen bekommen, ist deine Entscheidung (Frage unten, mit Bildern).
+- Deine Wahl (2026-11-11): **B**, also zuerst die Teile am Rand flacher Flächen teilen ([#46](https://github.com/leckermatz79/mesh2brick/issues/46)), damit auch Burg und Duo ganze glatte Flächen bekommen; Fliesen bleiben bis dahin aus.
 
-## Erledigt (#44, 85-%-Regel, noch kein Release)
+## Erledigt (#44, 85-%-Regel, in `main`, kein Release)
 
 - **Regel:** Der Fliesen-Durchlauf plant jetzt erst alle Teile, ohne etwas zu ändern, und zählt dann für jede flache Fläche (zusammenhängende flache Zellen einer Lage): Welcher Anteil ihrer freien Oberseite liegt unter Teilen, die eine Fliese bekommen können? Ab 85 % wird die Fläche gefliest, darunter behält sie alle Noppen. Einstellbar mit `parts.tiles_min_share` (Standard 0,85; 0 = wie 1.7.0). Der Lauf sagt, wie viele Flächen ihre Noppen behalten.
 - **Gemessen** (alle Testmodelle, Fliesen eingeschaltet, Tabelle in [benchmarks.md](benchmarks.md), „Tile share per face“): Würfel, Texturwürfel, L-Winkel, zwei Körper unverändert (gleiche Fliesen, 0,00 mm). Burg 99 → 0 Fliesen, Duo 22 → 0. Alle 14 ein stabiles Stück, Zeit wie 1.7.0 (ein Hasen-Lauf ohne jede Fliese brauchte einmal 146 s, zweimal danach 120 s: Streuung).
@@ -60,7 +60,7 @@ Bilder für jedes Modell (links 1.6, rechts mit Fliesen): `out/tiles/vorher-nach
 
 ## Als Nächstes
 
-1. **Deine Entscheidung zu #44** (Frage unten). Je nach Antwort: Fliesen standardmäßig an und 2.0.0, oder zuerst Randteile aufteilen (eigenes Issue).
+1. **Randteile an flachen Flächen teilen** ([#46](https://github.com/leckermatz79/mesh2brick/issues/46), deine Wahl B vom 2026-11-11): Teile, die über den Rand einer flachen Fläche reichen, werden an der Flächengrenze geteilt (innen Platte + Fliese, außen bleibt der Stein), bevor die 85-%-Regel greift. Zuerst messen: geteilte Teile und Teilezuwachs je Fläche für Burg und Duo. Höchstens +15 % Teile pro Modell, darüber behält die Fläche Noppen. Stabilität nach dem Teilen neu prüfen, besonders unter Mauern. Die vier Kästen bleiben unverändert. Abnahme: du an Vergleichsbildern von Burg und Duo; überzeugt es, gehen Fliesen mit Teilen an und es wird 2.0.0, sonst Variante A (Fliesen an nur mit 85-%-Regel, ebenfalls 2.0.0).
 2. **ROADMAP 8 – mehr Dachsteine** (Reihenfolge in 2.0: 9, dann #44, dann 8, 10, 11, 12, 13). Die Messgröße von heute ist die Grundlinie dafür: Bei runden Formen machen die Voxeltreppen 1,8–2,4 mm Abweichung aus, Noppen nur 0,04–0,3 mm; Dachsteine an den Treppenkanten sind dort der Hebel. Hängt Punkt 8 an einer Änderung in legolization, steht die Frage „Fork oder Warten“ an (deine Entscheidung, vereinbart am 2026-11-07). Danach runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `choose_part` (Roadmap 10–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelheiten in [CHANGELOG.md](../CHANGELOG.md) und in den [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap).
@@ -82,7 +82,7 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | legolization setzt nur Platten bis 2×8. Größere Platten würden Teile sparen. | Upstream-Kandidat #10 |
 | Reine Computer-Grundfarben landen teils auf Nachbarfarben (#FF0000 → „Reddish Orange“). | von dir als Farbmetrik akzeptiert |
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
-| Fliesen liegen nur auf Teilen, deren ganze Oberseite unter der flachen Fläche liegt. Wo Teile über den Rand der Fläche reichen, bleiben Noppen: bei der Burg die Turmränder (ihr offenes STEP-Netz wird eine Noppe zu breit voxelisiert), bei Duo der gebogene Sockelrand; dort stehen die aufgelegten Fliesen eine Platte über den Randteilen. Deshalb sind Fliesen standardmäßig aus. | seit #44 behalten solche Flächen ganz ihre Noppen (statt fleckig); Randteile aufteilen wäre eigener Code (Frage unten) |
+| Fliesen liegen nur auf Teilen, deren ganze Oberseite unter der flachen Fläche liegt. Wo Teile über den Rand der Fläche reichen, bleiben Noppen: bei der Burg die Turmränder (ihr offenes STEP-Netz wird eine Noppe zu breit voxelisiert), bei Duo der gebogene Sockelrand; dort stehen die aufgelegten Fliesen eine Platte über den Randteilen. Deshalb sind Fliesen standardmäßig aus. | seit #44 behalten solche Flächen ganz ihre Noppen (statt fleckig); Randteile aufteilen: [#46](https://github.com/leckermatz79/mesh2brick/issues/46) |
 | Fliesen nur auf waagerechten Flächen. Schräge, aber ebene Flächen (ein Dach) behalten Noppen. | ROADMAP 8 (Dachsteine) |
 | Kleine Modelle mit vielen umgebauten Steinen brauchen etwas länger, weil legolizations Schrittsuche mehr Teile sieht (L-Winkel 30 → 36 s). | akzeptieren |
 | Liegt eine flache Fläche mehr als eine Platte von der Voxel-Oberkante entfernt, kommt die Fliese nur eine Platte näher (nur bei der Burg, 32 von 375 Fliesenfeldern). Platten werden nie tiefer gelegt. | akzeptieren |
@@ -155,15 +155,12 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | 2026-11-11 | Unterste Lage (Sockel) ohne Fliesen? | **Nein, der Sockel bekommt Fliesen** (`parts.tiles_on_base: true` bleibt Standard). |
 | 2026-11-11 | Was kommt vor ROADMAP 8? | **Ein eigenes Issue ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)):** Eine flache Fläche wird nur gefliest, wenn mindestens 85 % ihrer freiliegenden Oberseite fliesbar sind, sonst behält die ganze Fläche Noppen. Abnahme an Burg und Duo per Vergleichsbild durch dich. Überzeugt es, gehen Fliesen standardmäßig an und es wird 2.0.0. |
 | 2026-11-11 | KI-Live-Test mit Fliesen (offen aus ROADMAP 9) | **Von dir gemacht:** L-Winkel mit Fliesen, 177 Teile, 39 von 39 Schritttexten, keine Probleme, 6,5 Cent. |
+| 2026-11-11 | Überzeugt die 85-%-Regel (#44)? | **B: erst Randteile aufteilen.** Bilder gesehen: Die zwei Körper überzeugen, Burg und Duo haben mit der 85-%-Regel keine Fliesen mehr. Fliesen bleiben vorerst aus. #44 ist geschlossen, weiter in [#46](https://github.com/leckermatz79/mesh2brick/issues/46). |
+| 2026-11-11 | Wie sollen Randteile geteilt werden (#46)? | **An der Flächengrenze, bevor die 85-%-Regel greift:** innen Platte + Fliese, außen bleibt der Stein. Erst messen (geteilte Teile und Teilezuwachs je Fläche für Burg und Duo). Höchstens +15 % Teile pro Modell, darüber behält die Fläche Noppen. Stabilität nach dem Teilen neu prüfen, besonders unter Mauern. Die vier Kästen bleiben unverändert. Abnahme durch dich an Vergleichsbildern von Burg und Duo: überzeugt es, Fliesen standardmäßig an und 2.0.0; sonst Variante A (Fliesen an nur mit der 85-%-Regel, 2.0.0). |
 
 ## Fragen an dich
 
-1. **Überzeugt dich die 85-%-Regel?** Bilder: `out/tiles/vorher-nachher/85prozent/` (links Regel 1.7.0, rechts 85-%-Regel). Drei Wege:
-   - **A – so lassen, Fliesen an, 2.0.0:** Kästen glatt und exakt, Burg und Duo wie in 1.6 (nur Noppen, nichts fleckig). Ein Commit plus Release.
-   - **B – erst Randteile aufteilen** (eigenes Issue vor ROADMAP 8): Teile, die über den Rand einer flachen Fläche reichen, werden am Rand geteilt; der innere Teil bekommt die Fliese, der äußere behält Noppen. Dann könnten Burghof, Mauern, Türme, Bergfried und Duos Sockel ganz glatt werden. Kostet mehr Teile; danach wieder Bilder für dich.
-   - **C – Schwelle senken** (z. B. 50 %): Burghof, Bergfried-Dach und ein Teil von Duos Sockel würden gefliest, aber wieder mit Noppen-Inseln am Rand (fleckig).
-
-   **Mein Vorschlag: B**, weil nur so die Burg glatt wird, ohne fleckig zu sein. **Standard, wenn keine Antwort kommt:** A ohne Einschalten, also Fliesen bleiben aus, die Regel kommt ohne Release in `main`, und es geht mit ROADMAP 8 weiter.
+Keine offenen Fragen. Deine Wahl B vom 2026-11-11 steht unter „Deine Entscheidungen“; die Abnahme von [#46](https://github.com/leckermatz79/mesh2brick/issues/46) kommt wieder mit Vergleichsbildern.
 
 ## Offene Kleinigkeiten
 

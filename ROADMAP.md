@@ -1,7 +1,7 @@
 # mesh2brick – Roadmap after 1.0
 
 Status: draft by the product owner, 2026-11-07; updated 2026-11-07 after Roadmap 2 (item 8 split: its speed part
-moved to 1.x as 1.3.0), 2026-11-10 (2.0 order: 9 before 8) and 2026-11-11 (issue #44 before 8). Lives in the repo root next to SPEC.md.
+moved to 1.x as 1.3.0), 2026-11-10 (2.0 order: 9 before 8) and 2026-11-11 (issues #44 and #46 before 8). Lives in the repo root next to SPEC.md.
 SPEC.md stays the source of truth for *how* we work; this file says *what* comes next and in which order.
 Claude Code: treat each numbered item as a candidate issue. Before starting one, write the acceptance
 criteria into the issue, as in Phases 0–8.
@@ -80,6 +80,10 @@ baseline for 8, 10 and 11.
 Product owner, 2026-11-11: item 9 shipped in 1.7.0 with tiles off by default (patchy on the castle). Before item 8
 comes issue #44: a flat face is tiled only if at least 85 % of its open top can be tiled, otherwise the whole face
 keeps its studs; if the castle and Duo pictures convince, tiles go on by default and the release becomes 2.0.0.
+Product owner, 2026-11-11 (after #44): the 85 % rule left the castle and Duo without tiles, so issue #46 comes
+next, still before item 8: parts reaching past the edge of a flat face are split there (inside plate + tile, outside
+the brick stays) before the 85 % rule, at most +15 % parts per model. If the pictures convince, tiles go on by default
+with splitting and 2.0.0; otherwise tiles go on with the 85 % rule only (also 2.0.0).
 
 ---
 

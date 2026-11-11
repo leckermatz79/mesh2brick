@@ -10,7 +10,9 @@ phases (`v0.<phase>.0`) until 1.0.
 - Tiles go face by face (issue #44, product owner 2026-11-11): a flat face gets tiles only if at
   least 85 % of its open top can be tiled, otherwise all of it keeps its studs instead of looking
   patchy (castle tower rims, Duo's base edge). New setting `parts.tiles_min_share` (default 0.85;
-  0 = as in 1.7.0); the run says how many faces kept their studs. Tiles are still off by default.
+  0 = as in 1.7.0); the run says how many faces kept their studs. Tiles are still off by default:
+  with the rule the castle and Duo get no tiles at all, so parts at the edge of flat faces will be
+  split first (issue #46, product owner 2026-11-11).
 
 ## [1.7.0] - 2026-11-10 - Tiles on flat tops (opt-in)
 
