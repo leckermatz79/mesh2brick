@@ -60,7 +60,8 @@ class VoxelGrid:
             renders flat (so they may get a tile, :mod:`mesh2brick.voxel.flat`):
             how far that face lies above the cell's top, in cell layers;
             ``NaN`` elsewhere. ``None`` when no mesh said so (voxel files):
-            every top counts, at the height of the cells.
+            no top is flat (product owner, 2026-11-12: voxel inputs get tiles
+            only with ``parts.tiles=all``).
     """
 
     occupancy: NDArray[np.bool_]
@@ -160,13 +161,11 @@ class VoxelGrid:
         return (self.pitch_mm, self.pitch_mm, dz)
 
     def flat_tops(self) -> NDArray[np.float32]:
-        """:attr:`flat`, or every top cell at the height of the cells (offset 0)."""
+        """:attr:`flat`, or no flat top at all when no mesh said where they are."""
         if self.flat is not None:
             return self.flat
-        tops = self.occupancy.copy()
-        tops[:, :, :-1] &= ~self.occupancy[:, :, 1:]
-        offset: NDArray[np.float32] = np.where(tops, 0.0, np.nan).astype(np.float32)
-        return offset
+        none: NDArray[np.float32] = np.full(self.occupancy.shape, np.nan, np.float32)
+        return none
 
     @property
     def colors_used(self) -> tuple[int, ...]:

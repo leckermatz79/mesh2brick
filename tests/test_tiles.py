@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from tests.helpers import make_brick
 
 from mesh2brick.backends.legolization import (
     LegolizationBackend,
@@ -20,7 +21,7 @@ from mesh2brick.backends.legolization import (
 )
 from mesh2brick.config import load_settings
 from mesh2brick.export.bom import build_bom, write_boms
-from mesh2brick.model import BrickModel
+from mesh2brick.model import BrickModel, BuildStep
 from mesh2brick.place.tiles import flat_top_plates
 from mesh2brick.render.preview import PreviewOptions, render_png
 from mesh2brick.render.text import part_label
@@ -204,13 +205,16 @@ def test_a_box_gets_a_smooth_top_and_stays_one_stable_piece(
 
 @pytest.mark.ldraw
 def test_without_tile_in_categories_nothing_changes() -> None:
+    # Tiles are on by default since 2.0; without them it is the 1.6 result.
     grid = _box_grid(6, 4, 2)
     backend = LegolizationBackend()
-    plain = backend.place(grid, load_settings(None, []), name="box")
+    off = load_settings(None, ["parts.categories=[brick, plate, slope]"])
+    plain = backend.place(grid, off, name="box")
     assert not any(p.category == "tile" for p in plain.model.parts)
     assert not any("tile" in note for note in plain.notes)
-    also = backend.place(grid, load_settings(None, []), name="box")
+    also = backend.place(grid, off, name="box")
     assert also.model == plain.model
+    assert backend.pipeline_config(off).tiles is False
 
 
 @pytest.mark.ldraw
@@ -417,3 +421,61 @@ def test_a_face_a_plate_higher_gets_tiles_on_the_open_part_only() -> None:
         b for b in layout if b.layer == 2 and layout.part_of(b).ldraw_part == "2431"
     ]
     assert len(on_top) == 1  # one 1 x 4 tile on the open part; the plate stays whole
+
+
+@pytest.mark.ldraw
+def test_voxel_files_get_tiles_only_with_tiles_all(fixtures_dir: Path) -> None:
+    from mesh2brick.backends.legolization import load_voxel_file  # noqa: PLC0415
+
+    heart = load_voxel_file(fixtures_dir / "heart.vox")
+    backend = LegolizationBackend()
+    on = ["parts.categories=[brick, plate, slope, tile]"]
+    plain = backend.place(heart, load_settings(None, on), name="heart")
+    assert plain.model.part_count == 12
+    assert not any(p.category == "tile" for p in plain.model.parts)
+    every = backend.place(
+        heart, load_settings(None, [*on, "parts.tiles=all"]), name="h"
+    )
+    assert any(p.category == "tile" for p in every.model.parts)
+
+
+def test_tile_reserve_grows_with_the_part_count_and_uses_the_export_slack() -> None:
+    from mesh2brick.backends.legolization import (  # noqa: PLC0415
+        export_reserve_s,
+        tile_check_s,
+        tile_reserve_s,
+    )
+
+    assert tile_reserve_s(200) == 0.0  # fits into the export's slack
+    assert tile_reserve_s(1657) == pytest.approx(9.85, abs=0.1)
+    assert tile_reserve_s(4000) > tile_reserve_s(2000) > tile_reserve_s(1657)
+    assert tile_check_s(2209) > 60  # the cube's measured 65 s
+    assert export_reserve_s(1657) > tile_check_s(1657) - tile_reserve_s(1657)
+
+
+def test_skipped_tiles_are_marked_on_the_model_and_the_cover(tmp_path: Path) -> None:
+    from mesh2brick.render.pdf import _cover_notes  # noqa: PLC0415
+
+    model = BrickModel(
+        name="m",
+        parts=(make_brick("3001", 0, 0, 0, 0),),
+        steps=(BuildStep(),),
+        tiles_skipped=True,
+    )
+    again = BrickModel.load(model.save(tmp_path / "m.bricks.json"))
+    assert again.tiles_skipped
+    notes = [note for note, _ in _cover_notes(again, "de")]
+    assert "Fliesen übersprungen: Zeitgrenze; empfohlen --time 10min." in notes
+    english = [note for note, _ in _cover_notes(again, "en")]
+    assert "Tiles skipped: time limit; recommended --time 10min." in english
+
+
+def test_no_cut_when_a_piece_would_hang_on_nothing() -> None:
+    # A 2 x 2 brick whose far corner is not on the face; below it only a
+    # 1 x 2 plate under its front row. Any cut leaves a piece at the back
+    # with nothing below or above it, so the brick stays whole.
+    layout = _layout_with(("plate_1x2", 0, 0, 0, 0), ("brick_2x2", 0, 0, 1, 0))
+    flat = {(0, 0, 3): 0.0, (1, 0, 3): 0.0, (0, 1, 3): 0.0}
+    report = apply_tiles(layout, flat, split=True)
+    assert report.cut == 0
+    assert _parts(layout) == {"3023": 1, "3003": 1}

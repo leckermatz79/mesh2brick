@@ -189,6 +189,12 @@ class PartsConfig(_Section):
     part) at the edge first, so whole faces can be tiled (product owner,
     2026-11-11, issue #46): outside they keep their studs, inside they get
     plates and tiles; each cut stays held by a part above or below."""
+    tiles_overhang: bool = False
+    """Count top cells that stand out at most one cell past the mesh next to a
+    flat face (rounding, or the surface voxelization of an open mesh) as part
+    of that face, so they get tiles too ("Rand-Fliesen"); off, they keep
+    their studs as a rim ("Rand-Noppen"). Product owner decides on the
+    castle pictures (2026-11-12)."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:

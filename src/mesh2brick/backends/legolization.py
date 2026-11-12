@@ -91,6 +91,7 @@ from mesh2brick.place.split import choose_split
 from mesh2brick.place.tiles import (
     Column,
     cut_band,
+    face_groups,
     flat_faces,
     flat_top_plates,
     rect_cover,
@@ -704,19 +705,17 @@ def _place_exact(
 
 
 # ---------------------------------------------------------------- tiles (ROADMAP 9)
-TILE_CHECK_BASE_S: Final = 5.0
-TILE_CHECK_PER_PART_S: Final = 0.01
-"""Changes that make parts heavier (or cut parts) are followed by a stability
-check of the whole model, while the steps are planned (measured: 3 s for 189
-parts, 14 s for 776, 33 s for 1,682, 65 s for 2,209). With less time left
-than :func:`tile_check_s` only the changes that make parts lighter are made.
-The value is about half the measured time: a check that runs longer eats into
-the time kept for the export, which has room for it (20 s + 0.03 s per part
-kept, the PDF needs about 0.012 s per part). 0.02 s per part left the castle
-without tiles in one of two runs (issue #46)."""
-_TILES_UNCHECKED_NOTE: Final = (
-    "tiles skipped: the time limit stopped the stability check, so the tiles "
-    "could not be checked either (raise placement.time_limit_s)"
+TILE_CHECK_PER_PART_S: Final = 0.03
+"""Expected time of the stability check of the whole model after the tile
+pass, per part (measured 0.014-0.029 s: 3 s for 189 parts, 14 s for 776, 33 s
+for 1,682, 65 s for 2,209)."""
+EXPORT_NEED_BASE_S: Final = 5.0
+EXPORT_NEED_PER_PART_S: Final = 0.015
+"""What LDraw, parts lists, PDF and preview actually take (PDF 0.012-0.014 s
+per part on the fixtures); the rest of :func:`export_reserve_s` is slack."""
+RECOMMENDED_TILE_TIME: Final = "10min"
+_TILES_TIME_NOTE: Final = (
+    f"tiles skipped: time limit; recommended --time {RECOMMENDED_TILE_TIME}"
 )
 _TILES_UNDONE_NOTE: Final = (
     "tiles undone: with them the model would no longer hold together"
@@ -729,8 +728,22 @@ picture)."""
 
 
 def tile_check_s(parts: int) -> float:
-    """Seconds to keep for the stability check after the tile pass."""
-    return TILE_CHECK_BASE_S + TILE_CHECK_PER_PART_S * parts
+    """Expected seconds of the stability check after the tile pass."""
+    return TILE_CHECK_PER_PART_S * parts
+
+
+def tile_reserve_s(parts: int) -> float:
+    """Seconds to keep free for the tile check, from the part count.
+
+    Like :func:`export_reserve_s` (product owner, 2026-11-12). The check runs
+    beside the step planning and may run into the time kept for the export as
+    far as the export does not need it; only the rest has to be kept free
+    before the export (castle, 1,657 parts: 10 s).
+    """
+    slack = export_reserve_s(parts) - (
+        EXPORT_NEED_BASE_S + EXPORT_NEED_PER_PART_S * parts
+    )
+    return max(0.0, tile_check_s(parts) - slack)
 
 
 @dataclass(frozen=True, slots=True)
@@ -744,6 +757,8 @@ class _Tiling:
     notes: tuple[str, ...] = ()
     before: Layout | None = None
     check: Future[StabilityReport] | None = None
+    skipped: bool = False
+    """The time limit kept tiles off flat tops (said on the cover)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -823,7 +838,7 @@ class TileReport:
         if self.unchecked:
             text += (
                 f"; {self.unchecked} flat top(s) keep their studs (no time to check "
-                "stability with them; raise placement.time_limit_s)"
+                "stability with them)"
             )
         if self.cut_moved:
             text += f"; {self.cut_moved} cut(s) moved one stud in to stay held"
@@ -929,7 +944,7 @@ def apply_tiles(
     for plan in plans:
         if plan.steps:
             tileable[face_of[plan.roof[0]]] += len(plan.roof)
-    chosen = tiled_faces(open_cells, tileable, min_share)
+    chosen = tiled_faces(open_cells, tileable, min_share, face_groups(face_of))
     counts: Counter[str] = Counter()
     gained = False
     for plan in plans:
@@ -1219,6 +1234,12 @@ def _cut_steps(
         for _, piece in cover
     ):
         return None
+    held: list[tuple[frozenset[Column], tuple[int, ...]]] = [
+        (piece, (bottom - 1, top + 1)) for _, piece in outside
+    ]
+    held += [(piece, (bottom - 1,)) for _, piece in stack]
+    if not all(_touches(layout, brick, piece, layers) for piece, layers in held):
+        return None  # a piece would hang on nothing (issue #46)
     steps = [
         (
             same[size],
@@ -1237,6 +1258,21 @@ def _cut_steps(
         for size, piece in cover
     ]
     return tuple(steps)
+
+
+def _touches(
+    layout: Layout,
+    brick: PlacedBrick,
+    columns: frozenset[Column],
+    layers: tuple[int, ...],
+) -> bool:
+    """Some other part lies right below or above one of ``columns``."""
+    return any(
+        (found := layout.brick_at((x, y, z))) is not None
+        and found.brick_id != brick.brick_id
+        for x, y in columns
+        for z in layers
+    )
 
 
 def _rect_keys(
@@ -1671,6 +1707,12 @@ class LegolizationBackend:
         config = self.pipeline_config(
             settings, height_unit=grid.height_unit, allowed=allowed
         )
+        tiling_on = "tile" in settings.parts.categories
+
+        def tiles_need(parts: int) -> float:
+            """Time kept free for the tile check, like the export's."""
+            return tile_reserve_s(parts) if tiling_on else 0.0
+
         outcome = run_placement(
             to_lego_grid(grid),
             config,
@@ -1678,7 +1720,9 @@ class LegolizationBackend:
             stop_at=(
                 None
                 if deadline is None
-                else lambda parts: deadline - export_reserve_s(parts)
+                else lambda parts: (
+                    deadline - export_reserve_s(parts) - tiles_need(parts)
+                )
             ),
             progress=self._progress,
         )
@@ -1742,6 +1786,7 @@ class LegolizationBackend:
                 units=units,
                 buildable=stability.buildable if stability.checked else None,
                 best_so_far=outcome.final is None,
+                tiles_skipped=tiling.skipped,
             ),
             stability=stability,
             backend=NAME,
@@ -1773,7 +1818,7 @@ class LegolizationBackend:
         if "tile" not in parts.categories:
             return _Tiling()
         if not stability.checked:
-            return _Tiling(notes=(_TILES_UNCHECKED_NOTE,))
+            return _Tiling(notes=(_TILES_TIME_NOTE,), skipped=True)
         left = (
             math.inf
             if deadline is None
@@ -1785,7 +1830,7 @@ class LegolizationBackend:
             flat_top_plates(_tile_faces(grid, parts.tiles), grid.plates_per_cell),
             allowed=allowed.parts,
             base=parts.tiles_on_base,
-            heavier=left >= tile_check_s(len(layout)),
+            heavier=left >= tile_reserve_s(len(layout)),
             min_share=parts.tiles_min_share,
             split=parts.tiles_split,
         )
@@ -1798,17 +1843,20 @@ class LegolizationBackend:
                 f"{TILE_PARTS_GUIDE:.0%} guide)"
             )
             notes = (*notes, guide)
+        skipped = report.unchecked > 0
+        if skipped:
+            notes = (*notes, _TILES_TIME_NOTE)
         if not report.tiled or not report.heavier:
             # Nothing changed, or only lighter parts on the same supports: the
             # verdict stands (ADR 0020).
-            return _Tiling(notes=notes)
+            return _Tiling(notes=notes, skipped=skipped)
         self._say(f"{report.summary()}; checking stability again")
         snapshot = layout.copy()
         solver = config.solver
         pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tile-check")
         check = pool.submit(lambda: _report(snapshot, analyze(snapshot, solver)))
         pool.shutdown(wait=False)
-        return _Tiling(notes=notes, before=before, check=check)
+        return _Tiling(notes=notes, before=before, check=check, skipped=skipped)
 
     def _steps(
         self,
@@ -1939,6 +1987,7 @@ class LegolizationBackend:
                 source=placement.model.source,
                 units=units,
                 buildable=placement.stability.buildable,
+                tiles_skipped=placement.model.tiles_skipped,
             ),
             native=_Native(layout=native.layout, plan=plan, units=units),
         )
@@ -1979,6 +2028,8 @@ class LegolizationBackend:
             checked=checked,
             units=units,
             buildable=placement.model.buildable,
+            best_so_far=placement.model.best_so_far,
+            tiles_skipped=placement.model.tiles_skipped,
         )
         return replace(
             placement,
@@ -2505,6 +2556,7 @@ def to_brick_model(
     units: Mapping[int, int] | None = None,
     buildable: bool | None = None,
     best_so_far: bool = False,
+    tiles_skipped: bool = False,
 ) -> BrickModel:
     """Convert legolization's layout + plan into a :class:`BrickModel`.
 
@@ -2582,6 +2634,7 @@ def to_brick_model(
         mass_g=round(float(layout.total_mass_g()), 1),
         buildable=buildable,
         best_so_far=best_so_far,
+        tiles_skipped=tiles_skipped,
     )
 
 
