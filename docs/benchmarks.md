@@ -1133,3 +1133,38 @@ step planning and its measured time is about 0.02 s per part; keeping half of th
 part) is enough, because a longer check only eats into the time kept for the export (20 s + 0.03 s
 per part, the PDF needs about 0.012 s per part). With that the castle got its tiles (254 s, 135
 states checked).
+
+## Conditions for 2.0 (2026-11-12)
+
+Product owner's three conditions before tiles go on by default (ADR 0020, third amendment). Castle
+runs with the default settings of this branch (tiles on, 5 minutes, `--config
+examples/mesh2brick.yaml`), three times in a row per variant, on battery (the stricter case for time).
+
+**Why the four towers differed.** In the mesh the towers are equal (22 mm = 6.29 studs). The grid
+lies offset to the castle, and the open STEP mesh is voxelized by "every cell the surface touches",
+so the voxel towers differ, and with them legolization's bricks (analysis of the #45 layout):
+
+| Tower | Voxel top | Flat cells | Bricks on top | Cuts | Share | Tiled (#46) |
+|---|---|---:|---|---|---:|---|
+| SW | 7 × 7 (one partial cell on the inner side) | 6 × 6 | 2 × 6, 1 × 6, 1 × 4, 1 × 3 | 4 not held → moved one stud, 1 left whole | 69 % | no |
+| SE | 8 × 7 (partial cell inside, overhang outside) | 6 × 6 | 1 × 8, 3 × 2 × 8 | 4, held | 100 % | yes |
+| NW | 7 × 8 | 6 × 6 | 1 × 8, 3 × 2 × 8 | 4, held | 100 % | yes |
+| NE | 8 × 8 | 6 × 6 | 4 × 2 × 8 | 4, held | 100 % | yes |
+
+Reasons in the product owner's terms: the share after cutting (69 % for SW) because its cuts were not
+held across (no brick below spans the cut, so they moved one stud in), caused by the grid position of
+the voxel overhang; time played no part.
+
+**Results, three runs each** (identical in all three):
+
+| Variant | Tiles | Towers SW / SE / NW / NE | Parts (1.6: 1,657) | Deviation mean / p95 mm | One stable piece | Time s | Checked states |
+|---|---:|---|---|---|---|---|---|
+| Rand-Noppen (`tiles_overhang: false`, equal faces alike) | 122 | studs on all four | 1,716 (+3.6 %) | 3.27 / 8.00 | yes, 3 of 3 | 249–252 | 139–150 / 242 |
+| Rand-Fliesen (`tiles_overhang: true`) | 197 | tiled, all four (49/49, 56/56, 56/56, 64/64 cells) | 1,826 (+10.2 %) | 3.07 / 8.00 | yes, 3 of 3 | 259–263 | 128–134 / 258 |
+
+No run skipped tiles for time. The first Rand-Fliesen runs failed the stability check ("tiles undone")
+because a cut left a 1 × 1 brick at a tower corner with nothing below it; every piece of a cut now
+needs a part right below or above, and the overhang ring includes the corners.
+
+**Voxel inputs:** `heart.vox` keeps its 12 parts (no flat tops without a mesh); with
+`parts.tiles=all` it still gets tiles.
