@@ -110,3 +110,25 @@ can be tiled; otherwise the whole face keeps its studs.**
   (every face 100 %); the castle (courtyard 69 %, keep roof 53 %, walls 30 %, towers 0–8 %) and Duo's
   base (51 %, 33 %) get none, always because parts reach past the edge of the face. Splitting those
   parts at the edge would be the next step if the product owner wants these faces smooth.
+
+## Amendment (2026-11-11, issue #46): cut the parts at the edge of a face
+
+With the 85 % rule alone the castle and Duo got no tiles: on every face too many parts reached past
+its edge. The product owner chose to cut them (option B), with two conditions added: every cut must
+stay held, and +15 % parts per model is a guide, not a cap.
+
+- A part whose top lies only partly on a flat face (the rest beyond the face's edge **or under
+  another part**, e.g. a courtyard plate running under a wall) is cut at the edge **before** the
+  85 % rule: outside, parts of its family and height keep the studs (rectangles of legolization's
+  sizes, same colour, whitelist and colour availability respected); inside, as in 1.7.0, plates and
+  tiles where the face is. Where the face is a plate higher, nothing is cut: tiles are laid on the
+  open part. `parts.tiles_split` (default on when tiles are on) switches it off.
+- **Held across the cut:** a part right below or above must cover columns on both sides of the cut,
+  so the pieces stay tied together. If none does, the cut moves one stud into the face (the inside
+  shrinks by the band along the cut); if that does not help either, the part stays whole and keeps
+  its studs. The run reports both counts.
+- A cut changes connections, not only weight, so every model with a cut gets the stability check
+  (in the thread beside the step planning, undone if it fails).
+- Above 15 % more parts the run says so ("tiles add N parts (+x %, more than the 15 % guide)"); the
+  tiles stay.
+- Numbers: docs/benchmarks.md, "Cuts at the edge of flat faces (issue #46)".

@@ -14,6 +14,14 @@ phases (`v0.<phase>.0`) until 1.0.
   with the rule the castle and Duo get no tiles at all, so parts at the edge of flat faces will be
   split first (issue #46, product owner 2026-11-11).
 
+### Added
+- Cuts at the edge of flat faces (issue #46, product owner 2026-11-11): a part whose top lies only
+  partly on a flat face (past its edge or under a wall) is cut there before the 85 % rule, outside
+  keeping its studs, inside getting plates and tiles; each cut must stay held by a part above or
+  below reaching across it (else the cut moves one stud in, else the part stays whole). Setting
+  `parts.tiles_split` (default on); models with cuts get the stability check; more than 15 % extra
+  parts is reported as a note.
+
 ## [1.7.0] - 2026-11-10 - Tiles on flat tops (opt-in)
 
 The first 2.0 item (issue #42, ROADMAP item 9, ADR 0020): with `tile` in `parts.categories`, open

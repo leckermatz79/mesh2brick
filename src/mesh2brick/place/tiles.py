@@ -146,3 +146,55 @@ def tiled_faces(
         for face, total in open_cells.items()
         if total and tileable_cells.get(face, 0) >= min_share * total - 1e-9
     )
+
+
+Column = tuple[int, int]
+
+
+def rect_cover(
+    columns: Collection[Column], sizes: Collection[Footprint]
+) -> list[tuple[Footprint, frozenset[Column]]] | None:
+    """Cover ``(x, y)`` columns exactly with rectangles of ``sizes`` (``None``: no).
+
+    Greedy from the smallest uncovered column: it must be a corner of whatever
+    rectangle covers it, so the largest size that fits there, either way
+    round, is taken. Used to split a part along the edge of a flat face (issue
+    #46); shapes from a straight or stepped edge are always covered when
+    1 x 1 is among the sizes.
+    """
+    left = set(columns)
+    order = sorted(sizes, key=lambda s: (-s[0] * s[1], s))
+    pieces: list[tuple[Footprint, frozenset[Column]]] = []
+    while left:
+        x0, y0 = min(left)
+        for small, big in order:
+            block = next(
+                (
+                    cells
+                    for w, h in {(small, big), (big, small)}
+                    if (
+                        cells := frozenset(
+                            (x0 + i, y0 + j) for i in range(w) for j in range(h)
+                        )
+                    )
+                    <= left
+                ),
+                None,
+            )
+            if block is not None:
+                pieces.append(((small, big), block))
+                left -= block
+                break
+        else:
+            return None
+    return pieces
+
+
+def cut_band(inside: Collection[Column], outside: Collection[Column]) -> set[Column]:
+    """Inside columns next to the outside ones: one stud along the cut."""
+    out = set(outside)
+    return {
+        (x, y)
+        for x, y in inside
+        if {(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)} & out
+    }
