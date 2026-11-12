@@ -114,6 +114,10 @@ _TEXT: Final[dict[str, dict[Language, str]]] = {
             "more computing time it would usually need fewer parts."
         ),
     },
+    "tiles_skipped": {
+        "de": "Fliesen übersprungen: Zeitgrenze; empfohlen --time 10min.",
+        "en": "Tiles skipped: time limit; recommended --time 10min.",
+    },
     "best_so_far": {
         "de": (
             "Zeitgrenze erreicht, bevor ein stabiles Modell gefunden war: Das ist "

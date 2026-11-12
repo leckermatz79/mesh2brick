@@ -29,7 +29,8 @@ def test_defaults_match_spec() -> None:
     assert s.voxel.height_unit == "brick"
     assert s.voxel.fill == "hollow"
     assert s.color.single_color == 4
-    assert s.parts.categories == ("brick", "plate", "slope")  # on again in 1.3.0
+    # slopes on again in 1.3.0, tiles on since 2.0
+    assert s.parts.categories == ("brick", "plate", "slope", "tile")
     assert s.placement.strategy == "kollsker"  # benchmark choice (SPEC said luo)
     assert s.placement.time_limit_s == 300
     assert s.steps.sequencing == "auto"

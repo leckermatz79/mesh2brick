@@ -133,7 +133,7 @@ def test_voxelize_keeps_the_mask_and_npz_round_trips_it(tmp_path: Path) -> None:
     assert np.isfinite(shell).sum() == np.isfinite(grid.flat).sum()
 
 
-def test_grids_without_mask_treat_every_top_as_flat() -> None:
+def test_grids_without_mask_have_no_flat_tops() -> None:
     occupancy = np.zeros((2, 2, 2), dtype=bool)
     occupancy[:, :, 0] = True
     occupancy[0, 0, 1] = True
@@ -141,9 +141,7 @@ def test_grids_without_mask_treat_every_top_as_flat() -> None:
         occupancy=occupancy, color=np.where(occupancy, 4, -1).astype(np.int32)
     )
     assert grid.flat is None
-    faces = grid.flat_tops()
-    assert np.isfinite(faces).sum() == 4  # three on the ground layer, one above
-    assert np.all(faces[np.isfinite(faces)] == 0)
+    assert not np.isfinite(grid.flat_tops()).any()  # voxel files: no tiles
 
 
 def test_flat_cells_must_be_occupied() -> None:
@@ -171,3 +169,21 @@ def test_a_mesh_without_up_facing_faces_has_no_flat_tops() -> None:
         np.asarray(bottom_only.triangles), occupancy, lattice, lego_cell_height_mm=9.6
     )
     assert not np.isfinite(faces).any()
+
+
+def test_overhang_cells_join_the_face_only_when_asked() -> None:
+    # A 16 mm slab (2 studs) on 8 mm cells, plus a filled column beyond it
+    # that the mesh does not reach: voxels one cell past the face's edge.
+    slab = trimesh.creation.box(bounds=[[0, 0, 0], [16, 32, 19.2]])
+    lattice = plan_lattice(np.asarray(slab.bounds), pitch=PITCH, height_unit="brick")
+    occupancy = fill_fractions(np.asarray(slab.triangles), lattice) >= 0.5
+    beyond = int(np.flatnonzero(occupancy.any(axis=(1, 2))).max()) + 1
+    occupancy[beyond] = occupancy[beyond - 1]
+    triangles = np.asarray(slab.triangles)
+    plain = flat_tops(triangles, occupancy, lattice, lego_cell_height_mm=9.6)
+    rim = flat_tops(
+        triangles, occupancy, lattice, lego_cell_height_mm=9.6, overhang=True
+    )
+    assert not np.isfinite(plain[beyond]).any()
+    assert np.isfinite(rim[beyond]).sum() == np.isfinite(rim[beyond - 1]).sum() > 0
+    assert np.allclose(rim[beyond][np.isfinite(rim[beyond])], 0.0, atol=1e-5)

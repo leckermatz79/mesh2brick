@@ -333,7 +333,7 @@ def test_catalog_list_shows_settings_and_json() -> None:
     assert rows["3001"]["enabled"] is False
     assert rows["3003"]["enabled"] is True
     assert rows["3039"]["enabled"] is True  # slopes are on by default since 1.3.0
-    assert rows["3070b"]["enabled"] is False  # tiles stay opt-in
+    assert rows["3070b"]["enabled"] is True  # tiles are on by default since 2.0
     assert rows["3001"]["size"] == "2 x 4 x 1 brick"
     assert rows["3001"]["bricklink"] == "3001"
     assert 4 in rows["3001"]["colors"]  # Red

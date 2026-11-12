@@ -7,6 +7,22 @@ phases (`v0.<phase>.0`) until 1.0.
 ## [Unreleased]
 
 ### Changed
+- **Tiles are on by default** (product owner, 2026-11-12, after three conditions; ADR 0020, third
+  amendment): `tile` is in the default `parts.categories` and the example config;
+  `[brick, plate, slope]` gives the 1.6 result.
+- The time kept for the tiles' stability check is estimated from the part count (about 0.03 s per
+  part, minus what the export's reserve does not need; castle 10 s) and kept free during placement
+  too; if tiles fall victim to the time limit anyway, the run and the cover say "Tiles skipped: time
+  limit; recommended --time 10min" (`BrickModel.tiles_skipped`, schema 6).
+- Voxel inputs (`.vox`, `.npy`, `.grid.npz` without a mask) get no tiles unless `parts.tiles=all`.
+- Equal flat faces (same shape and height, also turned or mirrored, e.g. the castle's four towers)
+  are tiled together or not at all; every piece of a cut needs a part right below or above it.
+
+### Added
+- `parts.tiles_overhang`: cells that stand out at most one cell past the mesh next to a flat face
+  count as part of it ("Rand-Fliesen"; default off until the product owner decides).
+
+### Changed
 - Tiles go face by face (issue #44, product owner 2026-11-11): a flat face gets tiles only if at
   least 85 % of its open top can be tiled, otherwise all of it keeps its studs instead of looking
   patchy (castle tower rims, Duo's base edge). New setting `parts.tiles_min_share` (default 0.85;

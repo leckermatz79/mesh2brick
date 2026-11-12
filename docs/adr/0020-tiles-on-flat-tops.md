@@ -132,3 +132,28 @@ stay held, and +15 % parts per model is a guide, not a cap.
 - Above 15 % more parts the run says so ("tiles add N parts (+x %, more than the 15 % guide)"); the
   tiles stay.
 - Numbers: docs/benchmarks.md, "Cuts at the edge of flat faces (issue #46)".
+
+## Amendment (2026-11-12, 2.0): tiles on by default, after three conditions
+
+The product owner accepted tiles with cuts in principle and set three conditions for switching them
+on by default (`tile` is now in the default `parts.categories`; `[brick, plate, slope]` gives the
+1.6 result):
+
+1. **Time.** The reserve for the stability check of the tiles is estimated from the part count like
+   `export_reserve_s`: the check takes about 0.03 s per part (measured 0.014–0.029 s) and may run
+   into the export's slack (`export_reserve_s` minus 5 s + 0.015 s per part that LDraw, parts lists
+   and PDF need); only the rest (`tile_reserve_s`, castle 10 s) is kept free, during legolization's
+   run too. Changes that need the check are made only with that much time left. If tiles fall
+   victim to the time limit anyway, the run and the cover say "Tiles skipped: time limit;
+   recommended --time 10min" (`BrickModel.tiles_skipped`, schema 6).
+2. **Voxel inputs** (`.vox`, `.npy`, `.grid.npz` without a mask) have no flat tops: no tiles unless
+   `parts.tiles=all`.
+3. **Equal faces alike.** The four castle towers are equal in the mesh but became four different
+   voxel towers (the grid lies offset to the castle: 7 × 7, 8 × 7, 7 × 8 and 8 × 8 cells, always 6 × 6
+   flat ones), so legolization placed different bricks and only one tower's cuts were not held.
+   Faces of the same shape in the same layer (up to quarter turns and mirroring) are now tiled
+   together or not at all. A variant counts the cells that stand out at most one cell past the mesh
+   next to a face (a ring, corners included) as part of the face (`parts.tiles_overhang`,
+   "Rand-Fliesen"); the product owner decides on the castle pictures. With it, a cut piece once hung
+   on nothing at a tower corner, so every piece of a cut now needs a part right below or above it,
+   not only the cut as a whole.

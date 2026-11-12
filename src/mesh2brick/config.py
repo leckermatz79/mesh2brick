@@ -157,10 +157,13 @@ PartNumbers = Annotated[tuple[str, ...], BeforeValidator(_part_numbers)]
 class PartsConfig(_Section):
     """Which parts placement may use."""
 
-    categories: tuple[PartCategory, ...] = ("brick", "plate", "slope")
+    categories: tuple[PartCategory, ...] = ("brick", "plate", "slope", "tile")
     """Part families placement may use. ``slope`` is on again since 1.3.0: the
     LP attempt order made it cheap (every fixture stable, at most 1.45x the
-    time without slopes, docs/benchmarks.md); ``[brick, plate]`` turns it off."""
+    time without slopes, docs/benchmarks.md); ``[brick, plate]`` turns it off.
+    ``tile`` is on since 2.0 (product owner, 2026-11-12): smooth tiles on the
+    tops the 3D model has flat (ADR 0020); ``[brick, plate, slope]`` turns
+    them off and gives the result of 1.6."""
     include: PartNumbers = ()
     """LDraw part numbers to allow explicitly (whitelist, Phase 4)."""
     exclude: PartNumbers = ()
@@ -189,6 +192,12 @@ class PartsConfig(_Section):
     part) at the edge first, so whole faces can be tiled (product owner,
     2026-11-11, issue #46): outside they keep their studs, inside they get
     plates and tiles; each cut stays held by a part above or below."""
+    tiles_overhang: bool = False
+    """Count top cells that stand out at most one cell past the mesh next to a
+    flat face (rounding, or the surface voxelization of an open mesh) as part
+    of that face, so they get tiles too ("Rand-Fliesen"); off, they keep
+    their studs as a rim ("Rand-Noppen"). Product owner decides on the
+    castle pictures (2026-11-12)."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:
