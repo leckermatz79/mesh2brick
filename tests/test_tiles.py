@@ -215,6 +215,8 @@ def test_without_tile_in_categories_nothing_changes() -> None:
     also = backend.place(grid, off, name="box")
     assert also.model == plain.model
     assert backend.pipeline_config(off).tiles is False
+    on = backend.place(grid, load_settings(None, []), name="box")
+    assert any(p.category == "tile" for p in on.model.parts)
 
 
 @pytest.mark.ldraw

@@ -27,7 +27,7 @@ color:
   palette: common       # common: ~40 current LEGO colours | solid: all with catalogue numbers | all: every LDraw colour
   bands: [1, 2, 14, 25, 4]   # height_bands: colours bottom to top (Blue..Red)
 parts:
-  categories: [brick, plate, slope]   # also: tile; [brick, plate] turns slopes off
+  categories: [brick, plate, slope, tile]   # [brick, plate, slope]: no tiles (as 1.6); [brick, plate, tile]: no slopes
   include: []           # whitelist of LDraw numbers, e.g. [3001, 3003]; see `mesh2brick catalog list`
   exclude: []           # blacklist, e.g. [3008, 3007]; 3005 and 3024 are always needed
   max_parts: 5000
@@ -37,6 +37,7 @@ parts:
   tiles_on_base: true   # tiles also on the lowest brick layer (a base, a courtyard)
   tiles_min_share: 0.85 # a flat face gets tiles only if at least this share of it can (else all studs)
   tiles_split: true     # cut parts at the edge of a flat face (outside studs, inside plate + tile)
+  tiles_overhang: false # true: cells standing out one cell past the model next to a flat face get tiles too
 placement:
   backend: legolization
   strategy: kollsker    # passed to the backend (also: luo, greedy, bond, fast, smga, beauty)
