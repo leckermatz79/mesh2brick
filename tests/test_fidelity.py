@@ -19,6 +19,7 @@ from mesh2brick.fidelity import (
     surface_deviation,
     surface_samples,
     triangle_distances,
+    visible_parts,
     weighted_percentile,
 )
 from mesh2brick.model import STUD_HEIGHT_MM, BrickModel, BuildStep, PlacedPart
@@ -105,6 +106,72 @@ def test_slopes_are_sampled_on_their_sloped_face() -> None:
     # The sloped column falls from 9.6 mm to the 1.6 mm lip; nothing at full height.
     assert over_slope[:, 2].max() < 9.6
     assert over_slope[:, 2].min() == pytest.approx(0.0)
+
+
+def _hollow_box_with_inner_slope() -> tuple[PlacedPart, PlacedPart]:
+    """A 4 x 4 box, 4 bricks high, with a cavity; a slope on the cavity floor."""
+    cavity = {(x, y, z) for x in (1, 2) for y in (1, 2) for z in range(3, 9)}
+    cells = tuple(
+        (x, y, z)
+        for x in range(4)
+        for y in range(4)
+        for z in range(12)
+        if (x, y, z) not in cavity
+    )
+    shell = PlacedPart(
+        part="x", color=4, x=0, y=0, layer=0, yaw=0, cells=cells, step=0, studs=()
+    )
+    slope = PlacedPart(
+        part="3040b", color=4, x=1, y=1, layer=3, yaw=0, step=0, category="slope",
+        cells=tuple((1, y, z) for y in (1, 2) for z in range(3, 6)), studs=((1, 2),),
+    )  # fmt: skip
+    return shell, slope
+
+
+def test_slopes_on_the_inner_wall_of_a_hollow_model_are_not_surface() -> None:
+    # Up to 2.0 every sloped top counted, also those facing a cavity (2.1 fix).
+    shell, slope = _hollow_box_with_inner_slope()
+    _points, alone = surface_samples(_model(shell))
+    _points, with_slope = surface_samples(_model(shell, slope))
+    outside = 2 * 32 * 32 + 4 * 32 * 38.4
+    assert alone.sum() == pytest.approx(outside)
+    assert with_slope.sum() == pytest.approx(outside)
+
+
+def test_visible_parts_touch_the_air_around_the_model() -> None:
+    shell, slope = _hollow_box_with_inner_slope()
+    assert visible_parts(_model(shell, slope)) == {0}
+    outer = replace(
+        slope, x=0, cells=tuple((5, y, z) for y in (0, 1) for z in range(3))
+    )
+    assert visible_parts(_model(shell, slope, outer)) == {0, 2}
+    assert visible_parts(_model()) == frozenset()
+
+
+def _slope_2x1() -> PlacedPart:
+    """A 3040b falling towards -y: stud column (0, 1), sloped column (0, 0)."""
+    return PlacedPart(
+        part="3040b", color=4, x=0, y=0, layer=0, yaw=0, step=0, category="slope",
+        cells=tuple((0, y, z) for y in (0, 1) for z in range(3)), studs=((0, 1),),
+    )  # fmt: skip
+
+
+def test_sides_showing_above_a_slope_are_surface() -> None:
+    # A 1 x 1 brick beside the sloped column shows its side above the slope:
+    # the face falls from 3 plates to the 0.5 plate lip, so 1.25 plates on
+    # average are open (1.25 x 3.2 mm x 8 mm = 32 mm²); the slope's own side
+    # there (1.75 plates on average, 44.8 mm²) is hidden.
+    slope = _slope_2x1()
+    beside = PlacedPart(
+        part="3005", color=4, x=1, y=0, layer=0, yaw=0, step=0,
+        cells=tuple((1, 0, z) for z in range(3)), studs=(),
+    )  # fmt: skip
+    _p, alone = surface_samples(_model(slope))
+    points, both = surface_samples(_model(slope, beside))
+    brick_faces = 2 * 64 + 3 * 8 * 9.6  # top, bottom, three free sides
+    assert both.sum() == pytest.approx(alone.sum() - 44.8 + brick_faces + 32.0)
+    side = points[np.isclose(points[:, 0], 8.0) & (points[:, 2] > 0)]
+    assert len(side)  # samples on the brick's side at x = 8 mm, above the slope
 
 
 def test_triangle_distances_match_brute_force_sampling() -> None:
