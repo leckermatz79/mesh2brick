@@ -1,6 +1,6 @@
 # Projektstatus
 
-Stand: 2026-11-16 · **ROADMAP 8 – mehr Dachsteine ([#51](https://github.com/leckermatz79/mesh2brick/issues/51)): fertig, PR wartet auf dich** (Ziel-Release 2.1.0) · davor [2.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.0.0) (Fliesen standardmäßig an) · Nächster Schritt: deine zwei Fragen unten, dann Merge und Tag v2.1.0
+Stand: 2026-11-16 · **ROADMAP 8 – mehr Dachsteine ([#51](https://github.com/leckermatz79/mesh2brick/issues/51)): fertig, [PR #52](https://github.com/leckermatz79/mesh2brick/pull/52) wartet auf dich** (Ziel-Release 2.1.0) · davor [2.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.0.0) (Fliesen standardmäßig an) · Nächster Schritt: deine zwei Fragen unten, dann Merge und Tag v2.1.0
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
@@ -10,7 +10,7 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 
 ![Vorher (2.0.0) und nachher (2.1): Fliegenpilz, Hase, Torus](gallery/roadmap8b-slopes-2.1.png)
 
-## Erledigt: ROADMAP 8 – mehr Dachsteine (Issue #51, PR offen)
+## Erledigt: ROADMAP 8 – mehr Dachsteine (Issue #51, PR #52)
 
 - **Zuerst gemessen: legolizations ältere Variante `smooth`.** Sie setzt an runden Modellen 13–27 sichtbare Dachsteine, bei gleicher Teilezahl und stabil, **aber die Abweichung sinkt nicht** (Kugel 2,05 → 2,06 mm, Rakete 1,46 → 1,48 mm). Sie schaut nur auf die Voxel: Bei etwa der Hälfte der Stufen liegt das 3D-Modell dort, wo die Stufe schon näher ist als ein Dachstein.
 - **Dabei zwei Fehler in der 2.0-Messgröße gefunden und behoben.** (1) Dachsteine auf der Innenwand hohler Modelle (dorthin setzt legolization die meisten seiner Dachsteine) wurden als Außenfläche gemessen. Die runden Modelle standen in 2.0.0 deshalb zu schlecht da (Kugel 2,35 statt 2,05 mm, Hase 2,04 statt 1,96 mm). (2) Steht neben einem Dachstein ein höherer Stein, ist dessen Seite über der Schräge sichtbar. Diese Fläche fehlte in der Messung und in den Bildern; dort sah man kleine weiße Löcher. Beides ist korrigiert. Alle Vergleiche hier messen 2.0.0 neu mit der korrigierten Messgröße. Kästen, Burg und Duo ändern sich dadurch nicht.
