@@ -6,6 +6,18 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-15 - Tiles on by default
+
+Shape fidelity, first step (ROADMAP item 9 with issues #44 and #46): flat tops get smooth tiles by
+default, where the 3D model has them flat and at the height of the face. The cubes, the L-bracket
+and the two bodies now match their mesh exactly (surface deviation 0.66–0.83 / 3.20–4.05 mm → 0.00 /
+0.00 mm), the castle gets a smooth courtyard and keep (118 tiles, +3.3 % parts), Duo at 32 studs a
+smooth base ring; round shapes keep their studs. All 15 release runs are one stable piece
+(docs/benchmarks.md, "Release 2.0"). `[brick, plate, slope]` in `parts.categories` gives the 1.6
+result. New in this series: the shape fidelity metric (`mesh2brick.fidelity`), the 85 % share per
+face, cuts at face edges and the product owner's conditions for the default (ADR 0020 and its
+amendments).
+
 ### Changed
 - **Tiles are on by default** (product owner, 2026-11-12, after three conditions; ADR 0020, third
   amendment): `tile` is in the default `parts.categories` and the example config;
@@ -17,13 +29,6 @@ phases (`v0.<phase>.0`) until 1.0.
 - Voxel inputs (`.vox`, `.npy`, `.grid.npz` without a mask) get no tiles unless `parts.tiles=all`.
 - Equal flat faces (same shape and height, also turned or mirrored, e.g. the castle's four towers)
   are tiled together or not at all; every piece of a cut needs a part right below or above it.
-
-### Added
-- `parts.tiles_overhang`: cells that stand out at most one cell past the mesh next to a flat face
-  count as part of it ("Rand-Fliesen"). Off by default: the product owner chose studs on the rim
-  ("Rand-Noppen", 2026-11-15).
-
-### Changed
 - Tiles go face by face (issue #44, product owner 2026-11-11): a flat face gets tiles only if at
   least 85 % of its open top can be tiled, otherwise all of it keeps its studs instead of looking
   patchy (castle tower rims, Duo's base edge). New setting `parts.tiles_min_share` (default 0.85;
@@ -31,7 +36,15 @@ phases (`v0.<phase>.0`) until 1.0.
   with the rule the castle and Duo get no tiles at all, so parts at the edge of flat faces will be
   split first (issue #46, product owner 2026-11-11).
 
+### Fixed
+- A cut at the edge of a flat face can no longer split the model: every part a cut part touched
+  right below or above must stay one group through the new pieces (Duo at 48 studs was split in two
+  and lost all its tiles and step checks in the first 2.0 run).
+
 ### Added
+- `parts.tiles_overhang`: cells that stand out at most one cell past the mesh next to a flat face
+  count as part of it ("Rand-Fliesen"). Off by default: the product owner chose studs on the rim
+  ("Rand-Noppen", 2026-11-15).
 - Cuts at the edge of flat faces (issue #46, product owner 2026-11-11): a part whose top lies only
   partly on a flat face (past its edge or under a wall) is cut there before the 85 % rule, outside
   keeping its studs, inside getting plates and tiles; each cut must stay held by a part above or
