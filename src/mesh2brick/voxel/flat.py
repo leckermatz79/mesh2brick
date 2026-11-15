@@ -21,6 +21,10 @@ the mesh (ADR 0020):
    facet on a dome).
 5. **Edges.** A top cell next to a face, covered at least half by flat rays at
    that face's height, belongs to it: most faces do not end on a stud line.
+6. **Overhang** (optional): a top cell next to a face (corners included)
+   whose rays find that face or nothing at all stands out past the mesh
+   (rounding, or surface voxelization of an open mesh); with ``overhang`` it
+   belongs to the face too, at the face's height.
 
 The result marks the top cells that may get a tile, with the height of the
 face above the cell's top (cells; within half a cell, by the fill rule), so
@@ -55,6 +59,8 @@ EDGE_SHARE: Final = 0.5
 _IN_LAYER: Final = np.zeros((3, 3, 3), dtype=bool)
 _IN_LAYER[:, :, 1] = ndimage.generate_binary_structure(2, 1)
 _SIDES: Final = ((1, 0), (-1, 0), (0, 1), (0, -1))
+_AROUND: Final = (*_SIDES, (1, 1), (1, -1), (-1, 1), (-1, -1))
+"""One ring of cells around a face, corners included (the overhang)."""
 
 
 def top_cells(occupancy: NDArray[np.bool_]) -> NDArray[np.bool_]:
@@ -71,6 +77,7 @@ def flat_tops(
     *,
     lego_cell_height_mm: float,
     samples: int = 4,
+    overhang: bool = False,
 ) -> NDArray[np.float32]:
     """How far the flat face over each top cell lies above the cell's top.
 
@@ -84,6 +91,10 @@ def flat_tops(
         lego_cell_height_mm: real height of one cell layer (9.6 or 3.2 mm),
             the scale of :data:`TOLERANCE_MM`.
         samples: rays per cell and horizontal axis.
+        overhang: also count the top cells next to a face that stand out
+            beyond the mesh (every ray finds the face or nothing at all):
+            voxels the rounding put one cell past the face's edge (product
+            owner, 2026-11-12, "Rand-Fliesen").
     """
     tops = top_cells(occupancy)
     stats = _ray_stats(_closest_hits(triangles, tops, lattice, samples), tops.shape)
@@ -96,13 +107,24 @@ def flat_tops(
     face = core & (sizes[labels] >= MIN_FACE_CELLS)
     border = tops & ~face & level & (flat >= EDGE_SHARE * samples * samples)
     edge = np.zeros_like(face)
+    beyond = tops & ~face & (flat == rays) & (flat < EDGE_SHARE * samples * samples)
+    beyond &= level | (flat == 0)
+    height = mean.copy()
+    out = np.zeros_like(face)
     for dx, dy in _SIDES:
         neighbour_face = _shifted(face, dx, dy, fill=False)
         neighbour_mean = _shifted(mean, dx, dy, fill=np.inf)
         edge |= border & neighbour_face & (np.abs(neighbour_mean - mean) <= tolerance)
+    for dx, dy in _AROUND if overhang else ():
+        neighbour_face = _shifted(face | edge, dx, dy, fill=False)
+        neighbour_mean = _shifted(mean, dx, dy, fill=np.inf)
+        joins = beyond & neighbour_face & ~out
+        joins &= (flat == 0) | (np.abs(neighbour_mean - mean) <= tolerance)
+        height = np.where(joins & (flat == 0), neighbour_mean, height)
+        out |= joins
     top = np.arange(occupancy.shape[2]) + 1.0
     offset: NDArray[np.float32] = np.where(
-        face | edge, mean - top[None, None, :], np.nan
+        face | edge | out, height - top[None, None, :], np.nan
     ).astype(np.float32)
     return offset
 

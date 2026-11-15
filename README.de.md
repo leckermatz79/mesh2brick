@@ -92,14 +92,16 @@ uv run mesh2brick catalog show 3001
 uv run mesh2brick convert modell.stl -o out/ --set "parts.include=[3001, 3003, 3004]"
 uv run mesh2brick convert modell.stl -o out/ --set "parts.exclude=[3008, 3007]"
 
-# Glatte Oberseiten: Fliesen dort, wo das 3D-Modell flach ist (Oberseite eines Kastens,
-# Sockel), Noppen überall sonst. Platten werden zu gleich großen Fliesen, Steine zu
-# 2 Platten + Fliese; die Stabilität wird neu geprüft. Auch auf Treppen runder Formen:
-# --set parts.tiles=all; unterste Lage ohne Fliesen: --set parts.tiles_on_base=false. Eine Fläche
-# bekommt nur Fliesen, wenn mindestens 85 % davon fliesbar sind (sonst bleiben alle Noppen):
-# --set parts.tiles_min_share=0.85. Teile, die über den Rand einer Fläche reichen, werden
-# vorher dort geteilt (aus: --set parts.tiles_split=false)
-uv run mesh2brick convert modell.stl -o out/ --set "parts.categories=[brick, plate, slope, tile]"
+# Glatte Oberseiten (seit 2.0 Standard): Fliesen dort, wo das 3D-Modell flach ist (Oberseite
+# eines Kastens, Sockel), Noppen überall sonst; Platten werden zu Fliesen, Steine zu Platte(n)
+# + Fliese, auf der Höhe der Fläche; die Stabilität wird neu geprüft. Gleiche Flächen werden
+# gleich behandelt, eine Fläche bekommt nur Fliesen, wenn mindestens 85 % davon fliesbar sind,
+# Teile über ihren Rand werden dort geteilt. Voxeldateien (.vox, .npy) bekommen keine Fliesen.
+# Fehlt die Zeit für die Prüfung, sagen Lauf und Deckblatt „Fliesen übersprungen: Zeitgrenze;
+# empfohlen --time 10min“. Ohne Fliesen (wie 1.6):
+uv run mesh2brick convert modell.stl -o out/ --set "parts.categories=[brick, plate, slope]"
+# Auch auf Treppen runder Formen (und bei Voxeldateien): --set parts.tiles=all;
+# unterste Lage ohne Fliesen: --set parts.tiles_on_base=false
 
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
 uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placement.seed=3

@@ -158,6 +158,7 @@ def voxelize(
         occupancy,
         lattice,
         lego_cell_height_mm=lego_cell_height_mm(unit),
+        overhang=settings.parts.tiles_overhang,
     )
     # Model colours use the full lattice: surface points in empty border cells
     # (details too thin to fill a cell) still colour their filled neighbours.

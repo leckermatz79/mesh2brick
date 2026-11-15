@@ -15,19 +15,19 @@ Apple-M2-Max-Laptop (eine Umwandlung nach der anderen).
 
 | Model | Shows · zeigt | Parts | Steps | Colours | One stable piece | Time |
 |---|---|---:|---:|---:|---|---:|
-| `bunny_lowpoly.stl` | Organic shape, thin ears, overlapping shells · Organische Form, dünne Ohren, überlappende Hüllen | 873 | 126 | 1 | yes · ja | 81 s |
-| `cube_10mm.step` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 1,952 | 274 | 1 | yes · ja | 220 s |
-| `cube_10mm.stl` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 1,952 | 274 | 1 | yes · ja | 222 s |
+| `bunny_lowpoly.stl` | Organic shape, thin ears, overlapping shells · Organische Form, dünne Ohren, überlappende Hüllen | 873 | 126 | 1 | yes · ja | 122 s |
+| `cube_10mm.step` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 2,091 | 294 | 1 | yes · ja | 251 s |
+| `cube_10mm.stl` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 2,091 | 294 | 1 | yes · ja | 249 s |
 | `heart.vox` | MagicaVoxel input (legolization example) · MagicaVoxel-Eingabe | 12 | 7 | 1 | yes · ja | 4 s |
-| `l_bracket.stl` | Overhang · Überhang | 153 | 37 | 1 | yes · ja | 30 s |
-| `rocket.blend` | Blender file: materials, an Array modifier, a hidden helper, millimetre units · Blender-Datei: Materialien, Array-Modifier, verstecktes Hilfsobjekt, mm | 263 | 42 | 4 | yes · ja | 19 s |
-| `sphere_r10.stl` | Round shape · Runde Form | 1,499 | 207 | 1 | yes · ja | 126 s |
-| `textured_cube.obj` | Image texture (OBJ) · Bildtextur (OBJ) | 2,280 | 327 | 2 | yes · ja | 231 s |
-| `toadstool.obj` | Material colours (OBJ) · Materialfarben (OBJ) | 1,239 | 178 | 2 | yes · ja | 157 s |
-| `torus.stl` | Through-hole · Durchgehendes Loch | 552 | 74 | 1 | yes · ja | 25 s |
-| `two_bodies.step` | STEP with two coloured bodies · STEP mit zwei farbigen Körpern | 606 | 83 | 2 | yes · ja | 156 s |
-| `vertex_colors.ply` | Vertex colours (PLY) · Vertexfarben (PLY) | 1,519 | 212 | 4 | yes · ja | 141 s |
-| `castle.step` | Generated STEP, about 1,650 parts: the v1.0 timing case · Erzeugtes STEP, rund 1.650 Teile: der Zeit-Test für v1.0 | 1,657 | 234 | 3 | yes · ja | 223 s |
+| `l_bracket.stl` | Overhang · Überhang | 177 | 40 | 1 | yes · ja | 38 s |
+| `rocket.blend` | Blender file: materials, an Array modifier, a hidden helper, millimetre units · Blender-Datei: Materialien, Array-Modifier, verstecktes Hilfsobjekt, mm | 263 | 42 | 4 | yes · ja | 18 s |
+| `sphere_r10.stl` | Round shape · Runde Form | 1,499 | 207 | 1 | yes · ja | 263 s |
+| `textured_cube.obj` | Image texture (OBJ) · Bildtextur (OBJ) | 2,466 | 354 | 2 | yes · ja | 243 s |
+| `toadstool.obj` | Material colours (OBJ) · Materialfarben (OBJ) | 1,239 | 178 | 2 | yes · ja | 255 s |
+| `torus.stl` | Through-hole · Durchgehendes Loch | 552 | 74 | 1 | yes · ja | 33 s |
+| `two_bodies.step` | STEP with two coloured bodies · STEP mit zwei farbigen Körpern | 702 | 97 | 2 | yes · ja | 182 s |
+| `vertex_colors.ply` | Vertex colours (PLY) · Vertexfarben (PLY) | 1,519 | 212 | 4 | yes · ja | 261 s |
+| `castle.step` | Generated STEP, about 1,650 parts: the v1.0 timing case · Erzeugtes STEP, rund 1.650 Teile: der Zeit-Test für v1.0 | 1,712 | 241 | 3 | yes · ja | 250 s |
 
 ## bunny_lowpoly
 

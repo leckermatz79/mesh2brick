@@ -8,6 +8,7 @@ import numpy as np
 
 from mesh2brick.place.tiles import (
     TilePiece,
+    face_groups,
     flat_faces,
     flat_top_plates,
     tile_cover,
@@ -68,3 +69,22 @@ def test_a_face_is_tiled_from_the_share_on() -> None:
     assert tiled_faces(open_cells, tileable, 0.85) == {0, 2}
     assert tiled_faces(open_cells, tileable, 0.0) == {0, 1, 2}
     assert tiled_faces({0: 20}, {0: 17}, 0.85) == {0}  # exactly 85 %
+
+
+def test_equal_faces_share_a_group_whatever_their_turn() -> None:
+    tower = [(x, y, 29) for x in range(3) for y in range(2)]
+    turned = [(10 + y, 10 + x, 29) for x, y, _ in tower]  # a quarter turn away
+    other_layer = [(20 + x, y, 20) for x, y, _ in tower]
+    cells = [*tower, *turned, *other_layer]
+    faces = flat_faces(cells)
+    groups = face_groups(faces)
+    assert groups[faces[tower[0]]] == groups[faces[turned[0]]]
+    assert groups[faces[tower[0]]] != groups[faces[other_layer[0]]]
+
+
+def test_equal_faces_are_tiled_together_or_not_at_all() -> None:
+    open_cells = {0: 36, 1: 36, 2: 36, 3: 36, 4: 100}
+    tileable = {0: 36, 1: 36, 2: 36, 3: 25, 4: 90}  # one tower below 85 %
+    groups = {0: "tower", 1: "tower", 2: "tower", 3: "tower", 4: "court"}
+    assert tiled_faces(open_cells, tileable, 0.85, groups) == {4}
+    assert tiled_faces(open_cells, tileable, 0.85) == {0, 1, 2, 4}

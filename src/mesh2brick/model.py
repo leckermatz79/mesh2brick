@@ -22,13 +22,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 Cell = tuple[int, int, int]
-SCHEMA_VERSION: Final = 5
+SCHEMA_VERSION: Final = 6
 """Version 2 (Phase 6) added step verdicts, pre-assembly units, mass and the
 buildability verdict; version 3 (Phase 7) added section titles and step
 texts; version 4 (Roadmap 2) the time-limit mark ``best_so_far``; version 5
-(1.3.0) the stud columns of slopes. Older files still load (the new fields
-default)."""
-READABLE_SCHEMAS: Final = frozenset({1, 2, 3, 4, SCHEMA_VERSION})
+(1.3.0) the stud columns of slopes; version 6 (2.0) the mark
+``tiles_skipped``. Older files still load (the new fields default)."""
+READABLE_SCHEMAS: Final = frozenset({1, 2, 3, 4, 5, SCHEMA_VERSION})
 MAX_SECTION_CHARS: Final = 40
 MAX_STEP_TEXT_CHARS: Final = 200
 MM_PER_STUD: Final = 8.0
@@ -167,6 +167,9 @@ class BrickModel:
     best_so_far: bool = False
     """The time limit stopped the backend; this is the best model it had found
     by then (ADR 0015)."""
+    tiles_skipped: bool = False
+    """Tiles were on, but the time limit left no time to check them, so flat
+    tops kept studs that would have got tiles (ADR 0020)."""
 
     def __post_init__(self) -> None:
         if self.parts and not self.steps:
@@ -254,6 +257,7 @@ class BrickModel:
             "mass_g": self.mass_g,
             "buildable": self.buildable,
             "best_so_far": self.best_so_far,
+            "tiles_skipped": self.tiles_skipped,
             "steps": [asdict(step) for step in self.steps],
             "colors": {str(code): asdict(info) for code, info in self.colors.items()},
             "parts": [
@@ -295,6 +299,7 @@ class BrickModel:
                 None if data.get("buildable") is None else bool(data["buildable"])
             ),
             best_so_far=bool(data.get("best_so_far", False)),
+            tiles_skipped=bool(data.get("tiles_skipped", False)),
         )
 
     def to_json(self) -> str:

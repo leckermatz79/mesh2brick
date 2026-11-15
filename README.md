@@ -89,13 +89,15 @@ uv run mesh2brick catalog show 3001
 uv run mesh2brick convert model.stl -o out/ --set "parts.include=[3001, 3003, 3004]"
 uv run mesh2brick convert model.stl -o out/ --set "parts.exclude=[3008, 3007]"
 
-# Smooth tops: tiles where the 3D model is flat (the top of a box, a base), studs
-# everywhere else. Plates become tiles of the same size, bricks 2 plates + tile; stability
-# is checked again. On the stairs of round shapes too: --set parts.tiles=all; none on the
-# lowest layer: --set parts.tiles_on_base=false. A face gets tiles only if at least 85 % of it
-# can (else it keeps all its studs): --set parts.tiles_min_share=0.85. Parts reaching past a
-# face's edge are cut there first (off: --set parts.tiles_split=false)
-uv run mesh2brick convert model.stl -o out/ --set "parts.categories=[brick, plate, slope, tile]"
+# Smooth tops (on by default since 2.0): tiles where the 3D model is flat (the top of a box,
+# a base), studs everywhere else; plates become tiles, bricks plate(s) + tile, at the height of
+# the face; stability is checked again. Equal faces are treated alike, a face is tiled only if
+# at least 85 % of it can be, parts reaching past its edge are cut there first. Voxel files
+# (.vox, .npy) get no tiles. If the time limit leaves no time to check them, the run and the
+# cover say "tiles skipped: time limit; recommended --time 10min". No tiles (as in 1.6):
+uv run mesh2brick convert model.stl -o out/ --set "parts.categories=[brick, plate, slope]"
+# Also on the stairs of round shapes (and voxel files): --set parts.tiles=all;
+# none on the lowest layer: --set parts.tiles_on_base=false
 
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3

@@ -134,18 +134,63 @@ def flat_faces(cells: Iterable[Cell]) -> dict[Cell, int]:
 
 
 def tiled_faces(
-    open_cells: Mapping[int, int], tileable_cells: Mapping[int, int], min_share: float
+    open_cells: Mapping[int, int],
+    tileable_cells: Mapping[int, int],
+    min_share: float,
+    groups: Mapping[int, object] | None = None,
 ) -> frozenset[int]:
     """Faces whose tileable share of the open top reaches ``min_share``.
 
     ``open_cells``: per face, its cells with nothing on them; ``tileable_cells``:
-    per face, those of them under parts that can get a smooth top.
+    per face, those of them under parts that can get a smooth top. Faces with
+    the same ``groups`` value (equal faces, :func:`face_groups`) are tiled
+    together or not at all: only when every one of them reaches the share.
     """
-    return frozenset(
+    passing = {
         face
         for face, total in open_cells.items()
         if total and tileable_cells.get(face, 0) >= min_share * total - 1e-9
-    )
+    }
+    if groups is None:
+        return frozenset(passing)
+    failing = {groups.get(face) for face in open_cells if face not in passing}
+    return frozenset(face for face in passing if groups.get(face) not in failing)
+
+
+def face_groups(face_of: Mapping[Cell, int]) -> dict[int, tuple[object, ...]]:
+    """A key per face; faces of the same shape in the same layer share it.
+
+    The shape is the face's cells moved to the origin, the same under every
+    quarter turn and mirror image: the four towers of a castle are equal
+    faces even though they lie at different corners (product owner,
+    2026-11-12: equal faces are treated alike).
+    """
+    cells: dict[int, list[Cell]] = {}
+    for cell, face in face_of.items():
+        cells.setdefault(face, []).append(cell)
+    keys: dict[int, tuple[object, ...]] = {}
+    for face, members in cells.items():
+        layer = members[0][2]
+        columns = [(x, y) for x, y, _ in members]
+        keys[face] = (layer, _canonical(columns))
+    return keys
+
+
+def _canonical(columns: list[Column]) -> tuple[Column, ...]:
+    """The smallest of the 8 turned and mirrored copies, moved to the origin."""
+    shapes = []
+    for turn in range(4):
+        for mirror in (False, True):
+            moved = []
+            for column in columns:
+                a, b = column
+                for _ in range(turn):
+                    a, b = -b, a
+                moved.append((-a, b) if mirror else (a, b))
+            x0 = min(c[0] for c in moved)
+            y0 = min(c[1] for c in moved)
+            shapes.append(tuple(sorted((x - x0, y - y0) for x, y in moved)))
+    return min(shapes)
 
 
 Column = tuple[int, int]

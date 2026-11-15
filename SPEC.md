@@ -133,7 +133,7 @@ color:
   single_color: 4       # LDraw-Code
   palette: common       # common|solid|all (2026-11-01: common = ~40 aktuelle LEGO-Farben, Standard; solid = alle Volltonfarben mit Katalognummern; all = alle LDraw-Volltonfarben, ADR 0008)
 parts:
-  categories: [brick, plate, slope]   # slope war 2026-11-01 bis 1.3.0 opt-in (legolization 0.5.0 bis zu 50x langsamer); seit 1.3.0 (ROADMAP Punkt 8, Issue #34) wieder Standard: die Reihenfolge der LP-Versuche macht Slopes billig (alle Fixtures stabil, höchstens 1,45-fache Zeit)
+  categories: [brick, plate, slope, tile]   # tile seit 2.0 Standard (PO 2026-11-12, ADR 0020: Fliesen nur auf flachen Flächen des 3D-Modells); slope war 2026-11-01 bis 1.3.0 opt-in (legolization 0.5.0 bis zu 50x langsamer); seit 1.3.0 (ROADMAP Punkt 8, Issue #34) wieder Standard: die Reihenfolge der LP-Versuche macht Slopes billig (alle Fixtures stabil, höchstens 1,45-fache Zeit)
   include: []
   exclude: []
   max_parts: 5000
