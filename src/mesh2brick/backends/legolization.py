@@ -1175,6 +1175,8 @@ def _plan_cut(  # noqa: PLR0911 - every way a cut can fail, spelled out
     )  # fmt: skip
     if pieces is None:
         return _TopPlan(brick, tuple(roof), "kept")
+    if not _stays_together(layout, brick, pieces):
+        return _TopPlan(brick, tuple(roof), "loose")
     if not heavier:
         return _TopPlan(brick, tuple(roof), "unchecked")
     tiled = tuple(c for c in roof if (c[0], c[1]) in inner)
@@ -1258,6 +1260,45 @@ def _cut_steps(
         for size, piece in cover
     ]
     return tuple(steps)
+
+
+def _stays_together(
+    layout: Layout,
+    brick: PlacedBrick,
+    pieces: tuple[tuple[str, frozenset[Cell], int], ...],
+) -> bool:
+    """The parts ``brick`` touched stay one group through its new pieces.
+
+    ``brick`` held every part right below and above it together; the pieces
+    of a cut must do the same, or the cut could split the model (Duo at 48
+    studs: a ground brick held only through the cut part became a loose
+    island of three parts, 2026-11-15).
+    """
+    cells = layout.cells_of(brick)
+    low, high = min(c[2] for c in cells) - 1, max(c[2] for c in cells) + 1
+    near = {
+        found.brick_id: frozenset(layout.cells_of(found))
+        for x, y, _ in cells
+        for z in (low, high)
+        if (found := layout.brick_at((x, y, z))) is not None
+        and found.brick_id != brick.brick_id
+    }
+    groups = [piece for _, piece, _ in pieces] + list(near.values())
+    owner = {cell: i for i, group in enumerate(groups) for cell in group}
+    parent = list(range(len(groups)))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i, group in enumerate(groups):
+        for x, y, z in group:
+            for other in (owner.get((x, y, z - 1)), owner.get((x, y, z + 1))):
+                if other is not None:
+                    parent[root(i)] = root(other)
+    return len({root(i) for i in range(len(groups))}) == 1
 
 
 def _touches(

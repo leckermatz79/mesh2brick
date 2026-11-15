@@ -481,3 +481,19 @@ def test_no_cut_when_a_piece_would_hang_on_nothing() -> None:
     report = apply_tiles(layout, flat, split=True)
     assert report.cut == 0
     assert _parts(layout) == {"3023": 1, "3003": 1}
+
+
+def test_no_cut_that_would_split_the_model() -> None:
+    # A 2 x 2 brick (layers 3..5) on a 1 x 2 brick under its x = 0 column and a
+    # 1 x 1 ground brick under (1, 0), which nothing else holds. Only (0, 0)
+    # is on the face. The cut is held (the 1 x 2 below spans it), but the
+    # outside piece over (1, 0) would hold just the ground brick: an island.
+    layout = _layout_with(
+        ("brick_1x2", 0, 0, 0, 90),  # x 0, y 0..1
+        ("brick_1x1", 1, 0, 0, 0),  # the ground brick at (1, 0)
+        ("brick_2x2", 0, 0, 3, 0),
+    )
+    report = apply_tiles(layout, {(0, 0, 5): 0.0}, split=True)
+    assert report.cut == 0
+    assert report.cut_loose == 1
+    assert _parts(layout) == {"3004": 1, "3005": 1, "3003": 1}
