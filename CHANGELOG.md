@@ -20,7 +20,8 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ### Added
 - `parts.tiles_overhang`: cells that stand out at most one cell past the mesh next to a flat face
-  count as part of it ("Rand-Fliesen"; default off until the product owner decides).
+  count as part of it ("Rand-Fliesen"). Off by default: the product owner chose studs on the rim
+  ("Rand-Noppen", 2026-11-15).
 
 ### Changed
 - Tiles go face by face (issue #44, product owner 2026-11-11): a flat face gets tiles only if at

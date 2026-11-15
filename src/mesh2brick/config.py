@@ -196,8 +196,8 @@ class PartsConfig(_Section):
     """Count top cells that stand out at most one cell past the mesh next to a
     flat face (rounding, or the surface voxelization of an open mesh) as part
     of that face, so they get tiles too ("Rand-Fliesen"); off, they keep
-    their studs as a rim ("Rand-Noppen"). Product owner decides on the
-    castle pictures (2026-11-12)."""
+    their studs as a rim ("Rand-Noppen", the default: the product owner
+    preferred studs on the castle's towers, 2026-11-15)."""
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:
