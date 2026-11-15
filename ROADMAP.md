@@ -84,6 +84,8 @@ Product owner, 2026-11-11 (after #44): the 85 % rule left the castle and Duo wit
 next, still before item 8: parts reaching past the edge of a flat face are split there (inside plate + tile, outside
 the brick stays) before the 85 % rule, at most +15 % parts per model. If the pictures convince, tiles go on by default
 with splitting and 2.0.0; otherwise tiles go on with the 85 % rule only (also 2.0.0).
+Item 8 (issue #51, target 2.1.0, product owner 2026-11-15): an own slope pass after placement like the tiles,
+no change to legolization; slopes are rated against the input mesh, the deviation is the acceptance metric.
 
 ---
 

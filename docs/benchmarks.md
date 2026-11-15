@@ -1209,3 +1209,108 @@ release run (placement unchanged since), its deviation from "Shape fidelity base
   tiles at 48 studs), and 188 of 324 states are checked again (1.6: 214; this part of the run was
   on battery, so its timings are not comparable). The castle loses 2 of 34 cuts to the same rule
   (122 → 118 tiles, same faces).
+
+## Slopes (ROADMAP 8, 2026-11-15)
+
+Issue #51, ADR 0021. Three release runs (`scripts/benchmark_release.py`): **2.0.0** (`out/release-2.0`,
+legolization's `preserve` pass), **smooth** (`--set parts.slopes=smooth`, fixtures and castle; Duo
+leaves out all slopes for its colours in that mode, so it was not run; the first half of this run
+was on battery, the rest on mains power, so its times are indicative) and **2.1** (`out/slopes/mesh`,
+the final pass, all 15 inputs, mains power, no sleep). The deviation of all three is measured again
+with the 2.1 metric: `uv run python scripts/benchmark_slopes.py out/release-2.0 out/slopes/smooth
+out/slopes/mesh --labels 2.0.0 smooth 2.1 --remeasure --local samples/Duo_Duolingo.3mf`.
+
+**Two fixes in the metric first.** (1) Up to 2.0 every sloped top counted as outer surface, also the
+tops of the slopes on the inner wall of hollow models (legolization's `preserve` puts most of its
+slopes there). They lie far from the mesh, so the round fixtures read too high: sphere 2.35 / 4.82
+instead of 2.05 / 4.59 mm, vertex-colour sphere 2.36 / 4.85 instead of 2.06 / 4.58, bunny 2.04 / 4.50
+instead of 1.96 / 4.40, toadstool 2.03 / 4.58 instead of 1.96 / 4.50, torus 1.95 / 4.48 instead of
+1.90 / 4.46. Now a sloped top counts when the cell above it is outside air. (2) A part right beside a
+sloped column, taller than the slope's face there, shows its side above the face; the slope's cells
+count as filled, so neither the metric nor the preview had that face (small white holes in previews
+of slope-rich models). Both now take it from `render.preview.slope_gap_faces` (clipped per plate;
+32 mm² beside a 3040b). Boxes, castle, heart and Duo (no slope outside) are unchanged.
+
+**legolization's two modes** (deviation mean / p95 mm, 2.1 metric; slopes, visible in brackets):
+
+| Input | 2.0.0 (`preserve`) | `smooth` |
+|---|---|---|
+| `bunny_lowpoly.stl` | 14 (4) · 873 parts · 1.96 / 4.40 · stable · 122 s | 13 (12) · 873 · 1.96 / 4.41 · stable · 109 s |
+| `rocket.blend` | 0 · 263 · 1.46 / 3.18 · stable · 18 s | 13 (13) · 263 · 1.48 / 3.22 · stable · 17 s |
+| `sphere_r10.stl` | 46 (0) · 1,499 · 2.05 / 4.59 · stable · 263 s | 22 (22) · 1,499 · 2.06 / 4.60 · stable · 258 s |
+| `toadstool.obj` | 16 (5) · 1,239 · 1.96 / 4.50 · stable · 255 s | 27 (26) · 1,240 · 1.97 / 4.52 · stable · 261 s |
+| `torus.stl` | 4 (0) · 552 · 1.90 / 4.46 · stable · 33 s | 18 (18) · 552 · 1.91 / 4.48 · stable · 24 s |
+| `vertex_colors.ply` | 46 (0) · 1,519 · 2.06 / 4.58 · stable · 261 s | 23 (23) · 1,519 · 2.07 / 4.59 · stable · 257 s |
+| `castle.step`, `--config` | 4 (1) · 1,712 · 3.27 / 8.00 · stable · 250 s | 13 (0) · 1,707 · 3.27 / 8.00 · stable · 249 s |
+| boxes, heart | 0 slopes, unchanged | 0 slopes, unchanged |
+
+`smooth` turns 1 x 1 columns at descending stairs into 45° slopes over the stair below: 13–27
+visible slopes per round model at the same part count and stability, but **no lower deviation**
+(sphere 2.05 → 2.06, rocket 1.46 → 1.48 mm). It never looks at the mesh, and on about half of the
+stairs the mesh runs where the stair is already closer than a slope would be (ADR 0021, Context).
+
+**Tuning the own pass** (bunny, sphere, toadstool; first on voxel models with a slope wherever a
+site was rated, then on the saved 2.0.0 layouts; metric without fix 2 for these rows):
+
+- **Minimum gain** 0 / 0.5 / 1 / 2 mm, voxel models: sphere 1.844 / 1.843 / 1.851 / 1.885 mm with
+  356 / 328 / 284 / 188 slopes, toadstool 1.710 / 1.711 / 1.719 / 1.755 mm. 0.5 mm keeps the
+  deviation with 8 % fewer slopes.
+- **Tilt windows** (45° / 33° slopes): 25–75° / 12–50° sphere 1.843, toadstool 1.711; 15–85° /
+  8–60° 1.808 and 1.701 (chosen); 30–65° / 15–40° 1.888 and 1.766; no gate at all 1.820 and 1.720.
+  The gain does most of the choosing; the gate keeps slopes off level and vertical surfaces.
+- **Hold rule** (saved bunny layout): parts around a cut must hang together through the new parts
+  alone: 115 slopes, 86 of 229 sites blocked; through at most 15 / 40 / 200 parts nearby: 115 /
+  122 / 138 slopes; "the model stays one piece" (chosen): 140 slopes. Every variant stable, highest
+  load 0.017 of 1.
+- **Parts per slope** (bunny, one piece): no limit 140 slopes, +18.3 % parts, 1.763 / 4.099 mm; at
+  most +2 parts per slope (chosen) 129, +14.2 %, 1.783 / 4.133; at most +1: 77, +5.4 %, 1.851 /
+  4.228. Cheap sites first, then the rest: 145, +18.0 %, 1.764 / 4.090 (no help). A slope's gain
+  does not depend on its cost (mean gain 2.3–3.8 mm for every cost from −1 to +5 parts).
+- **A parts limit per model** (`parts.slopes_max_share`, off by default): at +15 % the torus gets 84
+  instead of 169 slopes, 1.742 / 4.250 instead of 1.661 / 4.137 mm (+31 % parts without the limit);
+  the sphere 239 instead of 318, 1.891 / 4.365 instead of 1.873 / 4.337 mm (+22 %).
+
+**Release run 2.1** (2.1 metric for both columns):
+
+| Input | Parts 2.0.0 → 2.1 | Slopes (visible) | Deviation mean / p95 mm | One stable piece | Time s | Checked states | PDF MB |
+|---|---|---|---|---|---|---|---:|
+| `bunny_lowpoly.stl` | 873 → 997 (+124, +14.2 %) | 14 (4) → 143 (133) | 1.96 / 4.40 → 1.78 / 4.12 | yes | 122 → 138 | 126/126 → 137/137 | 3.04 |
+| `cube_10mm.step` | 2,091 → 2,091 | 0 → 0 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 251 → 247 | 119/294 → 123/294 | 6.38 |
+| `cube_10mm.stl` | 2,091 → 2,091 | 0 → 0 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 249 → 248 | 120/294 → 125/294 | 6.38 |
+| `heart.vox` | 12 → 12 | 0 → 0 | 0.08 / 0.85 → 0.08 / 0.85 | yes | 4 → 4 | 7/7 → 7/7 | 0.29 |
+| `l_bracket.stl` | 177 → 177 | 0 → 0 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 38 → 36 | 40/40 → 40/40 | 1.29 |
+| `rocket.blend` | 263 → 285 (+22, +8.4 %) | 0 → 33 (33) | 1.46 / 3.18 → 1.35 / 3.18 | yes | 18 → 20 | 42/42 → 48/48 | 1.27 |
+| `sphere_r10.stl` | 1,499 → 1,826 (+327, +21.8 %) | 46 (0) → 318 (272) | 2.05 / 4.59 → 1.86 / 4.33 | yes | 263 → 261 | 157/207 → 135/242 | 5.17 |
+| `textured_cube.obj` | 2,466 → 2,466 | 0 → 0 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 243 → 243 | 125/354 → 127/354 | 9.83 |
+| `toadstool.obj` | 1,239 → 1,431 (+192, +15.5 %) | 16 (5) → 208 (197) | 1.96 / 4.50 → 1.75 / 4.20 | yes | 255 → 261 | 178/178 → 149/200 | 4.35 |
+| `torus.stl` | 552 → 723 (+171, +31.0 %) | 4 (0) → 169 (165) | 1.90 / 4.46 → 1.65 / 4.12 | yes | 33 → 46 | 74/74 → 102/102 | 2.67 |
+| `two_bodies.step` | 702 → 702 | 0 → 0 | 0.00 / 0.00 → 0.00 / 0.00 | yes | 182 → 179 | 97/97 → 97/97 | 2.44 |
+| `vertex_colors.ply` | 1,519 → 1,856 (+337, +22.2 %) | 46 (0) → 325 (279) | 2.06 / 4.58 → 1.86 / 4.35 | yes | 261 → 263 | 153/212 → 122/254 | 6.74 |
+| `castle.step` (generated), `--config` | 1,712 → 1,712 | 4 (1) → 4 (1) | 3.27 / 8.00 → 3.27 / 8.00 | yes | 250 → 249 | 143/241 → 148/241 | 5.14 |
+| Duo @32 (local only) | 1,081 → 1,190 (+109, +10.1 %) | 0 → 109 (109) | 1.72 / 4.23 → 1.61 / 4.03 | yes | 143 → 156 | 161/161 → 176/176 | 4.06 |
+| Duo @48, 20 min (local only) | 2,308 → 2,650 (+342, +14.8 %) | 0 → 311 (311) | 1.76 / 4.29 → 1.64 / 4.09 | yes | 1151 → 1160 | 188/324 → 189/371 | 9.07 |
+
+- **Every run is one stable piece**; no slope was undone. Round shapes come 9–13 % closer to their
+  mesh on average and 5–8 % at the 95th percentile (torus most, the spheres least); Duo 6–7 % and
+  5 %; the rocket 8 % on average (its 95th percentile is the fins' edges, unchanged).
+- **Unchanged:** cubes, textured cube, L-bracket, two bodies, castle and heart have the same parts
+  in the same steps and pixel-identical previews as 2.0.0 (no candidate on boxes; the castle's mesh
+  is open, so it is not rated; the heart is a voxel file).
+- **Parts:** +8 % to +15 % on rocket, Duo, bunny and toadstool; +22 % on the two spheres and +31 % on
+  the torus (above the +15 % guide; the run says so). 30–200 stairs per round model keep their step
+  because a slope would add more than two parts.
+- **Colours:** Duo uses slopes in the colours LEGO makes them in; 38 (32 studs) / 93 (48 studs)
+  stairs keep their step because 3039 and 4286 do not exist in Bright Green (colour 10), handed over
+  to ROADMAP 12. The textured cube has no candidate.
+- **Time:** bunny 1.13 times its 2.0.0 time (ROADMAP: at most 2); castle 249 s and textured cube
+  243 s stay under 300 s. The slope pass itself takes 0.2–0.4 s (bunny, torus, sphere), the rating
+  0.02–0.5 s (Duo with 2.1 million triangles); the stability
+  check of the finished model runs beside the step planning. Models that use all 5 minutes check
+  fewer intermediate states (sphere 135 of 242, vertex-colour sphere 122 of 254, toadstool 149 of
+  200); the cover says how many.
+- **Estimate:** `inspect` now adds 0.45 / 0.58 / 0.75 parts per stud cell worth a slope (measured
+  0.49–0.71); 15 of 15 inside the range (`scripts/benchmark_estimate.py --results out/slopes/mesh`;
+  without the term the bunny was outside).
+- **Output checks:** all files, parts-list totals and strict LDraw re-reads pass; the parts list
+  shows 3039, 3040b and 4286 with their names and pictures; step pictures and "first" boxes show
+  the slopes. Pictures: `out/slopes/vorher-nachher/` (local), `docs/gallery/roadmap8b-slopes-2.1.png`.

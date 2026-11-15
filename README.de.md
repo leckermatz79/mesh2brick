@@ -103,6 +103,17 @@ uv run mesh2brick convert modell.stl -o out/ --set "parts.categories=[brick, pla
 # Auch auf Treppen runder Formen (und bei Voxeldateien): --set parts.tiles=all;
 # unterste Lage ohne Fliesen: --set parts.tiles_on_base=false
 
+# Dachsteine an Rundungen (seit 2.1 Standard): Wo das 3D-Modell geneigt ist und ein Dachstein
+# näher an ihm liegt als die Voxelstufe, bekommt die Stufe einen 45°- oder 33°-Dachstein (3040b,
+# 3039, 4286); ein Dachstein darf auch die Ecke einer Stufe füllen. Kästen bleiben, wie sie sind,
+# das Modell bleibt ein stabiles Stück (neu geprüft, sonst zurückgenommen). Dachsteine, die LEGO
+# in einer Farbe nicht herstellt, bleiben Stufen (der Lauf zählt sie). Voxeldateien bekommen nur
+# legolizations eigene Dachsteine. Wie in 2.0:
+uv run mesh2brick convert modell.stl -o out/ --set parts.slopes=preserve
+# Dachsteine kosten Teile (runde Modelle +10 % bis +30 %); höchstens +15 % für Dachsteine, die
+# besten zuerst: --set parts.slopes_max_share=0.15. Ganz ohne Dachsteine:
+# --set "parts.categories=[brick, plate, tile]"
+
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
 uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placement.seed=3
 
