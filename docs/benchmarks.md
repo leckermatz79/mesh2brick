@@ -1168,3 +1168,44 @@ needs a part right below or above, and the overhang ring includes the corners.
 
 **Voxel inputs:** `heart.vox` keeps its 12 parts (no flat tops without a mesh); with
 `parts.tiles=all` it still gets tiles.
+
+## Release 2.0 (2026-11-15)
+
+`uv run python scripts/benchmark_release.py --out out/release-2.0 --local samples/Duo_Duolingo.3mf@32
+--local samples/Duo_Duolingo.3mf@48:1200` with the 2.0 defaults (tiles on, Rand-Noppen), mains power
+for the first 11 inputs, battery for the rest (lid open; no sleep during the run). "1.6" is the 1.5
+release run (placement unchanged since), its deviation from "Shape fidelity baseline".
+
+| Input | Parts 1.6 → 2.0 | Tiles | Deviation mean / p95 mm, 1.6 → 2.0 | One stable piece | Time s 1.6 → 2.0 | Checked states | PDF MB |
+|---|---|---:|---|---|---|---|---:|
+| bunny_lowpoly.stl | 873 → 873 | 0 | 2.04 / 4.50 → 2.04 / 4.50 | yes | 120 → 122 | 126/126 | 2.62 |
+| cube_10mm.step | 1,952 → 2,091 (+139, +7.1 %) | 139 | 0.83 / 4.05 → 0.00 / 0.00 | yes | 250 → 251 | 119/294 | 6.38 |
+| cube_10mm.stl | 1,952 → 2,091 (+139, +7.1 %) | 139 | 0.83 / 4.05 → 0.00 / 0.00 | yes | 249 → 249 | 120/294 | 6.38 |
+| heart.vox | 12 → 12 | 0 | 0.08 / 0.85 → 0.08 / 0.85 | yes | 4 → 4 | 7/7 | 0.29 |
+| l_bracket.stl | 153 → 177 (+24, +15.7 %) | 24 | 0.60 / 4.05 → 0.00 / 0.00 | yes | 30 → 38 | 40/40 | 1.29 |
+| rocket.blend | 263 → 263 | 0 | 1.46 / 3.18 → 1.46 / 3.18 | yes | 18 → 18 | 42/42 | 1.19 |
+| sphere_r10.stl | 1,499 → 1,499 | 0 | 2.35 / 4.82 → 2.35 / 4.82 | yes | 261 → 263 | 157/207 | 4.39 |
+| textured_cube.obj | 2,280 → 2,466 (+186, +8.2 %) | 186 | 0.83 / 4.05 → 0.00 / 0.00 | yes | 245 → 243 | 125/354 | 9.83 |
+| toadstool.obj | 1,239 → 1,239 | 0 | 2.03 / 4.58 → 2.03 / 4.58 | yes | 250 → 255 | 178/178 | 3.88 |
+| torus.stl | 552 → 552 | 0 | 1.95 / 4.48 → 1.95 / 4.48 | yes | 33 → 33 | 74/74 | 1.98 |
+| two_bodies.step | 606 → 702 (+96, +15.8 %) | 96 | 0.66 / 3.20 → 0.00 / 0.00 | yes | 163 → 182 | 97/97 | 2.44 |
+| vertex_colors.ply | 1,519 → 1,519 | 0 | 2.36 / 4.85 → 2.36 / 4.85 | yes | 260 → 261 | 153/212 | 5.58 |
+| castle.step (generated), --config | 1,657 → 1,712 (+55, +3.3 %) | 118 | 3.31 / 8.00 → 3.27 / 8.00 | yes | 251 → 250 | 143/241 | 5.14 |
+| Duo_Duolingo @32 (local) | 1,025 → 1,081 (+56, +5.5 %) | 56 | 1.86 / 4.23 → 1.72 / 4.23 | yes | 128 → 143 | 161/161 | 3.74 |
+| Duo_Duolingo @48:1200 (local) | 2,308 → 2,308 | 0 | 1.76 / 4.29 → 1.76 / 4.29 | yes | 1151 → 1151 | 188/324 | 7.61 |
+
+- **Every run is one stable piece**; `inspect`'s estimate contains every count (15 of 15, range on
+  average a factor 1.78). Boxes match their mesh (0.00 / 0.00 mm); round shapes, the rocket and the
+  heart (voxel file) are unchanged. Time against 1.6: −1 % to +12 %, except the L-bracket (+27 %,
+  30 → 38 s, its 24 extra parts in legolization's step search; 36–37 s in earlier runs).
+- **Castle three times with the final code** (this run and two more, `out/tiles/v3`): 118 tiles,
+  1,712 parts, stable, 250 / 254 / 257 s, 143 / 139 / 134 of 241 states checked, no tile skipped.
+- **Duo at 48 studs** found the last bug before the release: the first 2.0 run tiled its base and
+  the stability check undid all tiles ("would no longer hold together"), leaving no time for the step
+  checks (0 of 324). The tiles were stable, but a cut had split the model in two: a 1 × 1 ground brick
+  hung on the rest only through the part that got cut, and the outside piece still stood on it.
+  Every part a cut part touched right below or above must now stay one group through the new pieces;
+  with that, 17 of Duo's cuts stay undone, its base face falls below 85 % and keeps its studs (no
+  tiles at 48 studs), and 188 of 324 states are checked again (1.6: 214; this part of the run was
+  on battery, so its timings are not comparable). The castle loses 2 of 34 cuts to the same rule
+  (122 → 118 tiles, same faces).
