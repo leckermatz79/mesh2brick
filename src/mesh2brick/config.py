@@ -175,6 +175,19 @@ class PartsConfig(_Section):
     of placement for the whole model, ``split`` replaces each by shorter parts
     of the same colour after placement and re-checks stability, ``report``
     only flags them in the parts list."""
+    slopes: Literal["mesh", "preserve", "smooth"] = "mesh"
+    """Where slopes go when ``slope`` is in ``categories`` (ROADMAP 8, ADR 0021):
+    ``mesh`` (default since 2.1) puts them on the stairs of surfaces the input
+    mesh tilts, wherever a slope lies closer to the mesh than the stair, after
+    legolization's own ``preserve`` pass; ``preserve`` is that pass alone
+    (2.0: only exact profile matches, mostly inside hollow walls); ``smooth``
+    is legolization's older pass (1 x 1 columns at descending stairs become
+    45° slopes, adding material outside the shape, no mesh involved)."""
+    slopes_max_share: Annotated[float, Field(ge=0.0)] | None = None
+    """At most this share of extra parts for slopes with ``slopes: mesh``
+    (0.15 = +15 %; the slopes that bring the model closest come first, the
+    other stairs keep their steps). ``None`` (default): no limit; the run
+    reports more than the +15 % guide (as for tiles)."""
     tiles: Literal["flat", "all"] = "flat"
     """Where tiles go when ``tile`` is in ``categories`` (ROADMAP 9, ADR 0020):
     ``flat`` only on open tops the input mesh renders flat (a box's top, a
@@ -198,6 +211,11 @@ class PartsConfig(_Section):
     of that face, so they get tiles too ("Rand-Fliesen"); off, they keep
     their studs as a rim ("Rand-Noppen", the default: the product owner
     preferred studs on the castle's towers, 2026-11-15)."""
+
+    @property
+    def mesh_slopes(self) -> bool:
+        """Slopes go where the mesh tilts (``slope`` on, ``slopes: mesh``)."""
+        return "slope" in self.categories and self.slopes == "mesh"
 
     @model_validator(mode="after")
     def _check_lists(self) -> Self:

@@ -7,7 +7,8 @@
 
 For every input converted in both runs, renders the finished models from the
 same camera (``<name>.bricks.json``) next to each other, with part count,
-tile count and surface deviation (if the run recorded it) under each, and
+tile and slope count (visible slopes in brackets) and surface deviation (if
+the run recorded it) under each, and
 writes ``<name>.png``. ``--elevation`` / ``--azimuth`` change the view (a
 steeper view shows tops better).
 """
@@ -25,6 +26,7 @@ from benchmark_estimate import run_dir
 from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 
+from mesh2brick.fidelity import visible_parts
 from mesh2brick.model import BrickModel
 from mesh2brick.render.preview import PreviewOptions, render_png
 
@@ -66,6 +68,10 @@ def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
 def _caption(label: str, model: BrickModel, row: dict[str, Any]) -> str:
     tiles = sum(1 for p in model.parts if p.category == "tile")
     text = f"{label}: {model.part_count:,} parts, {tiles} tiles"
+    seen = visible_parts(model)
+    slopes = [i for i, p in enumerate(model.parts) if p.category == "slope"]
+    if slopes:
+        text += f", {len(slopes)} slopes ({sum(i in seen for i in slopes)} visible)"
     if deviation := row.get("deviation"):
         text += f", deviation {deviation['mean_mm']:.2f} / {deviation['p95_mm']:.2f} mm"
     return text

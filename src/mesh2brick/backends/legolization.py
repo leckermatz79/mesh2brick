@@ -66,7 +66,6 @@ from legolization.instructions.sequencer import (
     RotStep,
     plan_instructions,
 )
-from legolization.layout import CollisionError
 from legolization.ldraw_in import LdrawImportError, layout_from_ldraw
 from legolization.ldraw_out import write_model
 from legolization.mesh import grid_from_mesh
@@ -77,8 +76,20 @@ from legolization.stability import solver as _lego_solver
 from legolization.stability.solver import StabilityResult, analyze
 
 from mesh2brick.backends.checks import check_states, default_workers
+from mesh2brick.backends.layout_ops import anything as _anything
+from mesh2brick.backends.layout_ops import place_exact as _place_exact
+from mesh2brick.backends.layout_ops import produced_in
+from mesh2brick.backends.layout_ops import rect_dims as _rect_dims
+from mesh2brick.backends.layout_ops import rect_keys as _rect_keys
 from mesh2brick.backends.protocols import BackendError, Placement, StabilityReport
 from mesh2brick.backends.pyldraw import part_exists
+from mesh2brick.backends.slopes import (
+    SLOPE_PARTS_GUIDE,
+    SLOPES_TIME_NOTE,
+    SLOPES_UNDONE_NOTE,
+    SlopeReport,
+    apply_slopes,
+)
 from mesh2brick.catalog.rebrickable import available_colors
 from mesh2brick.catalog.whitelist import (
     BackendRules,
@@ -87,6 +98,7 @@ from mesh2brick.catalog.whitelist import (
     allowed_parts,
 )
 from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
+from mesh2brick.place.slopes import slope_sites
 from mesh2brick.place.split import choose_split
 from mesh2brick.place.tiles import (
     Column,
@@ -430,12 +442,6 @@ class SplitReport:
     """(LDraw part, colour) pairs that could not be replaced."""
 
 
-def produced_in(part: str, colour: int) -> bool | None:
-    """Whether LEGO makes ``part`` in ``colour`` (``None``: unknown)."""
-    colours = available_colors(part)
-    return None if colours is None else colour in colours
-
-
 def unavailable_parts(
     colours: Iterable[int],
     settings: Settings,
@@ -505,18 +511,6 @@ def replacement_options(
         candidates.sort(key=lambda c: float(np.linalg.norm(np.array(rgb[c]) - target)))
         options.extend(((part, c),) for c in candidates[:nearest])
     return tuple(options)
-
-
-def _rect_dims(part: Any) -> tuple[int, int, int] | None:
-    """(width, length, height) of a full-rectangle part, else ``None``."""
-    cells = part.occupied_cells
-    xs = {c[0] for c in cells}
-    ys = {c[1] for c in cells}
-    zs = {c[2] for c in cells}
-    if len(cells) != len(xs) * len(ys) * len(zs):
-        return None
-    width, length = sorted((len(xs), len(ys)))
-    return (width, length, len(zs))
 
 
 def split_unavailable(
@@ -681,29 +675,6 @@ def _neighbour_joints(
     return found
 
 
-def _place_exact(
-    layout: Layout,
-    key: str,
-    target: frozenset[tuple[int, int, int]],
-    layer: int,
-    colour: int,
-) -> int | None:
-    """Add ``key`` so it covers exactly ``target``; its brick id or ``None``."""
-    part = layout.catalog[key]
-    tx = min(c[0] for c in target)
-    ty = min(c[1] for c in target)
-    for yaw in part.orientations:
-        cells = part.cells_at(0, 0, layer, yaw)
-        x = tx - min(c[0] for c in cells)
-        y = ty - min(c[1] for c in cells)
-        if frozenset(part.cells_at(x, y, layer, yaw)) == target:
-            try:
-                return layout.add(key, x, y, layer, yaw, colour).brick_id
-            except CollisionError:
-                return None
-    return None
-
-
 # ---------------------------------------------------------------- tiles (ROADMAP 9)
 TILE_CHECK_PER_PART_S: Final = 0.03
 """Expected time of the stability check of the whole model after the tile
@@ -750,15 +721,30 @@ def tile_reserve_s(parts: int) -> float:
 class _Tiling:
     """What the tile pass did in :meth:`LegolizationBackend.place`.
 
-    ``check`` is the running stability check of the tiled model (``None``:
-    not needed); ``before`` the layout to go back to if it fails.
+    ``before`` is the layout to go back to if the stability check of the
+    finished model fails (``None``: the tiles need no check, they only made
+    parts lighter on the same supports).
     """
 
     notes: tuple[str, ...] = ()
     before: Layout | None = None
-    check: Future[StabilityReport] | None = None
     skipped: bool = False
     """The time limit kept tiles off flat tops (said on the cover)."""
+
+
+@dataclass(frozen=True, slots=True)
+class _Sloping:
+    """What the slope pass did in :meth:`LegolizationBackend.place`.
+
+    ``before`` is the layout before the slopes, to go back to if the
+    stability check of the finished model fails (``None``: no slope placed).
+    """
+
+    notes: tuple[str, ...] = ()
+    before: Layout | None = None
+    skipped: bool = False
+    """The time limit kept slopes off the stairs (said on the cover)."""
+    report: SlopeReport | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1316,29 +1302,6 @@ def _touches(
     )
 
 
-def _rect_keys(
-    layout: Layout,
-    family: Any,
-    height: int,
-    *,
-    colour: int,
-    allowed: frozenset[str] | None,
-    produced: Callable[[str, int], bool | None],
-) -> dict[tuple[int, int], str]:
-    """``(small, big)`` -> key of the usable rectangle parts of one family."""
-    found: dict[tuple[int, int], str] = {}
-    for key, entry in sorted(layout.catalog.parts.items()):
-        dims = _rect_dims(entry)
-        if entry.category is not family or dims is None or dims[2] != height:
-            continue
-        if allowed is not None and entry.ldraw_part not in allowed:
-            continue
-        if produced(entry.ldraw_part, colour) is False:
-            continue
-        found.setdefault((dims[0], dims[1]), key)
-    return found
-
-
 def _apply_top(layout: Layout, plan: _TopPlan) -> _Outcome:
     """Carry out :func:`_plan_top`'s plan (undone if a part does not fit)."""
     brick = plan.brick
@@ -1733,6 +1696,9 @@ class LegolizationBackend:
             raise BackendError(msg)
         availability = settings.parts.availability
         early: list[str] = []
+        # The slope pass checks colours one slope at a time (ROADMAP 8), so it
+        # starts from the whitelist before the whole-model colour exclusion.
+        slope_allowed = whitelist(settings).parts
         if availability == "exclude":
             gone = unavailable_parts(grid.colors_used, settings)
             if gone:
@@ -1748,11 +1714,13 @@ class LegolizationBackend:
         config = self.pipeline_config(
             settings, height_unit=grid.height_unit, allowed=allowed
         )
-        tiling_on = "tile" in settings.parts.categories
+        finishing = "tile" in settings.parts.categories or (
+            settings.parts.mesh_slopes and grid.slopes is not None
+        )
 
         def tiles_need(parts: int) -> float:
-            """Time kept free for the tile check, like the export's."""
-            return tile_reserve_s(parts) if tiling_on else 0.0
+            """Time kept free for the check after tiles and slopes (as the export)."""
+            return tile_reserve_s(parts) if finishing else 0.0
 
         outcome = run_placement(
             to_lego_grid(grid),
@@ -1781,12 +1749,22 @@ class LegolizationBackend:
             layout,
             grid,
             settings=settings,
-            config=config,
             allowed=allowed,
             stability=stability,
             deadline=deadline,
         )
         early.extend(tiling.notes)
+        sloping = self._slope_stairs(
+            layout,
+            grid,
+            settings=settings,
+            allowed=allowed,
+            slopes=slope_allowed,
+            stability=stability,
+            deadline=deadline,
+        )
+        early.extend(sloping.notes)
+        check = self._check_finish(layout, config, tiling, sloping)
         if availability == "split":
             report = split_unavailable(layout)
             if report.replaced and stability.checked:
@@ -1803,15 +1781,15 @@ class LegolizationBackend:
                     "existing shorter parts; see the parts list"
                 )
         steps = self._steps(layout, config, settings, deadline)
-        if tiling.check is not None and tiling.before is not None:
-            tiled = tiling.check.result()
-            if stability.buildable and not tiled.buildable:
-                layout.replace_with(tiling.before)
-                early = [n for n in early if n not in tiling.notes]
-                early.append(_TILES_UNDONE_NOTE)
+        if check is not None:
+            finished = check.result()
+            if stability.buildable and not finished.buildable:
+                stability, early = self._undo_finish(
+                    layout, config, tiling, sloping, stability, early, deadline
+                )
                 steps = self._steps(layout, config, settings, deadline)
             else:
-                stability = tiled
+                stability = finished
         plan, units, checked = steps.plan, steps.units, steps.checked
         notes = [*allowed.notes, *early, *steps.notes]
         native = _Native(layout=layout, plan=plan, checked=checked, units=units)
@@ -1828,6 +1806,7 @@ class LegolizationBackend:
                 buildable=stability.buildable if stability.checked else None,
                 best_so_far=outcome.final is None,
                 tiles_skipped=tiling.skipped,
+                slopes_skipped=sloping.skipped,
             ),
             stability=stability,
             backend=NAME,
@@ -1841,19 +1820,17 @@ class LegolizationBackend:
         grid: VoxelGrid,
         *,
         settings: Settings,
-        config: PipelineConfig,
         allowed: Whitelist,
         stability: StabilityReport,
         deadline: float | None,
     ) -> _Tiling:
         """Tiles on the flat tops (ROADMAP 9, ADR 0020).
 
-        When a part got heavier, the whole model is checked again in a thread
-        while the steps are planned (the step planner waits on its own worker
-        processes); :meth:`place` undoes the tiles if the model no longer
-        holds together. With too little time left for that check only the
-        changes that make parts lighter are made; none when the run's own
-        stability check did not finish.
+        When a part got heavier, the whole model is checked again afterwards
+        (:meth:`_check_finish`, together with the slopes) and :meth:`place`
+        undoes the tiles if the model no longer holds together. With too little
+        time left for that check only the changes that make parts lighter are
+        made; none when the run's own stability check did not finish.
         """
         parts = settings.parts
         if "tile" not in parts.categories:
@@ -1891,13 +1868,127 @@ class LegolizationBackend:
             # Nothing changed, or only lighter parts on the same supports: the
             # verdict stands (ADR 0020).
             return _Tiling(notes=notes, skipped=skipped)
-        self._say(f"{report.summary()}; checking stability again")
+        return _Tiling(notes=notes, before=before, skipped=skipped)
+
+    def _slope_stairs(
+        self,
+        layout: Layout,
+        grid: VoxelGrid,
+        *,
+        settings: Settings,
+        allowed: Whitelist,
+        slopes: frozenset[str],
+        stability: StabilityReport,
+        deadline: float | None,
+    ) -> _Sloping:
+        """Slopes on the stairs of tilted surfaces (ROADMAP 8, ADR 0021).
+
+        Runs after the tiles, on the sites the voxelizer found worth it; the
+        stability check of the finished model follows in :meth:`_check_finish`.
+        ``slopes`` are the slopes the whitelist allows before the whole-model
+        colour exclusion (colours are checked slope by slope instead).
+        Skipped (and said on the cover) when the run's own check did not
+        finish or too little time is left for that check.
+        """
+        parts = settings.parts
+        if not parts.mesh_slopes or grid.slopes is None:
+            return _Sloping()
+        sites = slope_sites(grid.slopes)
+        if not sites:
+            return _Sloping()
+        left = (
+            math.inf
+            if deadline is None
+            else deadline - time.monotonic() - export_reserve_s(len(layout))
+        )
+        if not stability.checked or left < tile_reserve_s(len(layout)):
+            return _Sloping(notes=(SLOPES_TIME_NOTE,), skipped=True)
+        before = layout.copy()
+        report = apply_slopes(
+            layout,
+            sites,
+            allowed=allowed.parts,
+            slopes=slopes,
+            produced=produced_in if parts.availability != "report" else _anything,
+            max_added=(
+                None
+                if parts.slopes_max_share is None
+                else math.floor(parts.slopes_max_share * len(layout))
+            ),
+        )
+        notes: tuple[str, ...] = (
+            (report.summary(),) if report.count or report.colour else ()
+        )
+        if report.added > SLOPE_PARTS_GUIDE * len(before):
+            share = report.added / len(before)
+            guide = (
+                f"slopes add {report.added} parts (+{share:.1%}, more than the "
+                f"{SLOPE_PARTS_GUIDE:.0%} guide)"
+            )
+            notes = (*notes, guide)
+        if not report.count:
+            return _Sloping(notes=notes, report=report)
+        return _Sloping(notes=notes, before=before, report=report)
+
+    def _check_finish(
+        self,
+        layout: Layout,
+        config: PipelineConfig,
+        tiling: _Tiling,
+        sloping: _Sloping,
+    ) -> Future[StabilityReport] | None:
+        """Check the model with its new tiles and slopes, beside the step planning.
+
+        Runs in a thread while the steps are planned (the step planner waits on
+        its own worker processes); ``None`` when nothing needs a check: no
+        slope placed, and the tiles only made parts lighter.
+        """
+        if tiling.before is None and sloping.before is None:
+            return None
+        self._say("checking stability again with the new tiles and slopes")
         snapshot = layout.copy()
         solver = config.solver
-        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tile-check")
+        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="finish-check")
         check = pool.submit(lambda: _report(snapshot, analyze(snapshot, solver)))
         pool.shutdown(wait=False)
-        return _Tiling(notes=notes, before=before, check=check, skipped=skipped)
+        return check
+
+    def _undo_finish(  # noqa: PLR0917 - the state of one place() call
+        self,
+        layout: Layout,
+        config: PipelineConfig,
+        tiling: _Tiling,
+        sloping: _Sloping,
+        stability: StabilityReport,
+        early: list[str],
+        deadline: float | None,
+    ) -> tuple[StabilityReport, list[str]]:
+        """The finished model no longer holds: take the slopes, then the tiles back.
+
+        Slopes go first. Tiles that made parts heavier are then checked alone
+        if time allows and kept when they hold; otherwise they go too. Returns
+        the stability that now holds and the notes.
+        """
+        if sloping.before is not None:
+            layout.replace_with(sloping.before)
+            early = [n for n in early if n not in sloping.notes]
+            early.append(SLOPES_UNDONE_NOTE)
+            if tiling.before is None:
+                return stability, early  # the tiles only made parts lighter
+            left = (
+                math.inf
+                if deadline is None
+                else deadline - time.monotonic() - export_reserve_s(len(layout))
+            )
+            if left >= tile_check_s(len(layout)):
+                tiled = _report(layout, analyze(layout, config.solver))
+                if tiled.buildable:
+                    return tiled, early
+        if tiling.before is not None:
+            layout.replace_with(tiling.before)
+            early = [n for n in early if n not in tiling.notes]
+            early.append(_TILES_UNDONE_NOTE)
+        return stability, early
 
     def _steps(
         self,
@@ -2029,6 +2120,7 @@ class LegolizationBackend:
                 units=units,
                 buildable=placement.stability.buildable,
                 tiles_skipped=placement.model.tiles_skipped,
+                slopes_skipped=placement.model.slopes_skipped,
             ),
             native=_Native(layout=native.layout, plan=plan, units=units),
         )
@@ -2071,6 +2163,7 @@ class LegolizationBackend:
             buildable=placement.model.buildable,
             best_so_far=placement.model.best_so_far,
             tiles_skipped=placement.model.tiles_skipped,
+            slopes_skipped=placement.model.slopes_skipped,
         )
         return replace(
             placement,
@@ -2164,7 +2257,13 @@ class LegolizationBackend:
             "hollow": settings.voxel.fill == "hollow",
             "shell_studs": wall,
             "shell_plates": wall * plates_per_cell,
-            "slopes": "preserve" if "slope" in categories else False,
+            # "mesh" runs legolization's exact-match pass first; mesh2brick adds
+            # its own slopes afterwards (_slope_stairs, ADR 0021).
+            "slopes": (
+                ("smooth" if settings.parts.slopes == "smooth" else "preserve")
+                if "slope" in categories
+                else False
+            ),
             # mesh2brick puts tiles on itself, only on flat tops (_tile_tops);
             # legolization's own pass would tile every exposed plate.
             "tiles": False,
@@ -2598,6 +2697,7 @@ def to_brick_model(
     buildable: bool | None = None,
     best_so_far: bool = False,
     tiles_skipped: bool = False,
+    slopes_skipped: bool = False,
 ) -> BrickModel:
     """Convert legolization's layout + plan into a :class:`BrickModel`.
 
@@ -2676,6 +2776,7 @@ def to_brick_model(
         buildable=buildable,
         best_so_far=best_so_far,
         tiles_skipped=tiles_skipped,
+        slopes_skipped=slopes_skipped,
     )
 
 

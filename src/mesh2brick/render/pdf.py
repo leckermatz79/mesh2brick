@@ -754,6 +754,8 @@ def _cover_notes(model: BrickModel, lang: Language) -> list[tuple[str, Color]]:
         notes.append((text("stable_no", lang).capitalize() + ".", WARN_FILL))
     if model.tiles_skipped:
         notes.append((text("tiles_skipped", lang), HINT_FILL))
+    if model.slopes_skipped:
+        notes.append((text("slopes_skipped", lang), HINT_FILL))
     checks = coverage(model)
     if checks.kind == "none":
         notes.append((text("layer_order", lang), HINT_FILL))

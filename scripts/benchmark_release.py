@@ -16,7 +16,8 @@ how many intermediate states were checked for stability ("checked states",
 Roadmap 3) and how many steps need a supporting hand. Since 2.0 it measures
 shape fidelity too: the surface deviation of the brick model to the input
 mesh (mean and 95th percentile in mm, ``mesh2brick.fidelity``) and the number
-of tiles (ROADMAP 9).
+of tiles (ROADMAP 9); since 2.1 the slopes and how many of them are visible
+from outside (ROADMAP 8).
 
 The STEP case is built on the fly (a small castle of boxes, see
 ``castle_step``) and converted with ``--config examples/mesh2brick.yaml``,
@@ -137,6 +138,7 @@ def main() -> None:
 def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
     from mesh2brick.backends.legolization import LegolizationBackend  # noqa: PLC0415
     from mesh2brick.config import load_settings  # noqa: PLC0415
+    from mesh2brick.fidelity import visible_parts  # noqa: PLC0415
     from mesh2brick.inspection import inspect_file  # noqa: PLC0415
     from mesh2brick.model import BrickModel  # noqa: PLC0415
     from mesh2brick.pipeline import shape_deviation  # noqa: PLC0415
@@ -200,6 +202,10 @@ def _run(case: dict[str, Any], out: Path) -> dict[str, Any]:
         "deviation": deviation.as_dict(),
         "deviation_s": round(time.perf_counter() - started, 1),
         "tiles": sum(1 for part in model.parts if part.category == "tile"),
+        "slopes": sum(1 for part in model.parts if part.category == "slope"),
+        "slopes_visible": sum(
+            1 for i in visible_parts(model) if model.parts[i].category == "slope"
+        ),
         "parts": model.part_count,
         "steps": model.step_count,
         "checked_states": checks.checked,
@@ -248,9 +254,9 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
         "| Input | Parts | Steps | Checked states | Need a hand | Colours "
         "| One stable piece | Files + BOM + LDraw ok "
         "| PDF MB | kB per step | Time s | Estimate | In range "
-        "| Deviation mm (mean / p95) | Tiles |"
+        "| Deviation mm (mean / p95) | Tiles | Slopes (visible) |"
     )
-    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     big = [
         r
         for r in rows
@@ -277,7 +283,8 @@ def _print_table(rows: list[dict[str, Any]]) -> None:
             f"| {row['pdf_mb']} | {row['kb_per_step']} | {row['seconds']:.0f} "
             f"| {expected:,} ({low:,}-{high:,}) "
             f"| {'yes' if low <= row['parts'] <= high else 'NO'} "
-            f"| {_deviation(row)} | {row.get('tiles', 0)} |"
+            f"| {_deviation(row)} | {row.get('tiles', 0)} "
+            f"| {row.get('slopes', 0)} ({row.get('slopes_visible', 0)}) |"
         )
     if ranges := [(r["parts"], *r["estimate"]) for r in rows if not r["exit"]]:
         inside = sum(1 for parts, low, _, high in ranges if low <= parts <= high)

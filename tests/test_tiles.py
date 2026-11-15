@@ -261,7 +261,7 @@ def test_tiles_are_undone_when_the_check_fails(monkeypatch: pytest.MonkeyPatch) 
     def failing_tile_check(layout: Any, result: Any) -> Any:
         report = real(layout, result)
         name = threading.current_thread().name
-        if not name.startswith("tile-check"):
+        if not name.startswith("finish-check"):
             return report
         checks.append(name)
         return dataclasses.replace(report, stable=False)

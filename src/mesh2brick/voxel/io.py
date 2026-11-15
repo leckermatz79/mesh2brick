@@ -3,8 +3,8 @@
 """Voxel grid files.
 
 * ``.npz`` - mesh2brick's own lossless format (occupancy, colours, cell
-  size, origin and, since 2.0, the flat tops; older files read without
-  them). Use it to hand a grid from ``voxelize`` to ``place``.
+  size, origin and, since 2.0, the flat tops, since 2.1 the slope gains;
+  older files read without them). Use it to hand a grid from ``voxelize`` to ``place``.
 * ``.npy`` - a single ``int16`` array of LDraw colour codes, ``-1`` = empty,
   axes ``(x, y, z)`` with z up. This is exactly what legolization's
   ``VoxelGrid.from_npy`` reads (one voxel = one brick by default).
@@ -48,6 +48,8 @@ def save_npz(grid: VoxelGrid, path: Path) -> Path:
     }
     if grid.flat is not None:
         arrays["flat"] = grid.flat
+    if grid.slopes is not None:
+        arrays["slopes"] = grid.slopes
     with path.open("wb") as handle:
         np.savez_compressed(handle, allow_pickle=False, **arrays)
     return path
@@ -75,6 +77,7 @@ def load_npz(path: Path) -> VoxelGrid:
             pitch_mm=float(data["pitch_mm"]),
             origin_mm=(origin[0], origin[1], origin[2]),
             flat=data["flat"].astype(np.float32) if "flat" in data else None,
+            slopes=(data["slopes"].astype(np.float32) if "slopes" in data else None),
         )
 
 

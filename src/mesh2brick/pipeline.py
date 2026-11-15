@@ -228,7 +228,10 @@ def _say_grid(
     say(f"voxels: {grid.filled_count:,} cells, grid {grid.shape} ({seconds:.1f} s)")
     voxel = settings.voxel
     expected = parts_estimate(
-        grid, hollow=voxel.fill == "hollow", wall_thickness=voxel.wall_thickness
+        grid,
+        hollow=voxel.fill == "hollow",
+        wall_thickness=voxel.wall_thickness,
+        slopes_max_share=settings.parts.slopes_max_share,
     ).expected
     if hint := time_hint(expected, settings.placement.time_limit_s):
         say(f"note: {hint}")
