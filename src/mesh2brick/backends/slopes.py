@@ -14,6 +14,7 @@ the backend's (:meth:`mesh2brick.backends.legolization.LegolizationBackend.place
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections import Counter, deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
@@ -81,12 +82,15 @@ class SlopeReport:
     """Sites that stay stairs because the parts there cannot make room (a part
     of another family, the pieces would not hold together, no fitting part)."""
     costly: int = 0
-    """Sites that stay stairs because their slope would add more than
-    :attr:`max_cost` parts."""
+    """Stairs (stud cells) that keep their step because a slope there would
+    add more than :attr:`max_cost` parts."""
     max_cost: int | None = MAX_SLOPE_COST
     limited: int = 0
-    """Sites that stay stairs because the parts limit was reached
-    (``parts.slopes_max_share``)."""
+    """Stairs (stud cells) that keep their step because the parts limit was
+    reached (:attr:`max_share`, ``parts.slopes_max_share``)."""
+    max_share: float | None = None
+    joined: int = 0
+    """Parts saved by joining pieces with their neighbours (in :attr:`added`)."""
 
     @property
     def count(self) -> int:
@@ -114,7 +118,11 @@ class SlopeReport:
                 f"than {self.max_cost} parts there"
             )
         if self.limited:
-            text += f"; {self.limited} stair(s) keep their step: parts limit reached"
+            limit = "" if self.max_share is None else f" (+{self.max_share:.0%})"
+            text += (
+                f"; {self.limited} stair(s) keep their step: parts limit{limit} "
+                "reached, the slopes that bring the model closest came first"
+            )
         if self.colour:
             palette = default_palette()
             missing = "; ".join(
@@ -161,6 +169,8 @@ def apply_slopes(
     keys = _slope_keys(layout.catalog, slopes)
     placed: Counter[str] = Counter()
     wanting: dict[Cell, tuple[int, str]] = {}
+    dear: set[Cell] = set()
+    held_back: set[Cell] = set()
     counts: Counter[str] = Counter()
     taken: set[Cell] = set()
     pieces: set[int] = set()
@@ -179,14 +189,14 @@ def apply_slopes(
             and not isinstance(plan, str)
             and 1 + len(plan.pieces) - len(plan.donors) > max_cost
         ):
-            counts["costly"] += 1
+            dear.update((x, y, site.layer) for x, y in site.studs)
             continue
         if (
             max_added is not None
             and not isinstance(plan, str)
             and counts["added"] + 1 + len(plan.pieces) - len(plan.donors) > max_added
         ):
-            counts["limit"] += 1
+            held_back.update((x, y, site.layer) for x, y in site.studs)
             continue
         added = None if isinstance(plan, str) else _apply_slope(layout, key, site, plan)
         if added is None or isinstance(plan, str):
@@ -198,7 +208,8 @@ def apply_slopes(
         counts["cut"] += plan.cut
         counts["filled"] += plan.filled
         counts["added"] += len(added) - len(plan.donors)
-    counts["added"] -= _merge_pieces(layout, pieces, allowed=allowed, produced=produced)
+    joined = _merge_pieces(layout, pieces, allowed=allowed, produced=produced)
+    counts["added"] -= joined
     bottom = {(x, y, z // PLATES_PER_BRICK) for x, y, z in taken}
     kept = {cell: got for cell, got in wanting.items() if cell not in bottom}
     colour = Counter(code for code, _ in kept.values())
@@ -213,10 +224,59 @@ def apply_slopes(
         colour=dict(sorted(colour.items())),
         missing={code: tuple(sorted(parts)) for code, parts in sorted(missing.items())},
         blocked=counts["blocked"],
-        costly=counts["costly"],
+        costly=len(dear - bottom),
         max_cost=max_cost,
-        limited=counts["limit"],
+        limited=len(held_back - bottom - dear),
+        joined=joined,
     )
+
+
+def apply_slopes_within(
+    layout: Layout,
+    sites: Sequence[SlopeSite],
+    *,
+    max_share: float | None,
+    allowed: frozenset[str] | None = None,
+    slopes: frozenset[str] | None = None,
+    produced: Callable[[str, int], bool | None] = produced_in,
+) -> SlopeReport:
+    """:func:`apply_slopes` adding at most ``max_share`` of the layout's parts.
+
+    The best slopes come first; once the limit is reached the other stairs
+    keep their steps (``parts.slopes_max_share``, product owner 2026-11-16:
+    +15 %). Pieces joined with their neighbours give parts back, so the pass
+    is tried without a limit first (a model under the limit is not touched
+    by it), then with the largest running limit that ends within it.
+    ``None``: no limit. Changes ``layout`` in place.
+    """
+    kwargs: dict[str, Any] = {
+        "allowed": allowed,
+        "slopes": slopes,
+        "produced": produced,
+    }
+    if max_share is None:
+        return apply_slopes(layout, sites, **kwargs)
+    limit = math.floor(max_share * len(layout))
+    trial = layout.copy()
+    report = apply_slopes(trial, sites, **kwargs)
+    if report.added > limit:
+        low, high = limit, report.added + report.joined
+        best: tuple[Layout, SlopeReport] | None = None
+        while low <= high:
+            middle = (low + high) // 2
+            attempt = layout.copy()
+            found = apply_slopes(attempt, sites, max_added=middle, **kwargs)
+            if found.added <= limit:
+                best, low = (attempt, found), middle + 1
+            else:
+                high = middle - 1
+        if best is None:  # cannot happen: running limit = limit ends within it
+            attempt = layout.copy()
+            best = attempt, apply_slopes(attempt, sites, max_added=limit, **kwargs)
+        trial, report = best
+    layout.catalog = trial.catalog
+    layout.replace_with(trial)
+    return dataclasses.replace(report, max_share=max_share)
 
 
 @dataclass(frozen=True, slots=True)

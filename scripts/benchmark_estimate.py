@@ -6,8 +6,8 @@
 
 Reads ``results.json`` of a ``scripts/benchmark_release.py`` run and, for
 every converted input, the saved voxel grid (``<name>.grid.npz``) and the
-placed part count. Recomputes the estimate with the current code (default
-settings: hollow, wall 2, as the release run) and prints estimate, range and
+placed part count. Recomputes the estimate with the current code and the
+run's settings (hollow, wall 2, the slopes' parts limit) and prints estimate, range and
 whether the real count lies inside, next to the estimate the run recorded.
 Nothing is converted, so this takes seconds.
 """
@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from mesh2brick.config import load_settings
 from mesh2brick.voxel.estimate import parts_estimate
 from mesh2brick.voxel.io import load_npz
 
@@ -52,7 +53,11 @@ def main() -> None:
     for row in done:
         grid = load_npz(next(run_dir(args.results, row).glob("*.grid.npz")))
         started = time.perf_counter()
-        estimate = parts_estimate(grid)
+        config = Path(row["config"]) if row.get("config") else None
+        settings = load_settings(config, row.get("set", []))
+        estimate = parts_estimate(
+            grid, slopes_max_share=settings.parts.slopes_max_share
+        )
         ms = (time.perf_counter() - started) * 1000
         parts = row["parts"]
         ok = estimate.low <= parts <= estimate.high

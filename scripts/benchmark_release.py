@@ -24,7 +24,8 @@ The STEP case is built on the fly (a small castle of boxes, see
 the literal SPEC §9 command. ``--local`` adds models that must not be
 published (only their numbers are printed); ``@STUDS:SECONDS`` also sets
 ``placement.time_limit_s``. ``--set KEY=VALUE`` applies to every input (for
-example slopes on for all).
+example slopes on for all); ``--only NAME`` runs just these fixtures (the
+castle always runs).
 """
 
 from __future__ import annotations
@@ -79,6 +80,12 @@ def main() -> None:
     )
     parser.add_argument("--skip-fixtures", action="store_true")
     parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        help="fixture file name to run (repeatable; default: all)",
+    )
+    parser.add_argument(
         "--set",
         action="append",
         default=[],
@@ -95,6 +102,7 @@ def main() -> None:
             {"label": path.name, "path": path, "public": True}
             for path in sorted(FIXTURES.iterdir())
             if path.suffix.lower() in MODEL_SUFFIXES
+            and (not args.only or path.name in args.only)
         ]
     # The generated STEP castle always runs.
     castle = out / "castle.step"
