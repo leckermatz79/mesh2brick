@@ -1314,3 +1314,27 @@ site was rated, then on the saved 2.0.0 layouts; metric without fix 2 for these 
 - **Output checks:** all files, parts-list totals and strict LDraw re-reads pass; the parts list
   shows 3039, 3040b and 4286 with their names and pictures; step pictures and "first" boxes show
   the slopes. Pictures: `out/slopes/vorher-nachher/` (local), `docs/gallery/roadmap8b-slopes-2.1.png`.
+
+### Slopes within +15 % parts (2.1.1, 2026-11-16)
+
+Product owner, after the 2.1.0 pictures: `parts.slopes_max_share: 0.15` by default. Rerun of the
+models above 15 % and the bunny as a control (`scripts/benchmark_release.py --out out/slopes/cap15
+--only ...`, the castle runs anyway; on battery, so the times are indicative):
+
+| Input | Parts 2.0.0 → 2.1.1 (2.1.0) | Slopes (visible) | Deviation mean / p95 mm, 2.1.1 (2.1.0) | One stable piece | Time s | Checked states |
+|---|---|---|---|---|---|---|
+| `bunny_lowpoly.stl` | 873 → 997, +14.2 % (same) | 143 (133), same | 1.78 / 4.12 (same) | yes | 143 | 137/137 |
+| `sphere_r10.stl` | 1,499 → 1,723, +14.9 % (+21.8 %) | 241 (195) (318 (272)) | 1.88 / 4.35 (1.86 / 4.33) | yes | 267 | 127/234 |
+| `vertex_colors.ply` | 1,519 → 1,746, +14.9 % (+22.2 %) | 247 (201) (325 (279)) | 1.89 / 4.37 (1.86 / 4.35) | yes | 267 | 127/241 |
+| `toadstool.obj` | 1,239 → 1,424, +14.9 % (+15.5 %) | 201 (190) (208 (197)) | 1.75 / 4.20 (1.75 / 4.20) | yes | 263 | 149/198 |
+| `torus.stl` | 552 → 634, +14.9 % (+31.0 %) | 95 (91) (169 (165)) | 1.73 / 4.26 (1.65 / 4.12) | yes | 41 | 86/86 |
+| `castle.step`, `--config` | 1,712, unchanged | 4 (1) | 3.27 / 8.00 | yes | 250 | 148/241 |
+
+- The bunny is identical to 2.1.0 (the pass runs without the limit first and keeps that result at
+  +14.2 %); so are rocket (+8.4 %), Duo at 32 (+10.1 %) and at 48 studs (+14.8 %), the boxes and
+  the castle.
+- The limit costs the spheres 0.02–0.03 mm, the toadstool nothing, the torus most (0.08 / 0.14 mm):
+  its stairs all gain about the same, so the cut falls in the middle of them. 5–74 stairs per
+  model keep their step for the limit (the run names the number).
+- Estimate: `inspect` caps the slope term at 15 % too; 6 of 6 inside the range here, 15 of 15 with
+  the unchanged models (`scripts/benchmark_estimate.py`).

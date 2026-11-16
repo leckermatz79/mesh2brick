@@ -89,10 +89,15 @@ rounded surfaces the position changes from stair to stair. Only the mesh can tel
    --time 10min" (`BrickModel.slopes_skipped`, schema 7).
 4. **Settings.** `parts.slopes: mesh` (default) is all of the above after legolization's `preserve`
    pass; `preserve` gives the 2.0.0 result; `smooth` is legolization's older pass (for comparison).
-   The voxelizer computes the ratings only for `mesh`. `parts.slopes_max_share` (off by default)
-   limits the slopes' extra parts per model, best slopes first (torus at +15 %: 84 instead of 169
-   slopes, 1.74 instead of 1.66 mm; sphere 1.89 instead of 1.87 mm). Off, because the product owner
-   set +15 % as a guide that is reported, not enforced, for the tiles; the question is in STATUS.
+   The voxelizer computes the ratings only for `mesh`. **`parts.slopes_max_share: 0.15`** (product
+   owner, 2026-11-16, after the pictures): the slopes add at most 15 % parts per model; the slopes
+   that bring the model closest come first, the other stairs keep their steps and the run says how
+   many (`null`: no limit). Pieces joined again give parts back, so the pass runs without a limit
+   first (a model under 15 % is not touched by the limit), then with the largest running limit that
+   ends within 15 % (a binary search, a few tenths of a second per try). Release 2.1.1: sphere
+   +14.9 % instead of +21.8 % parts, 1.88 / 4.35 instead of 1.86 / 4.33 mm; torus +14.9 % instead of
+   +31.0 %, 1.73 / 4.26 instead of 1.65 / 4.12 mm; bunny, rocket and Duo unchanged. (2.1.0 shipped
+   with the limit off.)
 5. **Part estimate.** `inspect` adds 0.45 / 0.58 / 0.75 parts (low / expected / high) per stud cell
    with a slope worth placing (measured 0.49–0.71 on the release run); 15 of 15 runs inside the range.
 6. **Display and export need nothing new** beyond the faces of fix (2): slopes are drawn as wedges since 1.3 in every turn
