@@ -15,19 +15,19 @@ Apple-M2-Max-Laptop (eine Umwandlung nach der anderen).
 
 | Model | Shows · zeigt | Parts | Steps | Colours | One stable piece | Time |
 |---|---|---:|---:|---:|---|---:|
-| `bunny_lowpoly.stl` | Organic shape, thin ears, overlapping shells · Organische Form, dünne Ohren, überlappende Hüllen | 873 | 126 | 1 | yes · ja | 122 s |
-| `cube_10mm.step` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 2,091 | 294 | 1 | yes · ja | 251 s |
-| `cube_10mm.stl` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 2,091 | 294 | 1 | yes · ja | 249 s |
+| `bunny_lowpoly.stl` | Organic shape, thin ears, overlapping shells · Organische Form, dünne Ohren, überlappende Hüllen | 997 | 137 | 1 | yes · ja | 138 s |
+| `cube_10mm.step` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 2,091 | 294 | 1 | yes · ja | 247 s |
+| `cube_10mm.stl` | Plain cube (STL and STEP twin) · Würfel (STL und STEP) | 2,091 | 294 | 1 | yes · ja | 248 s |
 | `heart.vox` | MagicaVoxel input (legolization example) · MagicaVoxel-Eingabe | 12 | 7 | 1 | yes · ja | 4 s |
-| `l_bracket.stl` | Overhang · Überhang | 177 | 40 | 1 | yes · ja | 38 s |
-| `rocket.blend` | Blender file: materials, an Array modifier, a hidden helper, millimetre units · Blender-Datei: Materialien, Array-Modifier, verstecktes Hilfsobjekt, mm | 263 | 42 | 4 | yes · ja | 18 s |
-| `sphere_r10.stl` | Round shape · Runde Form | 1,499 | 207 | 1 | yes · ja | 263 s |
+| `l_bracket.stl` | Overhang · Überhang | 177 | 40 | 1 | yes · ja | 36 s |
+| `rocket.blend` | Blender file: materials, an Array modifier, a hidden helper, millimetre units · Blender-Datei: Materialien, Array-Modifier, verstecktes Hilfsobjekt, mm | 285 | 48 | 4 | yes · ja | 20 s |
+| `sphere_r10.stl` | Round shape · Runde Form | 1,826 | 242 | 1 | yes · ja | 261 s |
 | `textured_cube.obj` | Image texture (OBJ) · Bildtextur (OBJ) | 2,466 | 354 | 2 | yes · ja | 243 s |
-| `toadstool.obj` | Material colours (OBJ) · Materialfarben (OBJ) | 1,239 | 178 | 2 | yes · ja | 255 s |
-| `torus.stl` | Through-hole · Durchgehendes Loch | 552 | 74 | 1 | yes · ja | 33 s |
-| `two_bodies.step` | STEP with two coloured bodies · STEP mit zwei farbigen Körpern | 702 | 97 | 2 | yes · ja | 182 s |
-| `vertex_colors.ply` | Vertex colours (PLY) · Vertexfarben (PLY) | 1,519 | 212 | 4 | yes · ja | 261 s |
-| `castle.step` | Generated STEP, about 1,650 parts: the v1.0 timing case · Erzeugtes STEP, rund 1.650 Teile: der Zeit-Test für v1.0 | 1,712 | 241 | 3 | yes · ja | 250 s |
+| `toadstool.obj` | Material colours (OBJ) · Materialfarben (OBJ) | 1,431 | 200 | 2 | yes · ja | 261 s |
+| `torus.stl` | Through-hole · Durchgehendes Loch | 723 | 102 | 1 | yes · ja | 46 s |
+| `two_bodies.step` | STEP with two coloured bodies · STEP mit zwei farbigen Körpern | 702 | 97 | 2 | yes · ja | 179 s |
+| `vertex_colors.ply` | Vertex colours (PLY) · Vertexfarben (PLY) | 1,856 | 254 | 4 | yes · ja | 263 s |
+| `castle.step` | Generated STEP, about 1,650 parts: the v1.0 timing case · Erzeugtes STEP, rund 1.650 Teile: der Zeit-Test für v1.0 | 1,712 | 241 | 3 | yes · ja | 249 s |
 
 ## bunny_lowpoly
 

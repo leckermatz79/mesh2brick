@@ -28,6 +28,7 @@ mesh are missing. Pure functions, no I/O.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
@@ -37,13 +38,13 @@ from scipy import ndimage
 from scipy.spatial import cKDTree
 
 from mesh2brick.model import MM_PER_PLATE, MM_PER_STUD, STUD_HEIGHT_MM
-from mesh2brick.render.preview import slope_faces
+from mesh2brick.render.preview import slope_faces, slope_gap_faces
 from mesh2brick.voxel.grid import LEGO_MM_PER_STUD
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from mesh2brick.model import BrickModel
+    from mesh2brick.model import BrickModel, PlacedPart
     from mesh2brick.render.preview import SlopeFace
     from mesh2brick.voxel.grid import VoxelGrid
 
@@ -204,6 +205,7 @@ def surface_samples(
     studded = np.zeros(shape, dtype=bool)
     sloped = np.zeros(shape, dtype=bool)
     wedges: list[list[SlopeFace]] = []
+    slopes: list[PlacedPart] = []
     for index, part in enumerate(model.parts):
         tops = part.top_studs
         if tops:
@@ -215,6 +217,7 @@ def surface_samples(
             at = np.asarray(sorted(wedge[0]), dtype=np.int64) - low
             sloped[at[:, 0], at[:, 1], at[:, 2]] = True
             wedges.append(wedge[1])
+            slopes.append(part)
 
     points: list[NDArray[np.float64]] = []
     weights: list[NDArray[np.float64]] = []
@@ -241,14 +244,121 @@ def surface_samples(
         points.append(p)
         weights.append(w)
 
-    for faces in wedges:
-        for face in faces:
-            if not _wedge_face_exposed(face, outside, low):
-                continue
-            p, w = _face_samples(face.corners[None] * _SCALE, spacing_mm)
-            points.append(p)
-            weights.append(w)
+    found = _slope_samples(wedges, slopes, (occupied, sloped, outside), low, spacing_mm)
+    points.extend(p for p, _ in found)
+    weights.extend(w for _, w in found)
     return np.concatenate(points), np.concatenate(weights)
+
+
+def _slope_samples(
+    wedges: list[list[SlopeFace]],
+    slopes: list[PlacedPart],
+    grids: tuple[NDArray[np.bool_], NDArray[np.bool_], NDArray[np.bool_]],
+    low: NDArray[np.int64],
+    spacing_mm: float,
+) -> list[tuple[NDArray[np.float64], NDArray[np.float64]]]:
+    """Samples on the slopes' faces and on the sides that show above them."""
+    outside = grids[2]
+    found = [
+        _face_samples(face.corners[None] * _SCALE, spacing_mm)
+        for faces in wedges
+        for face in faces
+        if _wedge_face_exposed(face, outside, low)
+    ]
+    for part in slopes:
+        top = max(c[2] for c in part.cells) + 1
+        found.extend(
+            _polygon_samples(face.corners * _SCALE, spacing_mm)
+            for face, cell in slope_gap_faces(part)
+            if _gap_exposed(face, cell, top, grids, low)
+        )
+    return found
+
+
+def _gap_exposed(
+    face: SlopeFace,
+    cell: tuple[int, int, int],
+    top: int,
+    grids: tuple[NDArray[np.bool_], NDArray[np.bool_], NDArray[np.bool_]],
+    low: NDArray[np.int64],
+) -> bool:
+    """A neighbour's side above a slope: a plain filled cell, outside air above.
+
+    It counts when ``cell`` is filled and not part of a slope's sloped columns,
+    and the cell above the sloped column it faces (at the slope's ``top``) is
+    outside air, as for the sloped top itself.
+    """
+    occupied, sloped, outside = grids
+    at = np.asarray(cell, dtype=np.int64) - low
+    if np.any(at < 0) or np.any(at >= occupied.shape):
+        return False
+    if not occupied[at[0], at[1], at[2]] or sloped[at[0], at[1], at[2]]:
+        return False
+    column = at + np.rint(np.asarray(face.outward)).astype(np.int64)
+    above = np.asarray([column[0], column[1], top - low[2]])
+    if np.any(above < 0) or np.any(above >= outside.shape):
+        return True
+    return bool(outside[above[0], above[1], above[2]])
+
+
+def _polygon_samples(
+    corners: NDArray[np.float64], spacing_mm: float
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Samples on a planar convex polygon (mm), each weighted by its area.
+
+    Fan triangles, each cut into ``n x n`` small triangles (``n`` from the
+    longest edge and ``spacing_mm``), sampled at their centroids.
+    """
+    points: list[NDArray[np.float64]] = []
+    weights: list[NDArray[np.float64]] = []
+    for k in range(1, len(corners) - 1):
+        a, b, c = corners[0], corners[k], corners[k + 1]
+        area = 0.5 * float(np.linalg.norm(np.cross(b - a, c - a)))
+        if area <= _EPS:
+            continue
+        longest = max(
+            np.linalg.norm(b - a), np.linalg.norm(c - b), np.linalg.norm(a - c)
+        )
+        n = max(1, math.ceil(float(longest) / spacing_mm))
+        grid_i, grid_j = np.meshgrid(np.arange(n), np.arange(n), indexing="ij")
+        i, j = grid_i.ravel(), grid_j.ravel()
+        up = i + j < n  # upright small triangles: centroid at (i + 1/3, j + 1/3)
+        down = i + j < n - 1  # inverted ones: centroid at (i + 2/3, j + 2/3)
+        u = np.concatenate([(i[up] + 1 / 3) / n, (i[down] + 2 / 3) / n])
+        v = np.concatenate([(j[up] + 1 / 3) / n, (j[down] + 2 / 3) / n])
+        points.append(a + u[:, None] * (b - a) + v[:, None] * (c - a))
+        weights.append(np.full(len(u), area / (n * n)))
+    if not points:
+        return np.zeros((0, 3)), np.zeros(0)
+    return np.concatenate(points), np.concatenate(weights)
+
+
+def visible_parts(model: BrickModel) -> frozenset[int]:
+    """Indices of the parts with a cell face to the air around the model.
+
+    The parts a builder sees from outside (not those on the inner wall of a
+    hollow model): used to count visible slopes (ROADMAP 8).
+    """
+    if not model.parts:
+        return frozenset()
+    cells = np.asarray([c for p in model.parts for c in p.cells], dtype=np.int64)
+    low = cells.min(axis=0) - 1
+    shape = tuple(int(n) for n in cells.max(axis=0) - low + 2)
+    occupied = np.zeros(shape, dtype=bool)
+    local = cells - low
+    occupied[local[:, 0], local[:, 1], local[:, 2]] = True
+    outside = _outside_air(occupied)
+    near = np.zeros_like(outside)
+    for direction in _DIRECTIONS:
+        near |= np.roll(outside, shift=direction, axis=(0, 1, 2))
+    seen: set[int] = set()
+    start = 0
+    for index, part in enumerate(model.parts):
+        mine = local[start : start + len(part.cells)]
+        start += len(part.cells)
+        if near[mine[:, 0], mine[:, 1], mine[:, 2]].any():
+            seen.add(index)
+    return frozenset(seen)
 
 
 def _outside_air(occupied: NDArray[np.bool_]) -> NDArray[np.bool_]:
@@ -261,11 +371,21 @@ def _outside_air(occupied: NDArray[np.bool_]) -> NDArray[np.bool_]:
 def _wedge_face_exposed(
     face: SlopeFace, outside: NDArray[np.bool_], low: NDArray[np.int64]
 ) -> bool:
-    """Sloped tops always count; sides, lip and bottom where air is next to them."""
+    """Faces with the air around the model next to them.
+
+    A sloped top looks into the cell right above its column (the slope's
+    own cells end at its top), so it counts when that cell is outside: a
+    slope on the inner wall of a hollow model faces the cavity and does not
+    (2.1; up to 2.0 every sloped top counted). Sides, lip and bottom count
+    where the cell they face is outside.
+    """
     if face.outward[2] > 0:
-        return True
-    centre = face.corners.mean(axis=0) + 0.5 * np.asarray(face.outward)
-    cell = np.floor(centre).astype(np.int64) - low
+        x, y = np.floor(face.corners[:, :2].mean(axis=0))
+        above = math.ceil(float(face.corners[:, 2].max()) - 1e-9)
+        cell = np.asarray([x, y, above], dtype=np.int64) - low
+    else:
+        centre = face.corners.mean(axis=0) + 0.5 * np.asarray(face.outward)
+        cell = np.floor(centre).astype(np.int64) - low
     if np.any(cell < 0) or np.any(cell >= outside.shape):
         return True
     return bool(outside[cell[0], cell[1], cell[2]])

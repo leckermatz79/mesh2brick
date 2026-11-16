@@ -99,6 +99,15 @@ uv run mesh2brick convert model.stl -o out/ --set "parts.categories=[brick, plat
 # Also on the stairs of round shapes (and voxel files): --set parts.tiles=all;
 # none on the lowest layer: --set parts.tiles_on_base=false
 
+# Slopes on round shapes (on by default since 2.1): where the 3D model is tilted and a slope
+# lies closer to it than the voxel stair, the stair gets a 45° or 33° slope (3040b, 3039, 4286);
+# a slope may also fill the corner of a stair. Boxes stay as they are, the model stays one stable
+# piece (checked again, undone otherwise). Slopes LEGO does not make in a colour stay stairs (the
+# run counts them). Voxel files get only legolization's own slopes. As in 2.0:
+uv run mesh2brick convert model.stl -o out/ --set parts.slopes=preserve
+# Slopes cost parts (round models +10 % to +30 %); at most +15 % for slopes, best first:
+# --set parts.slopes_max_share=0.15. No slopes at all: --set "parts.categories=[brick, plate, tile]"
+
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3
 

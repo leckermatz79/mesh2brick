@@ -64,6 +64,8 @@ class Inspection:
     """``voxel.fill == "hollow"`` (placement builds a shell)."""
     wall_thickness: int = 2
     """``voxel.wall_thickness``."""
+    slopes_max_share: float | None = None
+    """``parts.slopes_max_share``."""
 
     @property
     def color_cells(self) -> list[tuple[int, int]]:
@@ -78,7 +80,10 @@ class Inspection:
     def parts_estimate(self) -> PartsEstimate:
         """Expected part count of the converted model, with a range."""
         return parts_estimate(
-            self.grid, hollow=self.hollow, wall_thickness=self.wall_thickness
+            self.grid,
+            hollow=self.hollow,
+            wall_thickness=self.wall_thickness,
+            slopes_max_share=self.slopes_max_share,
         )
 
 
@@ -125,6 +130,7 @@ def inspect_file(source: Path, settings: Settings, *, name: str) -> Inspection:
         seconds=time.perf_counter() - started,
         hollow=settings.voxel.fill == "hollow",
         wall_thickness=settings.voxel.wall_thickness,
+        slopes_max_share=settings.parts.slopes_max_share,
     )
 
 

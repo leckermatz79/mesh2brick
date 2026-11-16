@@ -134,6 +134,8 @@ color:
   palette: common       # common|solid|all (2026-11-01: common = ~40 aktuelle LEGO-Farben, Standard; solid = alle Volltonfarben mit Katalognummern; all = alle LDraw-Volltonfarben, ADR 0008)
 parts:
   categories: [brick, plate, slope, tile]   # tile seit 2.0 Standard (PO 2026-11-12, ADR 0020: Fliesen nur auf flachen Flächen des 3D-Modells); slope war 2026-11-01 bis 1.3.0 opt-in (legolization 0.5.0 bis zu 50x langsamer); seit 1.3.0 (ROADMAP Punkt 8, Issue #34) wieder Standard: die Reihenfolge der LP-Versuche macht Slopes billig (alle Fixtures stabil, höchstens 1,45-fache Zeit)
+  slopes: mesh          # 2026-11-15 (ROADMAP 8, ADR 0021): Dachsteine auf Treppen geneigter Flächen, wo sie näher am 3D-Modell liegen als die Stufe; preserve = wie 2.0, smooth = legolizations ältere Variante
+  slopes_max_share: null   # 2026-11-15: z. B. 0.15 = Dachsteine höchstens +15 % Teile (die besten zuerst); null = ohne Grenze, der Lauf meldet mehr als +15 %
   include: []
   exclude: []
   max_parts: 5000

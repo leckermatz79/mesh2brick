@@ -10,7 +10,7 @@ import pytest
 from matplotlib.image import imread
 from PIL import Image
 
-from mesh2brick.model import BrickModel, BuildStep, ColorInfo
+from mesh2brick.model import BrickModel, BuildStep, ColorInfo, PlacedPart
 from mesh2brick.render.preview import (
     PreviewOptions,
     grid_to_model,
@@ -211,3 +211,34 @@ def test_slopes_in_three_dimensions_and_part_pictures() -> None:
     model = _slope_2x1(((0, 1),))
     picture = render_part_png(model.parts[0], model.colors[4])
     assert picture.startswith(b"\x89PNG")
+
+
+def test_sides_above_a_slope_are_drawn_without_holes() -> None:
+    import warnings  # noqa: PLC0415
+
+    from mesh2brick.render.preview import slope_gap_faces  # noqa: PLC0415
+
+    slope = PlacedPart(
+        part="3040b", color=4, x=0, y=0, layer=0, yaw=0, step=0, category="slope",
+        cells=tuple((0, y, z) for y in (0, 1) for z in range(3)), studs=((0, 1),),
+    )  # fmt: skip
+    faces = slope_gap_faces(slope)
+
+    def area(corners: np.ndarray) -> float:
+        normal = np.cross(corners, np.roll(corners, -1, axis=0)).sum(axis=0)
+        return float(np.linalg.norm(normal) / 2)
+
+    left = sum(area(f.corners) for f, cell in faces if cell[0] == -1)
+    right = sum(area(f.corners) for f, cell in faces if cell[0] == 1)
+    front = sum(area(f.corners) for f, cell in faces if cell[1] == -1)
+    assert left == pytest.approx(1.25)  # stud x plates above the face
+    assert right == pytest.approx(1.25)
+    assert front == pytest.approx(2.5)  # above the half-plate lip
+    beside = PlacedPart(
+        part="3005", color=1, x=1, y=0, layer=0, yaw=0, step=0,
+        cells=tuple((1, 0, z) for z in range(3)),
+    )  # fmt: skip
+    model = BrickModel("m", (slope, beside), (BuildStep(),))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert render_png(model, PreviewOptions(width_px=200, height_px=150))

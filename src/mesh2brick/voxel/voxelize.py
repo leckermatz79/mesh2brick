@@ -51,6 +51,7 @@ from mesh2brick.voxel.grid import (
     lego_cell_height_mm,
 )
 from mesh2brick.voxel.rays import JITTER, ray_hits
+from mesh2brick.voxel.slopes import slope_gains
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -160,6 +161,15 @@ def voxelize(
         lego_cell_height_mm=lego_cell_height_mm(unit),
         overhang=settings.parts.tiles_overhang,
     )
+    slopes = None
+    if method == "volume" and unit == "brick" and wants_slopes(settings):
+        slopes = slope_gains(
+            np.asarray(mesh.triangles),
+            occupancy,
+            lattice,
+            flat,
+            lego_cell_height_mm=lego_cell_height_mm(unit),
+        )
     # Model colours use the full lattice: surface points in empty border cells
     # (details too thin to fill a cell) still colour their filled neighbours.
     full_color, color_notes = model_colors(
@@ -170,6 +180,8 @@ def voxelize(
     origin = _box_origin(box, lattice)
     occupancy = np.ascontiguousarray(occupancy[box])
     flat = np.ascontiguousarray(flat[box])
+    if slopes is not None:
+        slopes = np.ascontiguousarray(slopes[box])
     color = (
         apply_colors(occupancy, settings.color)  # bands follow the cropped height
         if settings.color.mode == "height_bands"
@@ -188,6 +200,7 @@ def voxelize(
         pitch_mm=lattice.pitch,
         origin_mm=origin,
         flat=flat,
+        slopes=slopes,
     )
     report = VoxelizeReport(
         method=method,
@@ -200,6 +213,11 @@ def voxelize(
         seconds=time.perf_counter() - started,
     )
     return VoxelizeResult(grid=grid, report=report, warnings=tuple(warnings))
+
+
+def wants_slopes(settings: Settings) -> bool:
+    """Whether placement puts slopes where the mesh tilts (ROADMAP 8, ADR 0021)."""
+    return settings.parts.mesh_slopes
 
 
 def model_pitch(extents: NDArray[np.float64], settings: Settings) -> float:
@@ -529,6 +547,11 @@ def hollow(grid: VoxelGrid, wall_thickness: int) -> VoxelGrid:
         pitch_mm=grid.pitch_mm,
         origin_mm=grid.origin_mm,
         flat=None if grid.flat is None else np.where(shell, grid.flat, np.nan),
+        slopes=(
+            None
+            if grid.slopes is None
+            else np.where(shell[..., None, None], grid.slopes, np.nan)
+        ),
     )
 
 

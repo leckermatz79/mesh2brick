@@ -23,10 +23,15 @@ The estimate retraces what legolization does (ADR 0019, docs/benchmarks.md
      bottom of a hollow box): rebuilt either as plates as well or, when
      legolization's final merge wins them back, as small bricks. Which one
      cannot be told beforehand, so the range is wide there.
+4. Slopes on tilted stairs (ROADMAP 8, ADR 0021) cost parts: cutting a brick
+   for a slope leaves pieces. Per stud cell the voxelizer found a slope worth
+   placing (:attr:`~mesh2brick.voxel.grid.VoxelGrid.slopes`) the run adds
+   :data:`SLOPE_PARTS_PER_CELL`.
 """
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
@@ -34,6 +39,7 @@ import numpy as np
 from scipy import ndimage
 
 from mesh2brick.voxel.grid import PLATES_PER_BRICK
+from mesh2brick.voxel.slopes import worth_a_slope
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -76,6 +82,9 @@ Python loop over the shell, about 2 seconds for 500,000 plate cells at worst
 (a sphere of 128 studs has 320,000 and takes 1.3 s)."""
 CELLS_PER_PART: Final = 4.0
 """Fallback: shell cells (1 stud x 1 brick) per placed part (measured 3.2-6.0)."""
+SLOPE_PARTS_PER_CELL: Final = (0.45, 0.58, 0.75)
+"""Parts the slope pass adds per stud cell worth a slope (low, typical, high);
+measured 0.49-0.71 on the 2.1 release run (docs/benchmarks.md)."""
 FALLBACK_RANGE: Final = (0.6, 1.6)
 """Range of the fallback, wide because it does not look at the shape."""
 
@@ -102,16 +111,44 @@ class PartsEstimate:
 
 
 def parts_estimate(
-    grid: VoxelGrid, *, hollow: bool = True, wall_thickness: int = 2
+    grid: VoxelGrid,
+    *,
+    hollow: bool = True,
+    wall_thickness: int = 2,
+    slopes_max_share: float | None = None,
 ) -> PartsEstimate:
     """Expected part count of ``grid`` once placed, with a range.
 
     ``hollow`` and ``wall_thickness`` are ``voxel.fill == "hollow"`` and
-    ``voxel.wall_thickness``.
+    ``voxel.wall_thickness``; ``slopes_max_share`` is
+    ``parts.slopes_max_share`` (the slopes' share of extra parts).
 
     Raises:
         ValueError: if ``wall_thickness`` is below 1.
     """
+    base = _placed_estimate(grid, hollow=hollow, wall_thickness=wall_thickness)
+    if grid.slopes is None:
+        return base
+    cells = worth_a_slope(grid.slopes)
+    if not cells:
+        return base
+    extra = [cells * rate for rate in SLOPE_PARTS_PER_CELL]
+    if slopes_max_share is not None:
+        extra = [
+            min(e, slopes_max_share * n)
+            for e, n in zip(extra, (base.low, base.expected, base.high), strict=True)
+        ]
+    low, expected, high = (
+        round(n + e)
+        for n, e in zip((base.low, base.expected, base.high), extra, strict=True)
+    )
+    return dataclasses.replace(base, low=low, expected=expected, high=high)
+
+
+def _placed_estimate(
+    grid: VoxelGrid, *, hollow: bool, wall_thickness: int
+) -> PartsEstimate:
+    """The estimate without slopes (steps 1-3 above)."""
     plates, colours = _plate_layers(grid)
     shell = _shell(plates, grid, wall_thickness) if hollow else plates
     total = int(shell.sum())

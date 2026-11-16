@@ -1,101 +1,67 @@
 # Projektstatus
 
-Stand: 2026-11-15 · **[2.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.0.0): Fliesen standardmäßig an** (PR [#49](https://github.com/leckermatz79/mesh2brick/pull/49), Tag v2.0.0; Studio-Prüfung bestanden) · davor Teilen am Flächenrand ([#46](https://github.com/leckermatz79/mesh2brick/issues/46)) und 85-%-Regel ([#44](https://github.com/leckermatz79/mesh2brick/issues/44)) · Nächster Schritt: ROADMAP 8 (mehr Dachsteine), sobald du grünes Licht gibst
+Stand: 2026-11-16 · **ROADMAP 8 – mehr Dachsteine ([#51](https://github.com/leckermatz79/mesh2brick/issues/51)): fertig, [PR #52](https://github.com/leckermatz79/mesh2brick/pull/52) wartet auf dich** (Ziel-Release 2.1.0) · davor [2.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.0.0) (Fliesen standardmäßig an) · Nächster Schritt: deine zwei Fragen unten, dann Merge und Tag v2.1.0
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
-- **2.0.0 ist veröffentlicht, Fliesen sind standardmäßig an:** Wo das 3D-Modell flach ist, liegen glatte Fliesen genau auf der Höhe der Fläche (Kästen 0,00 mm Abweichung, Burghof und Bergfried glatt), runde Formen behalten ihre Noppen, und alle 15 Läufe des Release-Benchmarks sind ein stabiles Stück.
-- Deine drei Bedingungen sind erfüllt, Rand-Noppen ist Standard (deine Wahl vom 2026-11-15), und in BrickLink Studio ist Duo mit Fliesen sauber: keine Überlappungen, keine schwebenden Fliesen.
+- **Runde Formen bekommen jetzt Dachsteine, und zwar nur dort, wo ein Dachstein näher am 3D-Modell liegt als die Voxelstufe:** Kugel, Hase, Fliegenpilz und Torus kommen ihrem Modell im Mittel 9–13 % näher (Kugel 2,05 → 1,86 mm), statt 10 sind jetzt 1.080 Dachsteine von außen sichtbar, und alle 15 Läufe bleiben ein stabiles Stück.
+- Kästen, Burg und Herz sind Teil für Teil und Pixel für Pixel wie in 2.0.0; der Preis sind mehr Teile (+8 % bis +31 %), darum die erste Frage unten.
 
-## Erledigt: 2.0.0 (veröffentlicht 2026-11-15)
+![Vorher (2.0.0) und nachher (2.1): Fliegenpilz, Hase, Torus](gallery/roadmap8b-slopes-2.1.png)
 
-- **Release:** PR #49 gemergt, Tag v2.0.0, [Release-Seite](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.0.0) aus dem CHANGELOG; Issue #46 geschlossen.
-- **Studio-Prüfung (Abnahme #42, von dir, 2026-11-15):** Duo mit 2.0.0-Standardeinstellungen (1.081 Teile, 56 Fliesen auf dem Sockel), in BrickLink Studio geöffnet: **keine Überlappungen, keine schwebenden Fliesen, Fliesen als „Tile“ angezeigt.** Damit ist der letzte offene Punkt der Abnahme von #42 erledigt.
+## Erledigt: ROADMAP 8 – mehr Dachsteine (Issue #51, PR #52)
 
-- **Release-Lauf mit Standardeinstellungen** (alle 13 Testmodelle plus Duo bei 32 und 48 Noppen, 2026-11-15): **alle 15 ein stabiles Stück**, die Teileschätzung von `inspect` trifft 15 von 15, das PDF des Texturwürfels bleibt mit 9,83 MB unter 10 MB. Die Kästen treffen ihr 3D-Modell genau, runde Formen, Rakete und Herz sind unverändert. Tabelle unten, Einzelheiten in [benchmarks.md](benchmarks.md), „Release 2.0“.
-- **Burg dreimal mit dem Endstand:** jedes Mal 118 Fliesen, 1.712 Teile, stabil, 250 / 254 / 257 s, keine Fliese übersprungen.
-- **Letzter Fehler vor dem Release, behoben:** Beim großen Duo (48 Noppen) hat ein Schnitt das Modell in zwei Stücke getrennt: Ein 1×1-Stein am Boden hing nur über das geschnittene Teil am Rest. Die Stabilitätsprüfung nahm deshalb alle Fliesen zurück, und für die Prüfung der Bauschritte blieb keine Zeit (0 von 324). Jetzt darf ein Schnitt das Modell nie trennen; sonst bleibt das Teil ganz und behält seine Noppen. Folge: Duo bei 48 Noppen bekommt keine Fliesen (17 Schnitte fallen weg, sein Sockel kommt unter 85 %) und prüft wieder 188 von 324 Schritten; die Burg verliert 2 von 34 Schnitten (122 → 118 Fliesen, dieselben Flächen).
-- **Galerie neu** mit Standardeinstellungen (Fliesen sichtbar auf den Kästen und der Burg), **CHANGELOG 2.0.0**, Version 2.0.0.
+- **Zuerst gemessen: legolizations ältere Variante `smooth`.** Sie setzt an runden Modellen 13–27 sichtbare Dachsteine, bei gleicher Teilezahl und stabil, **aber die Abweichung sinkt nicht** (Kugel 2,05 → 2,06 mm, Rakete 1,46 → 1,48 mm). Sie schaut nur auf die Voxel: Bei etwa der Hälfte der Stufen liegt das 3D-Modell dort, wo die Stufe schon näher ist als ein Dachstein.
+- **Dabei zwei Fehler in der 2.0-Messgröße gefunden und behoben.** (1) Dachsteine auf der Innenwand hohler Modelle (dorthin setzt legolization die meisten seiner Dachsteine) wurden als Außenfläche gemessen. Die runden Modelle standen in 2.0.0 deshalb zu schlecht da (Kugel 2,35 statt 2,05 mm, Hase 2,04 statt 1,96 mm). (2) Steht neben einem Dachstein ein höherer Stein, ist dessen Seite über der Schräge sichtbar. Diese Fläche fehlte in der Messung und in den Bildern; dort sah man kleine weiße Löcher. Beides ist korrigiert. Alle Vergleiche hier messen 2.0.0 neu mit der korrigierten Messgröße. Kästen, Burg und Duo ändern sich dadurch nicht.
+- **Der neue Dachstein-Nachlauf** (eigener Code nach legolizations Platzierung, wie bei den Fliesen; legolization selbst ist unverändert):
+  - Beim Voxelisieren prüft mesh2brick jede mögliche Dachstein-Stelle am 3D-Modell: Ist die Fläche dort geneigt und fällt sie in Richtung des Dachsteins ab? Wie viel weniger weicht der Dachstein entlang der senkrechten Strahlen vom Modell ab als die Stufe? Nur Stellen, die mindestens 0,5 mm näher kommen, sind Kandidaten.
+  - Nach der Platzierung setzt mesh2brick die besten zuerst: 45° (3040b, zwei nebeneinander als 3039) oder 33° (4286). Ein Dachstein darf die Kante einer Stufe abschneiden oder die Ecke über einer Stufe füllen; dabei kommt Material über die Voxelform hinaus dazu, wo das Modell es hat (dein OK vom 2026-11-15).
+  - Die Steine darunter werden zugeschnitten, der Rest wird aus gleich hohen Steinen derselben Farbe neu gebaut und, wo möglich, wieder mit Nachbarn zu größeren Steinen verbunden. Ein Dachstein darf höchstens 2 Teile mehr kosten, und das Modell muss ein Stück bleiben. Danach wird die Stabilität des ganzen Modells neu geprüft; hält es nicht, werden die Dachsteine zurückgenommen. Das ist in keinem Lauf passiert.
+  - **Farben:** Gibt es den Dachstein in der Farbe nicht, bleibt die Stufe, und der Lauf zählt sie. Duo: 38 Stufen (bei 48 Noppen 93), weil es 3039 und 4286 nicht in Bright Green gibt. Das übernimmt ROADMAP 12. Neu ist auch: Duo bekommt Dachsteine überhaupt erst jetzt (vorher schloss die Farbregel sie fürs ganze Modell aus).
+  - **Zeit:** Fehlt die Zeit für die Stabilitätsprüfung, wird der Nachlauf übersprungen, und Kommandozeile und Deckblatt sagen „Dachsteine übersprungen: Zeitgrenze; empfohlen --time 10min“. Das ist in keinem Lauf passiert.
+- **Darstellung und Export:** Dachsteine in allen vier Richtungen in Vorschau, Schrittbildern, „zuerst“-Feldern und Teilekasten („Dachstein 2 × 2“ usw. mit BrickLink-/Rebrickable-Nummer); LDraw-Datei streng wieder eingelesen, Teilelisten stimmen (alle 15 Läufe).
+- **Teileschätzung** von `inspect` zählt die Dachsteine jetzt mit; 15 von 15 Läufen im angezeigten Bereich.
+- **Einstellungen:** `parts.slopes: mesh` (neu, Standard), `preserve` (wie 2.0.0), `smooth` (legolizations alte Variante); `parts.slopes_max_share` begrenzt die Mehrteile (aus, siehe Frage 1). README (de/en), Beispiel-Config und SPEC §4 erklären es. Begründung: [ADR 0021](adr/0021-slopes-where-they-bring-the-model-closer-to-the-mesh.md).
 
-- **Fliesen standardmäßig an:** `tile` steht jetzt in den Standard-Kategorien (auch in der Beispiel-Config); `--set "parts.categories=[brick, plate, slope]"` gibt das Ergebnis von 1.6 (Test dazu).
-- **Bedingung 1, Zeit:** Die Reserve für die Stabilitätsprüfung der Fliesen wird aus der Teilezahl geschätzt, wie beim Export: Die Prüfung braucht etwa 0,03 s pro Teil und darf in den Export-Puffer hineinlaufen, soweit der Export ihn nicht braucht; nur der Rest wird freigehalten, schon während legolizations Platzierung (Burg: 10 s). Fallen Fliesen trotzdem der Zeitgrenze zum Opfer, sagen Kommandozeile und Deckblatt: „Fliesen übersprungen: Zeitgrenze; empfohlen --time 10min“. **Burg dreimal hintereinander mit Standardeinstellungen (5 min), je Variante:** jedes Mal alle Fliesen, jedes Mal stabil und gleich (Rand-Noppen 249–252 s, Rand-Fliesen 259–263 s; auf Akku, also eher langsamer als am Netz).
-- **Bedingung 2, Voxeldateien:** `.vox`, `.npy` und `.grid.npz` ohne Netz bekommen keine Fliesen (nur mit `--set parts.tiles=all`); das Herz bleibt bei 12 Teilen.
-- **Bedingung 3, Türme:** Im 3D-Modell sind sie gleich (6,29 Noppen breit), aber das Voxelgitter liegt verschoben zur Burg, und das offene STEP-Netz wird „jede berührte Zelle“ voxelisiert. So entstehen vier verschieden große Voxel-Türme (SW 7 × 7, SE 8 × 7, NW 7 × 8, NO 8 × 8 Zellen; flach sind immer 6 × 6), legolization setzt andere Steine, und nur beim SW-Turm hält kein Stein darunter die Schnittkante (Schnitt eine Noppe verschoben, ein Teil ganz, Anteil 69 % statt 100 %). Zeit spielte keine Rolle. **Jetzt:** Flächen gleicher Form in gleicher Höhe (auch gedreht oder gespiegelt) werden nur gemeinsam gefliest oder gar nicht. **Variante** dazu: Zellen, die höchstens eine Zelle über das Netz hinausstehen (ein Ring um die Fläche, Ecken eingeschlossen), zählen zur Fläche (`parts.tiles_overhang`).
-- **Nebenbei gefunden:** In der Variante hing beim NO-Turm ein beim Schneiden entstandener 1×1-Stein an der Ecke in der Luft, und die Stabilitätsprüfung nahm alle Fliesen zurück. Jetzt muss jedes Schnittstück selbst ein Teil darunter oder darüber haben; die drei Läufe danach sind sauber.
-- Zahlen und Gründe je Turm: [benchmarks.md](benchmarks.md), „Conditions for 2.0“; Begründung: ADR 0020, dritter Nachtrag.
-
-| Burg, je 3 Läufe | Fliesen | Türme | Teile (1.6: 1.657) | Abweichung Mittel / 95 % |
-|---|---:|---|---|---|
-| Rand-Noppen | 122 | alle vier mit Noppen | 1.716 (+3,6 %) | 3,27 / 8,00 mm |
-| Rand-Fliesen | 197 | alle vier ganz gefliest | 1.826 (+10,2 %) | 3,07 / 8,00 mm |
-| **Rand-Noppen, Endstand (gewählt)** | 118 | alle vier mit Noppen | 1.712 (+3,3 %) | 3,27 / 8,00 mm |
-
-Die ersten beiden Zeilen stammen von vor dem letzten Fehler (Schnitt trennt das Modell); der Endstand ist die dritte.
-
-## Davor: #46, Teilen am Flächenrand (in 2.0.0)
-
-- **Regel:** Ein Teil, dessen Oberseite nur teilweise auf einer flachen Fläche liegt (der Rest ragt über den Rand oder liegt unter einer Mauer bzw. einem Turm), wird an der Flächengrenze geteilt, bevor die 85-%-Regel greift: außen bleibt ein Stein (bzw. eine Platte) mit Noppen, innen Platte + Fliese auf der Höhe der Fläche. Liegt die Fläche eine Platte höher (Duo), wird nichts geteilt, die Fliesen kommen auf den freien Teil. Abschaltbar mit `--set parts.tiles_split=false`.
-- **Haltecheck (deine Ergänzung):** Jeder Schnitt muss von einem Teil darunter oder darüber überbrückt werden, das über die Schnittkante reicht. Sonst wandert der Schnitt eine Noppe in die Fläche; hilft auch das nicht, bleibt das Teil ganz. **Burghof:** 37 Hofteile reichen unter Mauern oder Türme; **17 davon wären nach dem Schnitt nur lose eingelegt gewesen.** Bei 12 hat das Verschieben um eine Noppe geholfen, 5 bleiben ganz. Der Hof kommt damit auf 90 % und wird gefliest.
-- **Stabilität:** Jedes Modell mit einem Schnitt wird ganz neu geprüft (parallel zur Schrittplanung). Alle 14 Testmodelle sind ein stabiles Stück.
-- **Teilezuwachs gegen den Richtwert +15 %:** Burg +10,1 % (1.657 → 1.825), Duo +5,5 % (1.025 → 1.081). Über 15 % liegen nur L-Winkel (+15,7 %) und zwei Körper (+15,8 %), unverändert seit 1.7.0, und das Herz (Voxeldatei, 12 → 25 Teile, +108 %; dort gilt jede Oberseite als flach). Der Lauf meldet das, nimmt aber nichts zurück.
-- **Nebenbei:** Die Zeitreserve für die Stabilitätsprüfung war zu vorsichtig: In einem von zwei Läufen bekam die Burg deshalb gar keine Fliesen. Sie ist jetzt halb so groß (5 s + 0,01 s pro Teil); eine längere Prüfung geht vom Export-Puffer ab, der dafür reicht.
-- **Bilder:** `out/tiles/vorher-nachher/teilen/` (links 85-%-Regel aus #45, rechts mit Teilen): `castle.png`, `Duo_Duolingo-32.png`, zur Kontrolle `two_bodies.png`. Zahlen pro Fläche in [benchmarks.md](benchmarks.md), „Cuts at the edge of flat faces“.
-
-## Davor: #44, 85-%-Regel (in 2.0.0)
-
-- **Regel:** Der Fliesen-Durchlauf plant jetzt erst alle Teile, ohne etwas zu ändern, und zählt dann für jede flache Fläche (zusammenhängende flache Zellen einer Lage): Welcher Anteil ihrer freien Oberseite liegt unter Teilen, die eine Fliese bekommen können? Ab 85 % wird die Fläche gefliest, darunter behält sie alle Noppen. Einstellbar mit `parts.tiles_min_share` (Standard 0,85; 0 = wie 1.7.0). Der Lauf sagt, wie viele Flächen ihre Noppen behalten.
-- **Gemessen** (alle Testmodelle, Fliesen eingeschaltet, Tabelle in [benchmarks.md](benchmarks.md), „Tile share per face“): Würfel, Texturwürfel, L-Winkel, zwei Körper unverändert (gleiche Fliesen, 0,00 mm). Burg 99 → 0 Fliesen, Duo 22 → 0. Alle 14 ein stabiles Stück, Zeit wie 1.7.0 (ein Hasen-Lauf ohne jede Fliese brauchte einmal 146 s, zweimal danach 120 s: Streuung).
-- **Warum Burg und Duo leer ausgehen:** Burghof 69 %, Bergfried-Dach 53 %, Mauerkronen 30 %, Turmdächer 0–8 %, Duos Sockel 51 % und 33 %. Der Grund ist immer derselbe: Teile, die über den Rand der flachen Fläche hinausreichen (die Burg wird eine Noppe zu breit voxelisiert, Duos Sockel hat einen gebogenen Rand). Passende Fliesen, Farben oder Zeit waren nie das Problem.
-- **Bilder:** `out/tiles/vorher-nachher/85prozent/` (links Regel 1.7.0, rechts 85-%-Regel: `castle.png`, `Duo_Duolingo-32.png`, zur Kontrolle `two_bodies.png`).
-
-## Davor: 1.7.0 (ROADMAP Punkt 9)
-
-- Fazit 1.7.0: **Wo das 3D-Modell flach ist, legt mesh2brick auf Wunsch glatte Fliesen, und zwar genau auf die Höhe der Fläche:** Würfel, L-Winkel und die zwei Körper treffen ihr 3D-Modell damit exakt (Abweichung 0,00 mm statt im Mittel 0,66–0,83 mm), Kugel, Hase und Fliegenpilz behalten wie gewünscht ihre Noppen.
-- **Alle Testmodelle bleiben ein stabiles Stück**, die Kästen brauchen 7–16 % mehr Teile; eingeschaltet wird es mit `tile` in `parts.categories`. Standardmäßig bleibt es aus, weil die Burg fleckig wirkt (deine Entscheidung 2026-11-11); das soll die 85-%-Regel in [#44](https://github.com/leckermatz79/mesh2brick/issues/44) beheben.
-
-- **Zuerst die Messgröße für ganz 2.0** (eigener Commit): Wie weit liegt die Außenseite des Steinmodells vom 3D-Modell weg? Gemessen in echten LEGO-Millimetern, Noppen mitgerechnet (4,8 mm breit, 1,7 mm hoch), als Mittel und als „95 % der Oberfläche liegen höchstens so weit weg“, in mm und in Noppen. Grundlinie 1.6: Kästen 0,6–0,8 mm im Mittel (95 %: 4,05 mm, weil die Voxel eine Platte über der Oberseite enden und die Noppen dazukommen), runde Formen 1,8–2,4 mm (95 %: 4,2–4,9 mm, das sind die Voxeltreppen), Burg 3,3 / 8,0 mm. Der Release-Benchmark zeigt die Spalte jetzt immer; Tabelle in [benchmarks.md](benchmarks.md), „Shape fidelity baseline“. Die Messung dauert 0,5–7,5 s pro Modell (Duo 25–33 s).
-- **legolizations eigener Fliesen-Tausch allein** (bisher mit `tile` eingeschaltet) bringt nichts: Er legt Fliesen auf die Treppen (Kugel 184, Fliegenpilz 117, Hase 61), keine einzige auf die Würfel-Oberseiten (dort liegen Steine, die tauscht er nicht) und kennt nur vier Fliesengrößen (Burghof fleckig). Die Abweichung ändert sich bei keinem Modell. Bilder: `out/tiles/vorher-nachher/legolization/`.
-- **Die neue Regel:** Beim Voxelisieren schaut mesh2brick mit denselben senkrechten „Strahlen“ auf jede oberste Zelle: Liegt darüber eine waagerechte, ebene Fläche des 3D-Modells (höchstens 1° geneigt, höchstens 0,1 mm Höhenunterschied, mindestens 2 Zellen groß; Randzellen zählen dazu, wenn die Fläche sie mindestens zur Hälfte bedeckt)? Nur dort gibt es Fliesen. Eine Kuppel, auch ganz oben, ist nie flach.
-- **Fliese auf die richtige Höhe:** Die Würfel sind 26,7 Steine hoch, die Voxel enden also eine Platte über dem Modell. Statt „2 Platten + Fliese“ wird ein Stein dort zu „1 Platte + Fliese“, die Oberseite liegt dann genau auf dem Modell (und es ist ein Teil weniger). Liegt die Fläche eine Platte höher (zwei Körper: 13,3 Steine), kommt eine Fliese auf den Stein. Platten werden zu gleich großen Fliesen (Teilezahl unverändert); alle neun Fliesengrößen aus legolizations Katalog werden genutzt, 2 × 3 und 2 × 8 als zwei Fliesen.
-- **Stabilität:** Wo ein Teil schwerer wird (2 Platten + Fliese wiegen mehr als der Stein, eine aufgelegte Fliese wiegt etwas), prüft mesh2brick das ganze Modell neu, parallel zur Schrittplanung; hält es nicht mehr, werden die Fliesen zurückgenommen. Wird alles nur leichter, bleibt das Urteil von vorher stehen. Ist zu wenig Zeit, macht es nur die leichteren Umbauten und sagt, wie viele Oberseiten ihre Noppen behalten.
-- **Darstellung:** Fliesen ohne Noppen in Vorschau, Schrittbildern und Teilekasten, in der Teileliste „Fliese 2 × 4“ mit BrickLink-/Rebrickable-Nummer (87079 usw.), als letzter Schritt aufgelegt. Die KI-Schicht weiß, was eine Fliese ist.
-- **Einstellungen:** `parts.tiles: flat` (nur flache Flächen) oder `all` (auch Treppen), `parts.tiles_on_base: true/false` (unterste Lage). README (de/en) und Beispiel-Config erklären es.
-- **Nebenbei behoben:** Mit eingeschalteter KI-Schicht, aber ohne API-Schlüssel ist `convert` bisher abgestürzt; jetzt wird die KI-Schicht übersprungen und der Lauf sagt „no API credentials: set ANTHROPIC_API_KEY“. Aufgefallen, weil in meiner Sitzung kein Schlüssel gesetzt war. Den Live-Test der Schritttexte mit Fliesen hast du gemacht (L-Winkel, 177 Teile, 39 von 39 Schritttexten, keine Probleme, 6,5 Cent); dazu prüft ein Test, dass Claude die Teile als „Fliese 2 × 4 (en: Tile …)“ und den Hinweis „Fliesen ohne Noppen, zuletzt auflegen“ bekommt.
-- **Begründung mit Zahlen:** [ADR 0020](adr/0020-tiles-on-flat-tops.md) (die Nummer 0019 war schon vergeben). Ein Upstream-Vorschlag an legolization (Maske für `apply_tiles`, auch Steine, alle Fliesengrößen) steht als Kandidat #18 in [UPSTREAM.md](UPSTREAM.md); nichts in Punkt 9 wartet darauf, die Frage „Fork oder Warten“ stellt sich hier also nicht.
-
-| Abnahme (Issue #42) | Ergebnis |
+| Abnahme (Issue #51) | Ergebnis |
 |---|---|
-| Messgröße für alle Testmodelle in benchmarks.md, mit und ohne Fliesen; mit Fliesen nicht schlechter | **ja**: nirgends schlechter; Kästen 0,00 / 0,00 mm, Burg 3,31 → 3,25 mm, Duo 1,86 → 1,81 mm |
-| Fliesen nur auf Flächen, die im 3D-Modell flach sind, nicht auf Kugel- und Hasen-Treppen; Bilder belegen es | **ja**: Würfel-, L-Winkel- und Zwei-Körper-Oberseite, Burghof und Mauern; Kugel, Hase, Fliegenpilz, Torus, Rakete: keine einzige. Die Hutmitte des Fliegenpilzes ist gewölbt, bekommt also keine. **Teilweise:** Burgtürme und Duos Sockel behalten am Rand Noppen (siehe Einschränkungen) |
-| Alle Testmodelle ein stabiles Stück | **ja**, 14 von 14 |
-| Zeit höchstens +20 % gegenüber 1.6 | **13 von 14**: −4 % bis +9 %; **L-Winkel +20,4 %** (30 → 36 s, 24 Teile mehr in legolizations Schrittsuche) |
-| PDF des Texturwürfels unter 10 MB | **ja**: 9,83 MB (1.6: 9,56 MB) |
-| Teilezahl: Platte → Fliese unverändert, Stein-Umbau pro Modell ausgewiesen | **ja** (Tabelle unten) |
-| Ohne `tile` alles wie 1.6 (Regressionstest) | **ja**, Test vorhanden; legolizations eigener Tausch wird nie mehr benutzt |
-| Studio-Prüfung durch dich | **ja** (2026-11-15, mit 2.0.0): Duo mit 56 Fliesen, keine Überlappungen, keine schwebenden Fliesen, Fliesen als „Tile“ angezeigt |
-| Tests: Maske (Ebene, Treppe, Kuppel), Steinumbau mit Stabilitätsprüfung, Darstellung ohne Noppen, Export-Nummern | **ja**: 850 Tests grün |
-| Zusätzlich: Stabilität nie schlechter, Zeitgrenze, Farben, LDraw-Prüfung, Teileschätzung | **ja**: Rücknahme getestet; nur Fliesen in Farben, die es gibt; LDraw-Datei liest sich streng wieder ein; `inspect` trifft weiter 14 von 14 |
+| Erst messen: `smooth` statt `preserve` auf allen Testmodellen | **ja**: viele sichtbare Dachsteine, gleiche Teilezahl, stabil, aber keine geringere Abweichung (Tabelle in [benchmarks.md](benchmarks.md), „Slopes (ROADMAP 8)“) |
+| Kugel, Hase, Fliegenpilz: Abweichung (Mittel und 95 %) messbar niedriger, 14 von 14 stabil | **ja**: Kugel 2,05 / 4,59 → 1,86 / 4,33 mm, Hase 1,96 / 4,40 → 1,78 / 4,12, Fliegenpilz 1,96 / 4,50 → 1,75 / 4,20; **15 von 15** ein stabiles Stück |
+| Sichtbare Dachsteine je Modell deutlich mehr, Zahl ausweisen | **ja**: Hase 4 → 133, Kugel 0 → 272, Fliegenpilz 5 → 197, Torus 0 → 165, Vertex-Kugel 0 → 279, Rakete 0 → 33, Duo 0 → 109 (alle Testmodelle zusammen 10 → 1.080) |
+| Hase höchstens doppelt so lange; Burg und Texturwürfel unter 5 Minuten | **ja**: Hase 122 → 138 s (1,13-fach); Burg 249 s, Texturwürfel 243 s |
+| Kästen und L-Winkel pixelgleich wie 2.0.0 | **ja**: Würfel (STEP, STL), Texturwürfel, L-Winkel, zwei Körper, dazu Burg und Herz: gleiche Teile, gleiche Schritte, gleiche Bilder |
+| Teilezuwachs ausweisen, Richtwert +15 % | **teilweise**: Rakete +8 %, Duo +10 % / +15 %, Hase +14 %, Fliegenpilz +16 %, Kugeln +22 %, **Torus +31 %**; der Lauf meldet alles über 15 % (siehe Frage 1) |
+| Dachsteine, die es in der Farbe nicht gibt, bleiben Stufen und werden gezählt | **ja**: Duo 38 (32 Noppen) / 93 (48 Noppen) Stufen, Farbe Bright Green, 3039 und 4286 |
+| Abweichung nirgends schlechter | **ja**: Rakete 1,46 → 1,35 mm, Duo 1,72 → 1,61 (32) und 1,76 → 1,64 (48), Burg, Kästen, Herz unverändert |
+| Tests: Neigung an Keil 45°, Keil 30°, Kuppel; Ersetzen mit Stabilitätsprüfung; Rücknahme | **ja**: 51 neue Tests, 927 grün |
+| Darstellung, Exporte, Schichtschritte, „zuerst“-Felder | **ja** (siehe oben) |
+| Texturwürfel-PDF unter 10 MB | **ja**: 9,83 MB (unverändert) |
 
-## Messwerte 2.0.0 (Release-Lauf, Standardeinstellungen)
+## Messwerte 2.1 (Release-Lauf, Standardeinstellungen, am Netz)
 
-| Modell | Fliesen | Teile 1.6 → 2.0 | Abweichung Mittel / 95 % in mm (1.6 → 2.0) | Zeit 1.6 → 2.0 |
-|---|---:|---|---|---|
-| Würfel (STEP und STL) | 139 | 1.952 → 2.091 (+7 %) | 0,83 / 4,05 → **0,00 / 0,00** | 250 → 250 s |
-| Texturwürfel | 186 | 2.280 → 2.466 (+8 %) | 0,83 / 4,05 → **0,00 / 0,00** | 245 → 243 s |
-| L-Winkel | 24 | 153 → 177 (+16 %) | 0,60 / 4,05 → **0,00 / 0,00** | 30 → 38 s |
-| Zwei Körper | 96 | 606 → 702 (+16 %) | 0,66 / 3,20 → **0,00 / 0,00** | 163 → 182 s |
-| Burg | 118 | 1.657 → 1.712 (+3 %) | 3,31 / 8,00 → 3,27 / 8,00 | 251 → 250 s |
-| Duo, 32 Noppen (nur lokal) | 56 | 1.025 → 1.081 (+5 %) | 1,86 / 4,23 → 1,72 / 4,23 | 128 → 143 s |
-| Duo, 48 Noppen, 20 min (nur lokal) | 0 | 2.308 → 2.308 | unverändert (1,76 / 4,29) | 1.151 → 1.151 s |
-| Herz (Voxeldatei) | 0 | 12 → 12 | unverändert (0,08 / 0,85) | 4 → 4 s |
-| Kugel, Vertex-Kugel, Hase, Fliegenpilz, Torus, Rakete | 0 | unverändert | unverändert (1,5–2,4 / 3,2–4,9) | 0 bis +2 % |
+| Modell | Teile 2.0.0 → 2.1 | Dachsteine (sichtbar) | Abweichung Mittel / 95 % in mm | Zeit |
+|---|---|---|---|---|
+| Hase | 873 → 997 (+14 %) | 14 (4) → 143 (133) | 1,96 / 4,40 → 1,78 / 4,12 | 122 → 138 s |
+| Kugel | 1.499 → 1.826 (+22 %) | 46 (0) → 318 (272) | 2,05 / 4,59 → 1,86 / 4,33 | 263 → 261 s |
+| Vertex-Kugel | 1.519 → 1.856 (+22 %) | 46 (0) → 325 (279) | 2,06 / 4,58 → 1,86 / 4,35 | 261 → 263 s |
+| Fliegenpilz | 1.239 → 1.431 (+16 %) | 16 (5) → 208 (197) | 1,96 / 4,50 → 1,75 / 4,20 | 255 → 261 s |
+| Torus | 552 → 723 (+31 %) | 4 (0) → 169 (165) | 1,90 / 4,46 → 1,65 / 4,12 | 33 → 46 s |
+| Rakete | 263 → 285 (+8 %) | 0 → 33 (33) | 1,46 / 3,18 → 1,35 / 3,18 | 18 → 20 s |
+| Duo, 32 Noppen (nur lokal) | 1.081 → 1.190 (+10 %) | 0 → 109 (109) | 1,72 / 4,23 → 1,61 / 4,03 | 143 → 156 s |
+| Duo, 48 Noppen, 20 min (nur lokal) | 2.308 → 2.650 (+15 %) | 0 → 311 (311) | 1,76 / 4,29 → 1,64 / 4,09 | 1.151 → 1.160 s |
+| Würfel, Texturwürfel, L-Winkel, zwei Körper, Burg, Herz | unverändert | unverändert | unverändert | gleich (±4 s) |
 
-Bilder: [Beispielgalerie](gallery/README.md) (neu, mit Fliesen); alle Läufe in `out/release-2.0/`.
+Bilder: `out/slopes/vorher-nachher/` (alle Modelle, links 2.0.0, rechts 2.1; Duo nur lokal), Galerie neu mit Dachsteinen. Alle Läufe in `out/slopes/mesh/`, die Grundlinie `smooth` in `out/slopes/smooth/`.
+
+## Davor: 2.0.0 (veröffentlicht 2026-11-15)
+
+- Fliesen standardmäßig an: Wo das 3D-Modell flach ist, liegen glatte Fliesen auf der Höhe der Fläche (Kästen 0,00 mm Abweichung, Burghof und Bergfried glatt); Teile über den Rand einer flachen Fläche werden dort geteilt, eine Fläche bekommt Fliesen nur, wenn mindestens 85 % davon fliesbar sind; Rand-Noppen ist Standard (deine Wahl). Studio-Prüfung von dir bestanden (Duo, keine Überlappungen, keine schwebenden Fliesen). Einzelheiten in [CHANGELOG.md](../CHANGELOG.md) (1.7.0 und 2.0.0) und [ADR 0020](adr/0020-tiles-on-flat-tops.md).
 
 ## Als Nächstes
 
-1. **ROADMAP 8 – mehr Dachsteine** (Reihenfolge in 2.0: 9, dann #44, dann 8, 10, 11, 12, 13). Die Messgröße von heute ist die Grundlinie dafür: Bei runden Formen machen die Voxeltreppen 1,8–2,4 mm Abweichung aus, Noppen nur 0,04–0,3 mm; Dachsteine an den Treppenkanten sind dort der Hebel. Hängt Punkt 8 an einer Änderung in legolization, steht die Frage „Fork oder Warten“ an (deine Entscheidung, vereinbart am 2026-11-07). Danach runde Teile, SNOT, Farbverfügbarkeit bei der Platzierung und `choose_part` (Roadmap 10–13). Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
+1. **Deine zwei Fragen unten**, dann Merge, Tag v2.1.0 und Release-Seite (Befehle im PR).
+2. **ROADMAP 10 – runde Teile** (Reihenfolge in 2.0: 9, 8, dann 10, 11, 12, 13). Die Messgröße zeigt, wo es noch hängt: die Unterseiten runder Formen (dort bräuchte es umgedrehte Dachsteine, die legolizations Katalog nicht hat) und die Stufen, die ein Dachstein zu teuer machen würde. ROADMAP 12 (Farben schon beim Platzieren) bekommt die gezählten Stufen von Duo als Ausgangspunkt. Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelheiten in [CHANGELOG.md](../CHANGELOG.md) und in den [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap).
 
@@ -106,7 +72,7 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | KI-Texte können plausibel klingen und trotzdem ungenau sein (z. B. „links“ statt „hinten“). Die Prüfung erkennt falsche Teile und Mengen, aber keine falsche Richtung; Claude sieht nicht jedes Schrittbild. | akzeptieren; mit Bewertungen und Notizen nachsteuern |
 | Die KI legt selten Schritte zusammen: Die kleinen hat mesh2brick schon vorher zusammengelegt, und die übrigen Nachbarn verdecken sich meist gegenseitig. | akzeptieren; der Nutzen liegt in Abschnitten und Texten |
 | Für Claude-Modelle, deren Preise mesh2brick nicht kennt, gilt die Kostengrenze nicht (der Lauf sagt das). | Preistabelle bei neuen Modellen ergänzen |
-| Große Modelle prüfen ihre Zwischenstände in der Zeit, die nach der Platzierung bleibt. In 5 Minuten schaffen die größten Testmodelle 35–76 % (Texturwürfel, Würfel, Burg, Vertex-Modell, Kugel; mit Fliesen etwas weniger als in 1.6, weil die Fliesen selbst geprüft werden); die ungeprüften stehen oben im Modell. Deckblatt und Kommandozeile sagen, wie viele geprüft sind. | `--time 20min` prüft alle; kein eigener Code nötig |
+| Große Modelle prüfen ihre Zwischenstände in der Zeit, die nach der Platzierung bleibt. In 5 Minuten schaffen die größten Testmodelle 35–76 % (Texturwürfel, Würfel, Burg, Vertex-Modell, Kugel; mit Fliesen und Dachsteinen etwas weniger, weil sie selbst geprüft werden und mehr Teile bringen: Kugel 135 von 242, Fliegenpilz 149 von 200); die ungeprüften stehen oben im Modell. Deckblatt und Kommandozeile sagen, wie viele geprüft sind. | `--time 20min` prüft alle; kein eigener Code nötig |
 | Während der Prüfung rechnet mesh2brick auf allen Kernen bis auf einen (bis zu einige Minuten, Lüfter hörbar). | von dir so gewollt (2026-11-09) |
 | Kleine Modelle (bis 500 Teile) nutzen weiter legolizations Suche; die geprüfte Schichtfolge wäre auch dort schneller und bräuchte seltener eine Hand (Rakete: 0 statt 11 Schritte). | von dir so entschieden (2026-11-09); Wiedervorlage bei 2.x Punkt 17 |
 | Hängen mehrere vorher zusammengesteckte Teile aneinander, wird ein Schritt größer (Kugel bei 32 Noppen: einmal 18 Teile, sonst meist höchstens 10). | selten; eigener Code, falls es stört |
@@ -118,10 +84,13 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | Bemalte Farben aus dem Slicer und Texturen in 3MF werden noch nicht gelesen. | bei Bedarf |
 | Eine flache Fläche bekommt Fliesen nur, wenn mindestens 85 % von ihr glatt werden können. Teile über den Rand werden geteilt, aber nur, wenn ein Teil darüber oder darunter den Schnitt hält und das Modell nicht getrennt wird. Bei Duo mit 48 Noppen reicht das nicht: sein Sockel behält alle Noppen. Bei der Burg behalten die Turmränder Noppen (Rand-Noppen, deine Wahl). | akzeptieren; Turmränder mit Fliesen: `--set parts.tiles_overhang=true` |
 | L-Winkel und zwei Körper brauchen mit Fliesen knapp 16 % mehr Teile (Richtwert 15 %); der Lauf sagt das. | von dir als Richtwert festgelegt (2026-11-11) |
-| Fliesen nur auf waagerechten Flächen. Schräge, aber ebene Flächen (ein Dach) behalten Noppen. | ROADMAP 8 (Dachsteine) |
+| Fliesen nur auf waagerechten Flächen. Schräge Flächen bekommen seit 2.1 Dachsteine, aber nur in den drei Neigungen, die legolization kennt (45° und 33°); ein flaches Dach (unter 8°) behält Noppen. | akzeptieren |
 | Kleine Modelle mit vielen umgebauten Steinen brauchen etwas länger, weil legolizations Schrittsuche mehr Teile sieht (L-Winkel 30 → 38 s, zwei Körper 163 → 182 s). | akzeptieren |
 | Liegt eine flache Fläche mehr als eine Platte von der Voxel-Oberkante entfernt, kommt die Fliese nur eine Platte näher (nur bei der Burg, 32 von 375 Fliesenfeldern). Platten werden nie tiefer gelegt. | akzeptieren |
-| Dachsteine sind an, aber legolization setzt nur wenige, und die meisten liegen innen in der hohlen Wand (10 von 130 sichtbar). | eigener Code in 2.0 (ROADMAP Punkt 8, zweiter Teil) |
+| Dachsteine kosten Teile: Wo ein Dachstein sitzt, werden die Steine darunter zugeschnitten (im Schnitt gut 1 Teil mehr pro Dachstein). Runde Modelle haben +8 % bis +31 % Teile (Torus am meisten); der Lauf meldet alles über +15 %. Stellen, die mehr als 2 Teile kosten würden, behalten ihre Stufe (30–200 je rundem Modell). | deine Frage 1; Grenze einstellbar mit `--set parts.slopes_max_share=0.15` |
+| Nur nach oben gerichtete Flächen bekommen Dachsteine. Die Unterseiten runder Formen (untere Kugelhälfte, Unterseite des Fliegenpilz-Huts) behalten Stufen: Umgedrehte Dachsteine gibt es in legolizations Katalog nicht. | ROADMAP 10 oder später (eigene Teile im Katalog) |
+| Dachsteine nur bei geschlossenen 3D-Modellen (innen und außen müssen klar sein) und in Steinhöhe; offene Netze (die Burg aus überlappenden Kästen) und `voxel.height_unit: plate` bekommen nur legolizations eigene Dachsteine. | akzeptieren; bei Bedarf eigener Code |
+| Dachsteine, die LEGO in einer Farbe nicht herstellt, bleiben Stufen (Duo: 38 Stufen in Bright Green, 3039 und 4286). | ROADMAP 12 (Farben schon beim Platzieren) |
 | Voxelisieren, PDF und Vorschau werden nicht abgebrochen; für sie hält mesh2brick Zeit frei (20 s + 0,03 s pro Teil, gemessen reichte das überall). Auf einem viel langsameren Rechner kann die Umwandlung die Grenze um einen Teil der PDF-Zeit überschreiten; die Kommandozeile sagt das dann. | akzeptieren |
 | Wird ein Modell an der Zeitgrenze abgeschnitten, hat es meist etwas mehr Teile (die letzte Optimierung spart Teile) oder ist im ungünstigsten Fall nicht auf Stabilität geprüft. Deckblatt und Kommandozeile sagen das. | mehr Zeit geben (`--set placement.time_limit_s=1200`); Upstream-Kandidat #5 |
 | Der schnellere Rechenweg und das Mitlesen der Zwischenstände sind lokale Eingriffe in legolization (UPSTREAM #2 und #5). Ändert legolization diese Stellen, meldet mesh2brick das beim Start. | bei Upstream vorschlagen (#5), wenn #88/#89 Antwort haben |
@@ -195,14 +164,21 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | 2026-11-12 | Überzeugt das Teilen am Flächenrand (#46)? | **Ja im Grundsatz:** Fliesen mit Teilen standardmäßig an, Release 2.0.0, aber erst nach drei Bedingungen in einem weiteren PR: (1) **Zeitreserve:** Burg dreimal hintereinander mit Standardeinstellungen (5 min), jedes Mal alle Fliesen da; die Reserve für die Fliesen-Stabilitätsprüfung aus der Teilezahl schätzen statt fester Wert (wie `export_reserve_s`); fallen Fliesen trotzdem der Zeitgrenze zum Opfer, sagen es Kommandozeile und Deckblatt klar („Fliesen übersprungen: Zeitgrenze; empfohlen --time 10min“). (2) **Voxel-Eingaben** (.vox, .npy, .grid.npz) ohne Netz bekommen standardmäßig keine Fliesen (nur mit `parts.tiles=all`); das Herz bleibt bei 12 Teilen. (3) **Burgtürme:** Die vier identischen Türme bekommen vier verschiedene Oberseiten, einer gar keine Fliesen. Je Turm den Grund nennen und gleiche Flächen gleich behandeln; als Variante prüfen, ob Zellen, die höchstens eine Zelle über das Eingabenetz hinausstehen, zur flachen Fläche zählen. Beide Varianten der Burg als Vergleichsbild (`castle-rand-noppen.png`, `castle-rand-fliesen.png`); du entscheidest am Bild. Danach Galerie erneuern, CHANGELOG 2.0.0, STATUS; Befehle mit `git pull` vor dem Tag. |
 | 2026-11-15 | Turmränder: Noppen oder Fliesen? | **Rand-Noppen bleibt Standard.** Für die Burg gefallen dir die Noppen auf den Türmen besser; das liegt an dieser Burg, beide Varianten sind sehr gut. „Rand-Fliesen“ bleibt als Einstellung (`--set parts.tiles_overhang=true`). Weiter mit Galerie, CHANGELOG 2.0.0 und Tag. |
 | 2026-11-15 | Studio-Prüfung mit Fliesen (Abnahme #42) | **Erledigt** (Duo, 2.0.0, lokal): keine Überlappungen, keine schwebenden Fliesen, Fliesen als „Tile“ angezeigt. 2.0.0 ist veröffentlicht. |
+| 2026-11-15 | Wie geht ROADMAP 8 (mehr Dachsteine)? | **Eigener Nachlauf in `place/` wie bei den Fliesen, kein Eingriff in legolization** (damit hängt nichts an einem Upstream-PR, die Fork-Frage stellt sich nicht). Erst `smooth` gegen `preserve` messen; Messgröße ist die Oberflächenabweichung; ein Dachstein darf Material über die Voxelform hinaus hinzufügen, wenn er dem Netz näher kommt; Dachsteine, die es in der Farbe nicht gibt, bleiben Stufen und werden gezählt (für Punkt 12); Burg und Texturwürfel unter 5 Minuten; Teilezuwachs ausweisen, Richtwert +15 %. Ziel-Release 2.1.0. Umgesetzt in [#51](https://github.com/leckermatz79/mesh2brick/issues/51). |
 
 ## Fragen an dich
 
-Keine offenen Fragen. Deine Wahl vom 2026-11-15 (Rand-Noppen) steht unter „Deine Entscheidungen“.
+Die Bilder dazu: [gallery/roadmap8b-slopes-2.1.png](gallery/roadmap8b-slopes-2.1.png) und lokal `out/slopes/vorher-nachher/` (alle Modelle, links 2.0.0, rechts 2.1).
+
+1. **Obergrenze für die Mehrteile durch Dachsteine?** Ohne Grenze: Torus +31 % Teile, Kugeln +22 %, Fliegenpilz +16 %, Hase +14 %, Duo +10 %. Mit `--set parts.slopes_max_share=0.15` (die wertvollsten Dachsteine zuerst, der Rest bleibt Stufe): Torus +15 % und 1,74 statt 1,66 mm Abweichung (ein Drittel des Gewinns weg), Kugel +15 % und 1,89 statt 1,87 mm (kaum ein Unterschied). **Standardannahme: keine Grenze, der Lauf meldet nur mehr als +15 %** (wie bei den Fliesen); die Grenze bleibt als Einstellung.
+2. **Gefällt dir die Optik der Rundungen?** Dachsteine stehen nur dort, wo sie dem Modell näher kommen. Darum wechseln sich auf einer Rundung Dachsteine und Stufen ab (etwa die Hälfte der Stufen bleibt), und Dachsteine zeigen in alle vier Richtungen. Ganz vereinzelte Dachsteine sind selten (0–3 % an Kugel, Hase, Fliegenpilz, Torus; 7 % an Duo, 12 % an der Rakete). Von der Seite, auf die man blickt, wirkt die Fläche glatter; Schrägen, die vom Betrachter weg abfallen, sieht man nur als schmale Kanten. **Standardannahme: so lassen.** Wenn dir ruhigere Flächen lieber sind, wäre eine Regel wie bei den Fliesen denkbar („nur zusammenhängende Dachstein-Flächen“).
 
 ## Offene Kleinigkeiten
 
-- **Upstream-Kandidat #18** (Maske für legolizations `apply_tiles`, auch Steine, alle Fliesengrößen): Text steht in [UPSTREAM.md](UPSTREAM.md); einreichen nur nach deinem OK, eilt nicht.
+- **Upstream-Kandidat #18** (Maske für legolizations `apply_tiles`, auch Steine, alle Fliesengrößen) und **neu #19** (legolizations Dachstein-Durchgang auf vorgegebene Stellen, damit andere eine bessere Bewertung nutzen können): Text steht in [UPSTREAM.md](UPSTREAM.md); einreichen nur nach deinem OK, eilt nicht.
+- **Selbst vergleichen:** dasselbe Modell mit und ohne die neuen Dachsteine:
+  `uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/pilz-2.1`
+  `uv run mesh2brick convert tests/fixtures/toadstool.obj -o out/pilz-2.0 --set parts.slopes=preserve`
 - **Rakete im Vergleich** (Wiedervorlage bei 2.x Punkt 17): legolizations Suche (Standard, mit blauen Baugruppen) gegen die geprüfte Schichtfolge mit Mini-Vorbauten:
   `uv run mesh2brick convert tests/fixtures/rocket.blend -o out/rocket-suche`
   `uv run mesh2brick convert tests/fixtures/rocket.blend -o out/rocket-schichten --set steps.sequencing=checked-layers`

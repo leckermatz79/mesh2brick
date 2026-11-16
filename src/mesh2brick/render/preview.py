@@ -41,7 +41,7 @@ from mesh2brick.model import (
 from mesh2brick.voxel.grid import LDU_PER_PLATE, LDU_PER_STUD
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from pathlib import Path
 
     from numpy.typing import NDArray
@@ -85,6 +85,8 @@ PART_MIN_SHARE: Final = 0.55
 """Smallest scale of a part picture relative to the largest part."""
 _STUD_SIDE_SHADE: Final = 0.62
 _STUD_TOP_SHADE: Final = 1.08
+_TINY_AREA: Final = 1e-9
+_TRIANGLE: Final = 3
 LIP_PLATES: Final = 0.5
 """Height of the vertical edge at the low end of a slope: 4 LDU in LDraw's
 3039, 3040b and 4286 (the slope falls from full height to it)."""
@@ -524,7 +526,8 @@ def _scene(  # noqa: PLR0915 - one pass over faces, edges and studs
                     groups_key.append(depth[with_stud])
                     groups_order.append(np.full(int(with_stud.sum()), order))
 
-    for poly, rgb, key, rank in _wedge_polygons(wedges, base, camera):
+    gaps = _gap_polygons(model, index, (low, owner, sloped), base, camera)
+    for poly, rgb, key, rank in [*_wedge_polygons(wedges, base, camera), *gaps]:
         groups_poly.append(poly)
         groups_rgb.append(rgb)
         groups_key.append(key)
@@ -605,6 +608,42 @@ def _wedge_polygons(
                     np.ones(1, np.int64),
                 )
                 for strip in _outline(corners, face.edges)
+            )
+    return result
+
+
+def _gap_polygons(
+    model: BrickModel,
+    index: NDArray[np.int64],
+    lattice: tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.bool_]],
+    base: NDArray[np.float64],
+    camera: Camera,
+) -> list[Polygons]:
+    """Sides of plain cells showing above slopes (:func:`slope_gap_faces`)."""
+    low, owner, sloped = lattice
+    view = camera.toward_viewer
+    result: list[Polygons] = []
+    for i in index:
+        for face, cell in slope_gap_faces(model.parts[int(i)]):
+            at = np.asarray(cell) - low
+            if np.any(at < 0) or np.any(at >= owner.shape):
+                continue
+            pos = int(owner[at[0], at[1], at[2]])
+            if pos < 0 or sloped[at[0], at[1], at[2]]:
+                continue
+            corners = face.corners * _SCALE
+            normal = _outward_normal(corners, face.outward)
+            if float(normal @ view) <= _FACING_EPS:
+                continue
+            depth = np.array([(np.asarray(face.key_cell, float) * _SCALE) @ view])
+            fill = np.clip(base[pos] * _shade(normal, view), 0.0, 1.0)
+            result.append(
+                (
+                    camera.project(corners)[None],
+                    fill[None],
+                    depth,
+                    np.zeros(1, np.int64),
+                )
             )
     return result
 
@@ -731,11 +770,137 @@ def slope_faces(part: PlacedPart) -> tuple[set[Cell], list[SlopeFace]] | None:
     return sloped, faces
 
 
+def slope_gap_faces(part: PlacedPart) -> list[tuple[SlopeFace, Cell]]:
+    """Faces of neighbouring parts that show above a slope's sloped face.
+
+    A slope's cells count as filled, but above its sloped face there is air:
+    a taller part right beside a sloped column (across the fall, or in front
+    of its lip) shows that much of its side. Returns those face pieces with
+    the neighbour's plate cell they belong to, one per plate layer (clipped
+    to it); the caller keeps the ones whose cell is a plain filled cell. The
+    outward direction points from the neighbour into the slope.
+    """
+    if part.category != "slope" or not part.studs:
+        return []
+    columns = {(x, y) for x, y, _ in part.cells}
+    high = set(part.studs) & columns
+    low = columns - high
+    if not high or not low:
+        return []
+    z0 = min(c[2] for c in part.cells)
+    z1 = max(c[2] for c in part.cells) + 1
+    shift = [
+        float(np.mean([c[k] for c in low]) - np.mean([c[k] for c in high]))
+        for k in (0, 1)
+    ]
+    axis = 0 if abs(shift[0]) >= abs(shift[1]) else 1
+    across = 1 - axis
+    sign = 1 if shift[axis] > 0 else -1
+    along = sorted({c[axis] for c in low})
+    sides = sorted({c[across] for c in low})
+    edge = along[0] if sign > 0 else along[-1] + 1
+    drop = (z1 - z0 - LIP_PLATES) / len(along)
+
+    def height(a: float) -> float:
+        return z1 - drop * (a - edge) * sign
+
+    def point(a: float, b: float, z: float) -> list[float]:
+        xyz = [0.0, 0.0, z]
+        xyz[axis], xyz[across] = a, b
+        return xyz
+
+    def cell(a: int, b: int, z: int) -> Cell:
+        xyz = [0, 0, z]
+        xyz[axis], xyz[across] = a, b
+        return (xyz[0], xyz[1], xyz[2])
+
+    def unit(k: int, value: float) -> tuple[float, float, float]:
+        vector = [0.0, 0.0, 0.0]
+        vector[k] = value
+        return (vector[0], vector[1], vector[2])
+
+    found: list[tuple[SlopeFace, Cell]] = []
+    for a in along:
+        a0, a1 = a, a + 1
+        for b, beside, out in (
+            (sides[0], sides[0] - 1, 1.0),
+            (sides[-1] + 1, sides[-1] + 1, -1.0),
+        ):
+            for z in range(z0, z1):
+                outline = _above(
+                    [(a0, height(a0)), (a1, height(a1))], float(z), float(z + 1)
+                )
+                if outline:
+                    corners = np.asarray([point(u, b, w) for u, w in outline])
+                    face = SlopeFace(corners, unit(across, out), cell(a, beside, z), ())
+                    found.append((face, cell(a, beside, z)))
+    a_low = along[-1] + 1 if sign > 0 else along[0]
+    front = a_low if sign > 0 else a_low - 1
+    for b in sides:
+        for z in range(z0, z1):
+            top = max(float(z), z0 + LIP_PLATES)
+            if top >= z + 1:
+                continue
+            corners = np.asarray(
+                [
+                    point(a_low, b, top),
+                    point(a_low, b + 1, top),
+                    point(a_low, b + 1, z + 1),
+                    point(a_low, b, z + 1),
+                ]
+            )
+            face = SlopeFace(corners, unit(axis, -float(sign)), cell(front, b, z), ())
+            found.append((face, cell(front, b, z)))
+    return found
+
+
+def _above(
+    profile: list[tuple[float, float]], bottom: float, top: float
+) -> list[tuple[float, float]]:
+    """The part of the strip ``bottom <= z <= top`` above a straight ``profile``.
+
+    ``profile`` is two ``(a, z)`` points; returns the outline (``(a, z)``) of
+    the region above it inside the strip, or ``[]`` when there is none.
+    """
+    (a0, h0), (a1, h1) = profile
+    roof = max(top, h0, h1) + 1.0
+    polygon = [(a0, h0), (a1, h1), (a1, roof), (a0, roof)]
+    polygon = _clip(polygon, lambda p: p[1] - bottom)
+    polygon = _clip(polygon, lambda p: top - p[1])
+    area = 0.5 * sum(
+        p[0] * q[1] - q[0] * p[1]
+        for p, q in zip(polygon, polygon[1:] + polygon[:1], strict=True)
+    )
+    return polygon if len(polygon) >= _TRIANGLE and abs(area) > _TINY_AREA else []
+
+
+def _clip(
+    polygon: list[tuple[float, float]],
+    inside: Callable[[tuple[float, float]], float],
+) -> list[tuple[float, float]]:
+    """Sutherland-Hodgman: the part of ``polygon`` where ``inside(p) >= 0``."""
+    result: list[tuple[float, float]] = []
+    for k, p in enumerate(polygon):
+        q = polygon[(k + 1) % len(polygon)]
+        fp, fq = inside(p), inside(q)
+        if fp >= 0:
+            result.append(p)
+        if (fp >= 0) != (fq >= 0):
+            t = fp / (fp - fq)
+            result.append((p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])))
+    return result
+
+
 def _outward_normal(
     corners: NDArray[np.float64], outward: tuple[float, float, float]
 ) -> NDArray[np.float64]:
-    """Unit normal of a planar polygon, pointing to the ``outward`` side."""
-    normal = np.cross(corners[1] - corners[0], corners[-1] - corners[0])
+    """Unit normal of a planar polygon, pointing to the ``outward`` side.
+
+    Newell's method: robust when three corners in a row are collinear (the
+    clipped faces of :func:`slope_gap_faces`).
+    """
+    following = np.roll(corners, -1, axis=0)
+    normal = np.cross(corners, following).sum(axis=0)
     if float(normal @ np.asarray(outward)) < 0:
         normal = -normal
     unit: NDArray[np.float64] = normal / np.linalg.norm(normal)

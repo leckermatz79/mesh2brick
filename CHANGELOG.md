@@ -6,6 +6,53 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-16 - Slopes on round shapes
+
+Shape fidelity, second step (ROADMAP item 8, issue #51, ADR 0021): round shapes get slopes where they
+bring the model closer to its 3D model. The voxelizer rates every stair of a tilted surface against
+the mesh; after legolization's run mesh2brick places 45° and 33° slopes (3039, 3040b, 4286) on the
+good ones, cutting the parts below and rebuilding what is left, and checks stability again. On the
+release run every model stays one stable piece; the sphere comes from 2.05 / 4.59 to 1.86 / 4.33 mm
+(mean / 95th percentile), the bunny from 1.96 / 4.40 to 1.78 / 4.12, the toadstool from 1.96 / 4.50 to
+1.75 / 4.20, the torus from 1.90 / 4.46 to 1.65 / 4.12; visible slopes on the public fixtures 10 →
+1,080. Slopes cost parts (+8 % to +31 %, reported against the +15 % guide). Boxes, the castle and voxel
+files are unchanged (same parts, pixel-identical previews). `parts.slopes: preserve` gives the 2.0.0
+result (docs/benchmarks.md, "Slopes (ROADMAP 8)").
+
+### Added
+- **Slopes on tilted stairs** (`parts.slopes: mesh`, the default; ADR 0021). Candidates come from the
+  input mesh (surface tilted 15–85° for 45° slopes, 8–60° for 33°, falling the slope's way) and are
+  rated by how much less bricks and mesh disagree along the voxelizer's vertical rays; sites with at
+  least 0.5 mm gain are tried best first, two 45° side by side as one 3039. A slope may cut a stair's
+  edge or fill its corner (material beyond the voxels, where the mesh is). It may add at most two
+  parts; the model must stay one piece; pieces left of cut parts join their neighbours again.
+- **Colours slope by slope:** a slope LEGO does not make in its colour leaves the stair, and the run
+  counts such stairs per colour (Duo: 38 at 32 studs, 3039 and 4286 not in Bright Green; for ROADMAP
+  12). With `parts.availability: exclude` the pass still uses slopes in the colours that have them.
+- `parts.slopes_max_share` (off by default): at most this share of extra parts for slopes, best
+  first (0.15 = +15 %).
+- One stability check for tiles and slopes, beside the step planning; if it fails, slopes are undone
+  first, then tiles. Without time for it the slopes are skipped: "Slopes skipped: time limit;
+  recommended --time 10min" on the command line and the cover (`BrickModel.slopes_skipped`,
+  schema 7).
+- `VoxelGrid.slopes` (also in `.grid.npz`), `fidelity.visible_parts`; the release benchmark records
+  slopes and visible slopes, `scripts/benchmark_slopes.py` compares runs (`--remeasure` with the
+  current metric), `scripts/compare_previews.py` names slopes in its captions.
+
+### Changed
+- `inspect` and the start of `convert` count the slopes' extra parts in the part estimate (0.45 /
+  0.58 / 0.75 per stud cell worth a slope; 15 of 15 release runs inside the range).
+- The backend's layout helpers moved to `backends/layout_ops.py`, the slope pass lives in
+  `backends/slopes.py`.
+
+### Fixed
+- **Shape fidelity metric:** the sloped tops of slopes on the inner wall of hollow models counted as
+  outer surface, so round models read too high in 2.0.0 (sphere 2.35 instead of 2.05 mm, bunny 2.04
+  instead of 1.96 mm); and the side of a taller part beside a slope, showing above the slope's face,
+  was not counted. The 2.0.0 models were measured again (docs/benchmarks.md).
+- **Previews and step pictures:** that side above a slope was not drawn either, which left
+  small white holes next to slopes.
+
 ## [2.0.0] - 2026-11-15 - Tiles on by default
 
 Shape fidelity, first step (ROADMAP item 9 with issues #44 and #46): flat tops get smooth tiles by

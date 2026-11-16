@@ -35,6 +35,8 @@ PLATES_PER_UNIT: Final[dict[HeightUnit, int]] = {"brick": PLATES_PER_BRICK, "pla
 LEGO_MM_PER_STUD: Final = 8.0
 """Real stud pitch of a LEGO brick in millimetres."""
 _NDIM: Final = 3
+SLOPE_AXES: Final = (4, 2)
+"""Descent directions and slope kinds of :attr:`VoxelGrid.slopes`."""
 
 
 def lego_cell_height_mm(height_unit: HeightUnit) -> float:
@@ -62,6 +64,12 @@ class VoxelGrid:
             ``NaN`` elsewhere. ``None`` when no mesh said so (voxel files):
             no top is flat (product owner, 2026-11-12: voxel inputs get tiles
             only with ``parts.tiles=all``).
+        slopes: ``float32[x, y, z, 4, 2]`` - how much closer to the input mesh
+            a slope brings the model (mean mm over its sloped columns,
+            :mod:`mesh2brick.voxel.slopes`), per stud cell, descent direction
+            and kind; ``NaN`` where no slope fits or helps. ``None`` when no
+            mesh said so (voxel files, open meshes, plate cells): no slopes
+            beyond legolization's own pass.
     """
 
     occupancy: NDArray[np.bool_]
@@ -70,6 +78,7 @@ class VoxelGrid:
     pitch_mm: float = 8.0
     origin_mm: tuple[float, float, float] = field(default=(0.0, 0.0, 0.0))
     flat: NDArray[np.float32] | None = None
+    slopes: NDArray[np.float32] | None = None
 
     def __post_init__(self) -> None:
         occupancy = np.asarray(self.occupancy)
@@ -98,17 +107,12 @@ class VoxelGrid:
         if np.any(color[occupancy] < 0):
             msg = "occupied cells need a non-negative LDraw colour code"
             raise ValueError(msg)
-        if self.flat is not None:
-            flat = np.asarray(self.flat, dtype=np.float32)
-            if flat.shape != occupancy.shape:
-                msg = f"flat must have the shape {occupancy.shape}"
-                raise ValueError(msg)
-            if np.any(np.isfinite(flat) & ~occupancy):
-                msg = "flat marks cells that are not occupied"
-                raise ValueError(msg)
-            frozen_flat = flat.copy()
-            frozen_flat.setflags(write=False)
-            object.__setattr__(self, "flat", frozen_flat)
+        for name, cells_axes in (("flat", ()), ("slopes", SLOPE_AXES)):
+            object.__setattr__(
+                self,
+                name,
+                _cell_array(getattr(self, name), name, occupancy, cells_axes),
+            )
         frozen_occupancy = occupancy.copy()
         frozen_color = color.astype(np.int32, copy=True)
         frozen_occupancy.setflags(write=False)
@@ -194,7 +198,40 @@ class VoxelGrid:
                 if self.flat is not None and other.flat is not None
                 else self.flat is other.flat
             )
+            and (
+                np.array_equal(self.slopes, other.slopes, equal_nan=True)
+                if self.slopes is not None and other.slopes is not None
+                else self.slopes is other.slopes
+            )
         )
 
     def __hash__(self) -> int:
         return hash((self.shape, self.height_unit, self.pitch_mm, self.filled_count))
+
+
+def _cell_array(
+    values: NDArray[np.float32] | None,
+    name: str,
+    occupancy: NDArray[np.bool_],
+    extra: tuple[int, ...],
+) -> NDArray[np.float32] | None:
+    """A frozen per-cell float array (``NaN``: unmarked), checked against ``occupancy``.
+
+    ``extra`` are trailing axes per cell (:data:`SLOPE_AXES` for the slopes);
+    a cell may only be marked where it is occupied.
+    """
+    if values is None:
+        return None
+    array = np.asarray(values, dtype=np.float32)
+    if array.shape != (*occupancy.shape, *extra):
+        msg = f"{name} must have the shape {(*occupancy.shape, *extra)}"
+        raise ValueError(msg)
+    marked = np.isfinite(array)
+    if extra:
+        marked = marked.any(axis=tuple(range(3, 3 + len(extra))))
+    if np.any(marked & ~occupancy):
+        msg = f"{name} marks cells that are not occupied"
+        raise ValueError(msg)
+    frozen = array.copy()
+    frozen.setflags(write=False)
+    return frozen
