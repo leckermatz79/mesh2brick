@@ -6,6 +6,27 @@ phases (`v0.<phase>.0`) until 1.0.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-16 - At most +15 % parts for slopes
+
+The product owner's decision after the 2.1.0 pictures (issue #51): slopes add at most 15 % parts per
+model by default (`parts.slopes_max_share: 0.15`); the slopes that bring the model closest to its 3D
+model come first, the other stairs keep their steps and the run says how many. Models that stay
+under 15 % are unchanged (bunny, rocket, Duo). Sphere +21.8 % → +14.9 % parts (deviation 1.88 / 4.35
+instead of 1.86 / 4.33 mm), vertex-colour sphere +22.2 % → +14.9 % (1.89 / 4.37 instead of 1.86 /
+4.35), toadstool +15.5 % → +14.9 % (1.75 / 4.20, the same), torus +31.0 % → +14.9 % (1.73 / 4.26
+instead of 1.65 / 4.12); every model stays one stable piece (docs/benchmarks.md, "Slopes within
++15 % parts").
+
+### Changed
+- `parts.slopes_max_share` defaults to 0.15 (2.1.0: off). Joined pieces give parts back, so the pass
+  runs without the limit first and keeps that result when it stays within 15 %; otherwise it takes
+  the largest running limit that ends within. `null` turns the limit off.
+- The slope note counts stairs once each ("N stair(s) keep their step: a slope would add more than 2
+  parts there" / "... parts limit (+15%) reached"); 2.1.0 counted every site tried (bunny 40 → 21).
+
+### Added
+- `scripts/benchmark_release.py --only NAME` runs just the given fixtures (the castle always runs).
+
 ## [2.1.0] - 2026-11-16 - Slopes on round shapes
 
 Shape fidelity, second step (ROADMAP item 8, issue #51, ADR 0021): round shapes get slopes where they

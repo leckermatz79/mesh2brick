@@ -105,8 +105,9 @@ uv run mesh2brick convert model.stl -o out/ --set "parts.categories=[brick, plat
 # piece (checked again, undone otherwise). Slopes LEGO does not make in a colour stay stairs (the
 # run counts them). Voxel files get only legolization's own slopes. As in 2.0:
 uv run mesh2brick convert model.stl -o out/ --set parts.slopes=preserve
-# Slopes cost parts (round models +10 % to +30 %); at most +15 % for slopes, best first:
-# --set parts.slopes_max_share=0.15. No slopes at all: --set "parts.categories=[brick, plate, tile]"
+# Slopes cost parts: at most +15 % per model by default, the slopes that bring the model closest
+# first (the run says how many stairs keep their step); no limit: --set parts.slopes_max_share=null.
+# No slopes at all: --set "parts.categories=[brick, plate, tile]"
 
 # Override any setting from mesh2brick.yaml on the command line
 uv run mesh2brick place model.vox --set placement.strategy=greedy --set placement.seed=3

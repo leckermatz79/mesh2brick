@@ -88,7 +88,7 @@ from mesh2brick.backends.slopes import (
     SLOPES_TIME_NOTE,
     SLOPES_UNDONE_NOTE,
     SlopeReport,
-    apply_slopes,
+    apply_slopes_within,
 )
 from mesh2brick.catalog.rebrickable import available_colors
 from mesh2brick.catalog.whitelist import (
@@ -1904,17 +1904,13 @@ class LegolizationBackend:
         if not stability.checked or left < tile_reserve_s(len(layout)):
             return _Sloping(notes=(SLOPES_TIME_NOTE,), skipped=True)
         before = layout.copy()
-        report = apply_slopes(
+        report = apply_slopes_within(
             layout,
             sites,
+            max_share=parts.slopes_max_share,
             allowed=allowed.parts,
             slopes=slopes,
             produced=produced_in if parts.availability != "report" else _anything,
-            max_added=(
-                None
-                if parts.slopes_max_share is None
-                else math.floor(parts.slopes_max_share * len(layout))
-            ),
         )
         notes: tuple[str, ...] = (
             (report.summary(),) if report.count or report.colour else ()

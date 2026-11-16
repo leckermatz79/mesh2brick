@@ -1,16 +1,23 @@
 # Projektstatus
 
-Stand: 2026-11-16 · **ROADMAP 8 – mehr Dachsteine ([#51](https://github.com/leckermatz79/mesh2brick/issues/51)): fertig, [PR #52](https://github.com/leckermatz79/mesh2brick/pull/52) wartet auf dich** (Ziel-Release 2.1.0) · davor [2.0.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.0.0) (Fliesen standardmäßig an) · Nächster Schritt: deine zwei Fragen unten, dann Merge und Tag v2.1.0
+Stand: 2026-11-16 · **2.1.1: Dachsteine höchstens +15 % Teile (deine Entscheidung), PR wartet auf dich** · davor [2.1.0 veröffentlicht](https://github.com/leckermatz79/mesh2brick/releases/tag/v2.1.0): ROADMAP 8 – mehr Dachsteine ([#51](https://github.com/leckermatz79/mesh2brick/issues/51), PR [#52](https://github.com/leckermatz79/mesh2brick/pull/52)) · Nächster Schritt: Merge und Tag v2.1.1, dann ROADMAP 10
 Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md](PLAN.md) · Messwerte: [benchmarks.md](benchmarks.md) · [Beispielgalerie](gallery/README.md) · Was 1.0 kann: [CHANGELOG.md](../CHANGELOG.md)
 
 ## Fazit in zwei Sätzen
 
 - **Runde Formen bekommen jetzt Dachsteine, und zwar nur dort, wo ein Dachstein näher am 3D-Modell liegt als die Voxelstufe:** Kugel, Hase, Fliegenpilz und Torus kommen ihrem Modell im Mittel 9–13 % näher (Kugel 2,05 → 1,86 mm), statt 10 sind jetzt 1.080 Dachsteine von außen sichtbar, und alle 15 Läufe bleiben ein stabiles Stück.
-- Kästen, Burg und Herz sind Teil für Teil und Pixel für Pixel wie in 2.0.0; der Preis sind mehr Teile (+8 % bis +31 %), darum die erste Frage unten.
+- Kästen, Burg und Herz sind Teil für Teil und Pixel für Pixel wie in 2.0.0; Dachsteine kosten höchstens +15 % Teile (seit 2.1.1, deine Wahl), die wertvollsten zuerst.
 
-![Vorher (2.0.0) und nachher (2.1): Fliegenpilz, Hase, Torus](gallery/roadmap8b-slopes-2.1.png)
+![Vorher (2.0.0) und nachher (2.1.1): Fliegenpilz, Hase, Torus](gallery/roadmap8b-slopes-2.1.png)
 
-## Erledigt: ROADMAP 8 – mehr Dachsteine (Issue #51, PR #52)
+## In Arbeit: 2.1.1 – höchstens +15 % Teile für Dachsteine
+
+- **Deine Entscheidung vom 2026-11-16 umgesetzt:** `parts.slopes_max_share` ist jetzt standardmäßig 0,15. Die Dachsteine, die das Modell am nächsten ans 3D-Modell bringen, kommen zuerst; danach bleiben die übrigen Stufen, und der Lauf sagt, wie viele („74 stair(s) keep their step: parts limit (+15%) reached“). Modelle, die ohnehin unter 15 % bleiben, ändern sich nicht (Hase, Rakete, Duo).
+- **Neu gerechnet** (Kugel, Vertex-Kugel, Fliegenpilz, Torus, Hase zur Kontrolle, Burg; auf Akku, Zeiten nur Richtwerte): alle ein stabiles Stück, alle bei +14,9 % Teilen. Die Grenze kostet die Kugeln 0,02–0,03 mm, den Fliegenpilz nichts, den Torus am meisten (1,73 statt 1,65 mm). Teileschätzung 15 von 15 im Bereich.
+- **Zählung ehrlicher:** Der Hinweis zählt jede Stufe jetzt einmal (2.1.0 zählte jeden geprüften Platz: Hase 40 statt 21).
+- 2.1.0 bleibt, wie veröffentlicht (ohne Grenze); 2.1.1 bringt die Grenze (deine Wahl). Release-Seite 2.1.0 ist angelegt.
+
+## Erledigt: 2.1.0 – ROADMAP 8, mehr Dachsteine (Issue #51, PR #52, veröffentlicht 2026-11-16)
 
 - **Zuerst gemessen: legolizations ältere Variante `smooth`.** Sie setzt an runden Modellen 13–27 sichtbare Dachsteine, bei gleicher Teilezahl und stabil, **aber die Abweichung sinkt nicht** (Kugel 2,05 → 2,06 mm, Rakete 1,46 → 1,48 mm). Sie schaut nur auf die Voxel: Bei etwa der Hälfte der Stufen liegt das 3D-Modell dort, wo die Stufe schon näher ist als ein Dachstein.
 - **Dabei zwei Fehler in der 2.0-Messgröße gefunden und behoben.** (1) Dachsteine auf der Innenwand hohler Modelle (dorthin setzt legolization die meisten seiner Dachsteine) wurden als Außenfläche gemessen. Die runden Modelle standen in 2.0.0 deshalb zu schlecht da (Kugel 2,35 statt 2,05 mm, Hase 2,04 statt 1,96 mm). (2) Steht neben einem Dachstein ein höherer Stein, ist dessen Seite über der Schräge sichtbar. Diese Fläche fehlte in der Messung und in den Bildern; dort sah man kleine weiße Löcher. Beides ist korrigiert. Alle Vergleiche hier messen 2.0.0 neu mit der korrigierten Messgröße. Kästen, Burg und Duo ändern sich dadurch nicht.
@@ -22,7 +29,7 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
   - **Zeit:** Fehlt die Zeit für die Stabilitätsprüfung, wird der Nachlauf übersprungen, und Kommandozeile und Deckblatt sagen „Dachsteine übersprungen: Zeitgrenze; empfohlen --time 10min“. Das ist in keinem Lauf passiert.
 - **Darstellung und Export:** Dachsteine in allen vier Richtungen in Vorschau, Schrittbildern, „zuerst“-Feldern und Teilekasten („Dachstein 2 × 2“ usw. mit BrickLink-/Rebrickable-Nummer); LDraw-Datei streng wieder eingelesen, Teilelisten stimmen (alle 15 Läufe).
 - **Teileschätzung** von `inspect` zählt die Dachsteine jetzt mit; 15 von 15 Läufen im angezeigten Bereich.
-- **Einstellungen:** `parts.slopes: mesh` (neu, Standard), `preserve` (wie 2.0.0), `smooth` (legolizations alte Variante); `parts.slopes_max_share` begrenzt die Mehrteile (aus, siehe Frage 1). README (de/en), Beispiel-Config und SPEC §4 erklären es. Begründung: [ADR 0021](adr/0021-slopes-where-they-bring-the-model-closer-to-the-mesh.md).
+- **Einstellungen:** `parts.slopes: mesh` (neu, Standard), `preserve` (wie 2.0.0), `smooth` (legolizations alte Variante); `parts.slopes_max_share` begrenzt die Mehrteile (in 2.1.0 aus, seit 2.1.1 standardmäßig 15 %). README (de/en), Beispiel-Config und SPEC §4 erklären es. Begründung: [ADR 0021](adr/0021-slopes-where-they-bring-the-model-closer-to-the-mesh.md).
 
 | Abnahme (Issue #51) | Ergebnis |
 |---|---|
@@ -31,28 +38,28 @@ Repo: https://github.com/leckermatz79/mesh2brick (öffentlich) · Plan: [PLAN.md
 | Sichtbare Dachsteine je Modell deutlich mehr, Zahl ausweisen | **ja**: Hase 4 → 133, Kugel 0 → 272, Fliegenpilz 5 → 197, Torus 0 → 165, Vertex-Kugel 0 → 279, Rakete 0 → 33, Duo 0 → 109 (alle Testmodelle zusammen 10 → 1.080) |
 | Hase höchstens doppelt so lange; Burg und Texturwürfel unter 5 Minuten | **ja**: Hase 122 → 138 s (1,13-fach); Burg 249 s, Texturwürfel 243 s |
 | Kästen und L-Winkel pixelgleich wie 2.0.0 | **ja**: Würfel (STEP, STL), Texturwürfel, L-Winkel, zwei Körper, dazu Burg und Herz: gleiche Teile, gleiche Schritte, gleiche Bilder |
-| Teilezuwachs ausweisen, Richtwert +15 % | **teilweise**: Rakete +8 %, Duo +10 % / +15 %, Hase +14 %, Fliegenpilz +16 %, Kugeln +22 %, **Torus +31 %**; der Lauf meldet alles über 15 % (siehe Frage 1) |
+| Teilezuwachs ausweisen, Richtwert +15 % | **ja, seit 2.1.1 als Grenze** (deine Entscheidung): höchstens +15 %; in 2.1.0 ohne Grenze Kugeln +22 %, Torus +31 % |
 | Dachsteine, die es in der Farbe nicht gibt, bleiben Stufen und werden gezählt | **ja**: Duo 38 (32 Noppen) / 93 (48 Noppen) Stufen, Farbe Bright Green, 3039 und 4286 |
 | Abweichung nirgends schlechter | **ja**: Rakete 1,46 → 1,35 mm, Duo 1,72 → 1,61 (32) und 1,76 → 1,64 (48), Burg, Kästen, Herz unverändert |
 | Tests: Neigung an Keil 45°, Keil 30°, Kuppel; Ersetzen mit Stabilitätsprüfung; Rücknahme | **ja**: 51 neue Tests, 927 grün |
 | Darstellung, Exporte, Schichtschritte, „zuerst“-Felder | **ja** (siehe oben) |
 | Texturwürfel-PDF unter 10 MB | **ja**: 9,83 MB (unverändert) |
 
-## Messwerte 2.1 (Release-Lauf, Standardeinstellungen, am Netz)
+## Messwerte 2.1.1 (Release-Läufe, Standardeinstellungen)
 
-| Modell | Teile 2.0.0 → 2.1 | Dachsteine (sichtbar) | Abweichung Mittel / 95 % in mm | Zeit |
+| Modell | Teile 2.0.0 → 2.1.1 | Dachsteine (sichtbar) | Abweichung Mittel / 95 % in mm | Zeit |
 |---|---|---|---|---|
 | Hase | 873 → 997 (+14 %) | 14 (4) → 143 (133) | 1,96 / 4,40 → 1,78 / 4,12 | 122 → 138 s |
-| Kugel | 1.499 → 1.826 (+22 %) | 46 (0) → 318 (272) | 2,05 / 4,59 → 1,86 / 4,33 | 263 → 261 s |
-| Vertex-Kugel | 1.519 → 1.856 (+22 %) | 46 (0) → 325 (279) | 2,06 / 4,58 → 1,86 / 4,35 | 261 → 263 s |
-| Fliegenpilz | 1.239 → 1.431 (+16 %) | 16 (5) → 208 (197) | 1,96 / 4,50 → 1,75 / 4,20 | 255 → 261 s |
-| Torus | 552 → 723 (+31 %) | 4 (0) → 169 (165) | 1,90 / 4,46 → 1,65 / 4,12 | 33 → 46 s |
+| Kugel | 1.499 → 1.723 (+15 %; 2.1.0: +22 %) | 46 (0) → 241 (195) | 2,05 / 4,59 → 1,88 / 4,35 | 263 → 267 s* |
+| Vertex-Kugel | 1.519 → 1.746 (+15 %; 2.1.0: +22 %) | 46 (0) → 247 (201) | 2,06 / 4,58 → 1,89 / 4,37 | 261 → 267 s* |
+| Fliegenpilz | 1.239 → 1.424 (+15 %; 2.1.0: +16 %) | 16 (5) → 201 (190) | 1,96 / 4,50 → 1,75 / 4,20 | 255 → 263 s* |
+| Torus | 552 → 634 (+15 %; 2.1.0: +31 %) | 4 (0) → 95 (91) | 1,90 / 4,46 → 1,73 / 4,26 | 33 → 41 s* |
 | Rakete | 263 → 285 (+8 %) | 0 → 33 (33) | 1,46 / 3,18 → 1,35 / 3,18 | 18 → 20 s |
 | Duo, 32 Noppen (nur lokal) | 1.081 → 1.190 (+10 %) | 0 → 109 (109) | 1,72 / 4,23 → 1,61 / 4,03 | 143 → 156 s |
 | Duo, 48 Noppen, 20 min (nur lokal) | 2.308 → 2.650 (+15 %) | 0 → 311 (311) | 1,76 / 4,29 → 1,64 / 4,09 | 1.151 → 1.160 s |
 | Würfel, Texturwürfel, L-Winkel, zwei Körper, Burg, Herz | unverändert | unverändert | unverändert | gleich (±4 s) |
 
-Bilder: `out/slopes/vorher-nachher/` (alle Modelle, links 2.0.0, rechts 2.1; Duo nur lokal), Galerie neu mit Dachsteinen. Alle Läufe in `out/slopes/mesh/`, die Grundlinie `smooth` in `out/slopes/smooth/`.
+\* auf Akku gerechnet (Richtwert). Bilder: `out/slopes/vorher-nachher-2.1.1/` (links 2.0.0, rechts 2.1.1; Duo nur lokal), 2.1.0 in `out/slopes/vorher-nachher/`; Galerie neu. Läufe: `out/slopes/mesh/` (2.1.0), `out/slopes/cap15/` (2.1.1, neu gerechnete Modelle), zusammen in `out/slopes/release-2.1.1/`; die Grundlinie `smooth` in `out/slopes/smooth/`.
 
 ## Davor: 2.0.0 (veröffentlicht 2026-11-15)
 
@@ -60,7 +67,7 @@ Bilder: `out/slopes/vorher-nachher/` (alle Modelle, links 2.0.0, rechts 2.1; Duo
 
 ## Als Nächstes
 
-1. **Deine zwei Fragen unten**, dann Merge, Tag v2.1.0 und Release-Seite (Befehle im PR).
+1. **Merge und Tag v2.1.1** (Befehle im PR), dann lege ich die Release-Seite an.
 2. **ROADMAP 10 – runde Teile** (Reihenfolge in 2.0: 9, 8, dann 10, 11, 12, 13). Die Messgröße zeigt, wo es noch hängt: die Unterseiten runder Formen (dort bräuchte es umgedrehte Dachsteine, die legolizations Katalog nicht hat) und die Stufen, die ein Dachstein zu teuer machen würde. ROADMAP 12 (Farben schon beim Platzieren) bekommt die gezählten Stufen von Duo als Ausgangspunkt. Upstream: Antworten auf legolization #88/#89, #90/#91 und #99 sowie trimesh #2669 abwarten.
 
 Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelheiten in [CHANGELOG.md](../CHANGELOG.md) und in den [Issues mit Label `roadmap`](https://github.com/leckermatz79/mesh2brick/issues?q=label%3Aroadmap).
@@ -87,7 +94,8 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | Fliesen nur auf waagerechten Flächen. Schräge Flächen bekommen seit 2.1 Dachsteine, aber nur in den drei Neigungen, die legolization kennt (45° und 33°); ein flaches Dach (unter 8°) behält Noppen. | akzeptieren |
 | Kleine Modelle mit vielen umgebauten Steinen brauchen etwas länger, weil legolizations Schrittsuche mehr Teile sieht (L-Winkel 30 → 38 s, zwei Körper 163 → 182 s). | akzeptieren |
 | Liegt eine flache Fläche mehr als eine Platte von der Voxel-Oberkante entfernt, kommt die Fliese nur eine Platte näher (nur bei der Burg, 32 von 375 Fliesenfeldern). Platten werden nie tiefer gelegt. | akzeptieren |
-| Dachsteine kosten Teile: Wo ein Dachstein sitzt, werden die Steine darunter zugeschnitten (im Schnitt gut 1 Teil mehr pro Dachstein). Runde Modelle haben +8 % bis +31 % Teile (Torus am meisten); der Lauf meldet alles über +15 %. Stellen, die mehr als 2 Teile kosten würden, behalten ihre Stufe (30–200 je rundem Modell). | deine Frage 1; Grenze einstellbar mit `--set parts.slopes_max_share=0.15` |
+| Dachsteine kosten Teile: Wo ein Dachstein sitzt, werden die Steine darunter zugeschnitten (im Schnitt gut 1 Teil mehr pro Dachstein). Seit 2.1.1 höchstens +15 % pro Modell (die wertvollsten zuerst); Stellen, die mehr als 2 Teile kosten würden, behalten ihre Stufe. Beim Torus fällt so etwa die Hälfte der möglichen Dachsteine weg. | von dir so entschieden (2026-11-16); ohne Grenze: `--set parts.slopes_max_share=null` |
+| Kleine Details wirken mit Dachsteinen unruhig: Duos linkes Auge hat bei 32 Noppen einen nur eine Zelle breiten weißen Rand, der schon in 2.0.0 stufig aussah; Dachsteine darauf machen es nicht ruhiger. Bei 48 Noppen passen die Dachsteine besser (deine Beobachtung). | Modellgröße; bei Bedarf `--size` größer wählen |
 | Nur nach oben gerichtete Flächen bekommen Dachsteine. Die Unterseiten runder Formen (untere Kugelhälfte, Unterseite des Fliegenpilz-Huts) behalten Stufen: Umgedrehte Dachsteine gibt es in legolizations Katalog nicht. | ROADMAP 10 oder später (eigene Teile im Katalog) |
 | Dachsteine nur bei geschlossenen 3D-Modellen (innen und außen müssen klar sein) und in Steinhöhe; offene Netze (die Burg aus überlappenden Kästen) und `voxel.height_unit: plate` bekommen nur legolizations eigene Dachsteine. | akzeptieren; bei Bedarf eigener Code |
 | Dachsteine, die LEGO in einer Farbe nicht herstellt, bleiben Stufen (Duo: 38 Stufen in Bright Green, 3039 und 4286). | ROADMAP 12 (Farben schon beim Platzieren) |
@@ -165,13 +173,13 @@ Alle früheren Punkte (1.x, Roadmap 1–8 der ersten Liste) sind fertig; Einzelh
 | 2026-11-15 | Turmränder: Noppen oder Fliesen? | **Rand-Noppen bleibt Standard.** Für die Burg gefallen dir die Noppen auf den Türmen besser; das liegt an dieser Burg, beide Varianten sind sehr gut. „Rand-Fliesen“ bleibt als Einstellung (`--set parts.tiles_overhang=true`). Weiter mit Galerie, CHANGELOG 2.0.0 und Tag. |
 | 2026-11-15 | Studio-Prüfung mit Fliesen (Abnahme #42) | **Erledigt** (Duo, 2.0.0, lokal): keine Überlappungen, keine schwebenden Fliesen, Fliesen als „Tile“ angezeigt. 2.0.0 ist veröffentlicht. |
 | 2026-11-15 | Wie geht ROADMAP 8 (mehr Dachsteine)? | **Eigener Nachlauf in `place/` wie bei den Fliesen, kein Eingriff in legolization** (damit hängt nichts an einem Upstream-PR, die Fork-Frage stellt sich nicht). Erst `smooth` gegen `preserve` messen; Messgröße ist die Oberflächenabweichung; ein Dachstein darf Material über die Voxelform hinaus hinzufügen, wenn er dem Netz näher kommt; Dachsteine, die es in der Farbe nicht gibt, bleiben Stufen und werden gezählt (für Punkt 12); Burg und Texturwürfel unter 5 Minuten; Teilezuwachs ausweisen, Richtwert +15 %. Ziel-Release 2.1.0. Umgesetzt in [#51](https://github.com/leckermatz79/mesh2brick/issues/51). |
+| 2026-11-16 | Obergrenze für die Mehrteile durch Dachsteine? | **Ja, standardmäßig +15 %** (`parts.slopes_max_share=0.15`): die wertvollsten Dachsteine zuerst, der Rest bleibt Stufe, der Lauf meldet, was wegfällt. Ohne Grenze: `--set parts.slopes_max_share=null`. |
+| 2026-11-16 | Optik der Rundungen (Dachsteine und Stufen im Wechsel)? | **So lassen.** Beobachtungen von dir: Duos linkes Auge sieht in beiden Modellen etwas seltsam aus, in der kleinen Duo-Variante ist die Verteilung der Dachsteine nicht ideal (liegt an der Modellgröße, bei 48 Noppen passen sie); Rakete ok; an Kugel und Vertex-Kugel fehlen auf der unteren Hälfte umgedrehte Dachsteine (kommt in einem späteren Schritt). |
+| 2026-11-16 | v2.1.0 war schon gepusht, bevor die Grenze drin war | **v2.1.0 bleibt** (veröffentlichte Tags werden nicht verschoben, 2.1.0 ist in sich stimmig: ohne Grenze); die Grenze kommt als **2.1.1**. Release-Seite 2.1.0 angelegt. |
 
 ## Fragen an dich
 
-Die Bilder dazu: [gallery/roadmap8b-slopes-2.1.png](gallery/roadmap8b-slopes-2.1.png) und lokal `out/slopes/vorher-nachher/` (alle Modelle, links 2.0.0, rechts 2.1).
-
-1. **Obergrenze für die Mehrteile durch Dachsteine?** Ohne Grenze: Torus +31 % Teile, Kugeln +22 %, Fliegenpilz +16 %, Hase +14 %, Duo +10 %. Mit `--set parts.slopes_max_share=0.15` (die wertvollsten Dachsteine zuerst, der Rest bleibt Stufe): Torus +15 % und 1,74 statt 1,66 mm Abweichung (ein Drittel des Gewinns weg), Kugel +15 % und 1,89 statt 1,87 mm (kaum ein Unterschied). **Standardannahme: keine Grenze, der Lauf meldet nur mehr als +15 %** (wie bei den Fliesen); die Grenze bleibt als Einstellung.
-2. **Gefällt dir die Optik der Rundungen?** Dachsteine stehen nur dort, wo sie dem Modell näher kommen. Darum wechseln sich auf einer Rundung Dachsteine und Stufen ab (etwa die Hälfte der Stufen bleibt), und Dachsteine zeigen in alle vier Richtungen. Ganz vereinzelte Dachsteine sind selten (0–3 % an Kugel, Hase, Fliegenpilz, Torus; 7 % an Duo, 12 % an der Rakete). Von der Seite, auf die man blickt, wirkt die Fläche glatter; Schrägen, die vom Betrachter weg abfallen, sieht man nur als schmale Kanten. **Standardannahme: so lassen.** Wenn dir ruhigere Flächen lieber sind, wäre eine Regel wie bei den Fliesen denkbar („nur zusammenhängende Dachstein-Flächen“).
+Keine offenen Fragen. Deine Antworten vom 2026-11-16 stehen unter „Deine Entscheidungen“.
 
 ## Offene Kleinigkeiten
 

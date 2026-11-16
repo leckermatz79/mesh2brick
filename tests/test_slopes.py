@@ -394,6 +394,36 @@ def test_a_parts_limit_keeps_the_best_slopes() -> None:
     assert _studs(limited, _slope(limited)) == {(2, 0)}  # the first, best one
 
 
+def _rows_of_stairs(rows: int) -> Any:
+    """``rows`` 2 x 4 bricks, each with a 1 x 4 brick on its front row."""
+    bricks = []
+    for row in range(rows):
+        bricks += [("brick_2x4", 0, 2 * row, 0, 0), ("brick_1x4", 0, 2 * row, 3, 0)]
+    return _layout_with(*bricks)
+
+
+def test_the_parts_limit_holds_after_pieces_are_joined_again() -> None:
+    from mesh2brick.backends.slopes import apply_slopes_within  # noqa: PLC0415
+
+    # Four sites, each costs one part (the 1 x 2 left of the 1 x 4): +50 %.
+    sites = [_site(((2, 2 * row),), (1, 0)) for row in range(4)]
+    free = _rows_of_stairs(4)
+    assert apply_slopes(free, sites).added == 4
+    limited = _rows_of_stairs(4)
+    report = apply_slopes_within(limited, sites, max_share=0.25)  # 2 of 8
+    assert (report.count, report.added, report.limited) == (2, 2, 2)
+    assert "parts limit (+25%) reached" in report.summary()
+    assert len(limited) == 10
+    under = _rows_of_stairs(4)
+    same = apply_slopes_within(under, sites, max_share=1.0)  # never reached
+    assert same.count == 4
+    assert same.limited == 0
+    assert {(b.part_key, b.x, b.y, b.layer, b.yaw) for b in under} == {
+        (b.part_key, b.x, b.y, b.layer, b.yaw) for b in free
+    }
+    assert apply_slopes_within(_rows_of_stairs(4), sites, max_share=None).count == 4
+
+
 def test_the_part_estimate_counts_the_slopes() -> None:
     from mesh2brick.voxel.estimate import (  # noqa: PLC0415
         SLOPE_PARTS_PER_CELL,
@@ -423,8 +453,9 @@ def _copy(grid: VoxelGrid, **changes: Any) -> VoxelGrid:
 
 
 def test_the_parts_limit_is_a_setting() -> None:
-    assert _settings().parts.slopes_max_share is None
-    assert _settings("parts.slopes_max_share=0.15").parts.slopes_max_share == 0.15
+    # Product owner, 2026-11-16: +15 % by default.
+    assert _settings().parts.slopes_max_share == 0.15
+    assert _settings("parts.slopes_max_share=null").parts.slopes_max_share is None
     with pytest.raises(ValueError, match="slopes_max_share"):
         _settings("parts.slopes_max_share=-1")
 

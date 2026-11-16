@@ -183,11 +183,11 @@ class PartsConfig(_Section):
     (2.0: only exact profile matches, mostly inside hollow walls); ``smooth``
     is legolization's older pass (1 x 1 columns at descending stairs become
     45° slopes, adding material outside the shape, no mesh involved)."""
-    slopes_max_share: Annotated[float, Field(ge=0.0)] | None = None
+    slopes_max_share: Annotated[float, Field(ge=0.0)] | None = 0.15
     """At most this share of extra parts for slopes with ``slopes: mesh``
-    (0.15 = +15 %; the slopes that bring the model closest come first, the
-    other stairs keep their steps). ``None`` (default): no limit; the run
-    reports more than the +15 % guide (as for tiles)."""
+    (default 0.15 = +15 %, product owner 2026-11-16): the slopes that bring
+    the model closest come first, the other stairs keep their steps and the
+    run says how many. ``None``: no limit (the run reports more than +15 %)."""
     tiles: Literal["flat", "all"] = "flat"
     """Where tiles go when ``tile`` is in ``categories`` (ROADMAP 9, ADR 0020):
     ``flat`` only on open tops the input mesh renders flat (a box's top, a

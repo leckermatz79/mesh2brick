@@ -110,9 +110,9 @@ uv run mesh2brick convert modell.stl -o out/ --set "parts.categories=[brick, pla
 # in einer Farbe nicht herstellt, bleiben Stufen (der Lauf zählt sie). Voxeldateien bekommen nur
 # legolizations eigene Dachsteine. Wie in 2.0:
 uv run mesh2brick convert modell.stl -o out/ --set parts.slopes=preserve
-# Dachsteine kosten Teile (runde Modelle +10 % bis +30 %); höchstens +15 % für Dachsteine, die
-# besten zuerst: --set parts.slopes_max_share=0.15. Ganz ohne Dachsteine:
-# --set "parts.categories=[brick, plate, tile]"
+# Dachsteine kosten Teile: standardmäßig höchstens +15 % pro Modell, die Dachsteine, die das Modell
+# am nächsten ans 3D-Modell bringen, zuerst (der Lauf sagt, wie viele Stufen bleiben); ohne Grenze:
+# --set parts.slopes_max_share=null. Ganz ohne Dachsteine: --set "parts.categories=[brick, plate, tile]"
 
 # Jede Einstellung aus mesh2brick.yaml lässt sich auf der Kommandozeile überschreiben
 uv run mesh2brick place modell.vox --set placement.strategy=greedy --set placement.seed=3
